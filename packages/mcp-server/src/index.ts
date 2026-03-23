@@ -18,7 +18,7 @@ server.tool(
   {
     query: z.string().describe('Search query (e.g., "postgres", "slack", "file system")'),
     category: z.enum(CATEGORIES).optional().describe('Filter by category'),
-    sort_by: z.enum(['stars', 'updated', 'name']).optional().default('stars').describe('Sort results'),
+    sort_by: z.enum(['stars', 'updated', 'name', 'downloads']).optional().default('stars').describe('Sort results'),
     limit: z.number().min(1).max(20).optional().default(10).describe('Max results (1-20)'),
   },
   async ({ query, category, sort_by, limit }) => {
@@ -27,7 +27,7 @@ server.tool(
       const results = servers.map(s => ({
         name: s.name,
         slug: s.slug,
-        description: s.description,
+        description: s.description ?? '',
         category: s.category,
         stars: s.github_stars,
         license: s.github_license,
@@ -75,7 +75,7 @@ server.tool(
         github_license: detail_server.github_license,
         github_last_push: detail_server.github_last_push,
         is_official: detail_server.is_official,
-        tools: detail_server.tools.map(t => ({
+        tools: (detail_server.tools ?? []).map(t => ({
           name: t.tool_name,
           description: t.tool_description,
           input_schema: t.input_schema,
