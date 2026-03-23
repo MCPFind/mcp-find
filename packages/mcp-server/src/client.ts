@@ -21,7 +21,7 @@ export async function searchServers(params: {
   const res = await fetch(url.toString(), { signal: AbortSignal.timeout(10_000) });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   const data: ServerListResponse = await res.json();
-  return data.servers;
+  return data?.servers ?? [];
 }
 
 export async function getServerDetails(serverId: string): Promise<ServerWithTools | null> {
