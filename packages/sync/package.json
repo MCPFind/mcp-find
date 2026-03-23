@@ -15,9 +15,11 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@mcpfind/shared": "workspace:*"
+    "@mcpfind/shared": "workspace:*",
+    "@supabase/supabase-js": "^2.100.0"
   },
   "devDependencies": {
+    "@types/node": "^22.19.15",
     "tsx": "^4",
     "typescript": "^5"
   }
