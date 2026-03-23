@@ -28,6 +28,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid sort' }, { status: 400 });
   }
 
+  // Validate status
+  if (!['active', 'deprecated'].includes(status)) {
+    return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
+  }
+
   try {
     const result = await listServers({ q, category, sort, page, limit, status });
     return NextResponse.json(result);
