@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@mcpfind/shared": "workspace:*",
+    "@supabase/supabase-js": "^2.100.0",
     "next": "^14",
     "react": "^18",
     "react-dom": "^18"
