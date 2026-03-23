@@ -18,9 +18,12 @@
     }
   },
   "dependencies": {
-    "@mcpfind/shared": "workspace:*"
+    "@mcpfind/shared": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@types/node": "^25.5.0",
     "typescript": "^5"
   }
 }
