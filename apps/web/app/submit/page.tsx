@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { SITE_NAME } from '@mcpfind/shared';
+import { SITE_NAME, REPO_URL } from '@mcpfind/shared';
 
 export const metadata: Metadata = {
   title: `Submit a Server | ${SITE_NAME}`,
@@ -16,7 +16,7 @@ export default function SubmitPage() {
         <code className="bg-gray-100 px-1 rounded">community-servers.yml</code>.
       </p>
       <a
-        href="https://github.com/gusmar2017/mcp-find/blob/main/CONTRIBUTING.md"
+        href={`${REPO_URL}/blob/main/CONTRIBUTING.md`}
         className="mt-6 text-blue-600 hover:underline"
       >
         Read the contributing guide &rarr;

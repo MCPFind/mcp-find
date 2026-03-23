@@ -3,6 +3,7 @@ import type { ClientType } from './types';
 export const SITE_NAME = 'MCP Find';
 export const SITE_URL = 'https://mcpfind.org';
 export const SITE_DESCRIPTION = 'The open-source way to find MCP servers. AI-agent optimized.';
+export const REPO_URL = 'https://github.com/gusmar2017/mcp-find';
 
 export const REGISTRY_API_BASE = 'https://registry.modelcontextprotocol.io';
 export const REGISTRY_SERVERS_ENDPOINT = '/v0/servers';

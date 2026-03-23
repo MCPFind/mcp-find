@@ -47,7 +47,7 @@ export async function listServers(params: ServerListParams): Promise<ServerListR
   };
 }
 
-export async function getServerBySlug(slug: string): Promise<ServerWithTools | null> {
+export const getServerBySlug = cache(async (slug: string): Promise<ServerWithTools | null> => {
   const { data: server, error } = await supabase
     .from('servers')
     .select('*')
@@ -62,7 +62,7 @@ export async function getServerBySlug(slug: string): Promise<ServerWithTools | n
     .eq('server_id', server.id);
 
   return { ...server, tools: tools || [] } as ServerWithTools;
-}
+});
 
 export async function getServerCount(): Promise<number> {
   const { count } = await supabase
