@@ -104,3 +104,11 @@ ALTER TABLE server_tools ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Public read servers" ON servers FOR SELECT USING (true);
 CREATE POLICY "Public read tools" ON server_tools FOR SELECT USING (true);
+
+-- Fix 6: CHECK constraints for enum-like columns
+ALTER TABLE servers ADD CONSTRAINT chk_source CHECK (source IN ('registry', 'community'));
+ALTER TABLE servers ADD CONSTRAINT chk_registry_status CHECK (registry_status IN ('active', 'deprecated'));
+ALTER TABLE servers ADD CONSTRAINT chk_package_type CHECK (package_type IS NULL OR package_type IN ('npm', 'pypi', 'docker', 'other'));
+
+-- Fix 7: Unique constraint on server_tools
+ALTER TABLE server_tools ADD CONSTRAINT uq_server_tools UNIQUE (server_id, tool_name);

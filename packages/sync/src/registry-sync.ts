@@ -33,7 +33,14 @@ export async function syncFromRegistry(supabase: SupabaseClient<any, any, any>):
     const servers = data.servers || data.items || [];
     cursor = data.nextCursor || data.cursor;
 
+    const records = [];
     for (const server of servers) {
+      // Fix 8: Guard against missing id and name
+      if (!server.id && !server.name) {
+        console.warn('Skipping server with no id or name');
+        continue;
+      }
+
       // Extract package info from the packages array
       const pkg = server.packages?.[0];
       const packageName = pkg?.name || null;
@@ -69,15 +76,14 @@ export async function syncFromRegistry(supabase: SupabaseClient<any, any, any>):
         last_synced_at: new Date().toISOString(),
       };
 
-      const { error } = await supabase
-        .from('servers')
-        .upsert(record, { onConflict: 'id' });
+      records.push(record);
+    }
 
-      if (error) {
-        console.error(`Failed to upsert ${record.id}:`, error.message);
-      } else {
-        totalSynced++;
-      }
+    // Fix 1: Batch upsert all records for this page at once
+    if (records.length > 0) {
+      const { error } = await supabase.from('servers').upsert(records, { onConflict: 'id' });
+      if (error) console.error(`Batch upsert failed:`, error.message);
+      else totalSynced += records.length;
     }
 
     console.log(`Synced batch: ${servers.length} servers (total: ${totalSynced})`);

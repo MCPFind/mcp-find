@@ -69,6 +69,8 @@ export async function categorizeServers(
   const servers = rawServers as ServerRow[];
   let categorized = 0;
 
+  // Fix 2: Group servers by new category and issue one update per category
+  const updates: Map<string, string[]> = new Map();
   for (const server of servers) {
     const newCategory = categorizeServer(
       server.name,
@@ -77,15 +79,20 @@ export async function categorizeServers(
       server.package_name
     );
 
-    // Only update if category changed
     if (newCategory !== server.category) {
-      const { error: updateError } = await supabase
-        .from('servers')
-        .update({ category: newCategory })
-        .eq('id', server.id);
-
-      if (!updateError) categorized++;
+      const ids = updates.get(newCategory) || [];
+      ids.push(server.id);
+      updates.set(newCategory, ids);
     }
+  }
+
+  for (const [category, ids] of updates) {
+    const { error } = await supabase
+      .from('servers')
+      .update({ category })
+      .in('id', ids);
+
+    if (!error) categorized += ids.length;
   }
 
   return categorized;

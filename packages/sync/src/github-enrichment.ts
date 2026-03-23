@@ -14,11 +14,12 @@ export async function enrichWithGitHub(
   supabase: SupabaseClient<any, any, any>,
   githubToken: string
 ): Promise<number> {
-  // Get all servers with GitHub URLs that need enrichment
+  // Fix 3: Only enrich servers not updated in the last 24 hours (staleness filter)
   const { data: rawServers, error } = await supabase
     .from('servers')
     .select('id, github_url')
-    .not('github_url', 'is', null);
+    .not('github_url', 'is', null)
+    .or('updated_at.lt.' + new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() + ',github_stars.eq.0');
 
   if (error || !rawServers) {
     console.error('Failed to fetch servers for enrichment:', error?.message);
@@ -42,6 +43,15 @@ export async function enrichWithGitHub(
         `${GITHUB_API_BASE}/repos/${parsed.owner}/${parsed.repo}`,
         { headers }
       );
+
+      // Fix 4: Handle 403 rate limit with retry-after header
+      if (repoRes.status === 403) {
+        const retryAfter = repoRes.headers.get('retry-after');
+        const waitMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : 60000;
+        console.warn(`Rate limited, waiting ${waitMs}ms`);
+        await sleep(waitMs);
+        continue;
+      }
 
       if (!repoRes.ok) {
         console.warn(`GitHub API ${repoRes.status} for ${parsed.owner}/${parsed.repo}`);
