@@ -6,11 +6,9 @@ Two devs. One week. One shipped product.
 
 My co-founder Adam and I just launched MCP Find — an open-source directory for Model Context Protocol servers.
 
-Here's the honest version of the story:
+Here's the short version:
 
-The MCP ecosystem is growing fast. There are 2,000+ servers in the official registry. But the tooling around discovery is still rough — the registry is a YAML file, and every consumer-facing directory that exists is closed source.
-
-We thought: someone should build the open-source version of this. So we did.
+There are 2,000+ MCP servers in the official registry but the registry is literally a YAML file. And every directory built on top of it is closed source. We kept saying "someone should make an open-source version" until we got tired of saying it and just built one.
 
 **What we shipped in a week:**
 
@@ -23,11 +21,11 @@ We thought: someone should build the open-source version of this. So we did.
 
 User reviews, install tracking, a CLI, curated collections. Week one is about getting the core right. The rest goes on the roadmap.
 
-The one-week constraint was deliberate. It forces you to cut everything that isn't essential and ship something real instead of planning forever.
+Giving ourselves only a week was the best decision. You can't overthink when the clock's running out.
 
 Live: https://mcpfind.com
 Repo: https://github.com/[your-handle]/mcp-find
 
-If you work in AI tooling, developer tools, or the MCP ecosystem — I'd love to hear what you'd want from a directory like this. Happy to connect.
+If you've used MCP servers and have opinions on what every directory gets wrong, I want to hear it. DMs open.
 
 #opensource #buildinpublic #mcp #aitools #developertools #nextjs #sideproject
