@@ -1,0 +1,75 @@
+name: Validate Community Submission
+on:
+  pull_request:
+    paths:
+      - 'community-servers.yml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install yaml
+      - name: Validate submission
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const YAML = require('yaml');
+
+            const content = fs.readFileSync('community-servers.yml', 'utf8');
+            const data = YAML.parse(content);
+            const errors = [];
+            const VALID_CATEGORIES = ['databases','cloud','devtools','communication','filesystems','search','ai-ml','finance','crm','productivity','other'];
+            const VALID_PACKAGE_TYPES = ['npm', 'pypi', 'docker'];
+
+            if (!data || !data.servers || !Array.isArray(data.servers)) {
+              errors.push('Invalid YAML: must have a `servers` array');
+            } else {
+              for (const [i, server] of data.servers.entries()) {
+                const prefix = `Server ${i + 1}`;
+                if (!server.name) errors.push(`${prefix}: missing \`name\``);
+                if (!server.github_url) errors.push(`${prefix}: missing \`github_url\``);
+                if (!server.package_name) errors.push(`${prefix}: missing \`package_name\``);
+                if (!server.description) errors.push(`${prefix}: missing \`description\``);
+                if (server.github_url && !server.github_url.startsWith('https://github.com/'))
+                  errors.push(`${prefix}: \`github_url\` must start with https://github.com/`);
+                if (server.package_type && !VALID_PACKAGE_TYPES.includes(server.package_type))
+                  errors.push(`${prefix}: invalid \`package_type\` — must be npm, pypi, or docker`);
+                if (server.category && !VALID_CATEGORIES.includes(server.category))
+                  errors.push(`${prefix}: invalid \`category\``);
+              }
+            }
+
+            if (errors.length > 0) {
+              const body = `## Validation Failed\n\n${errors.map(e => `- ${e}`).join('\n')}\n\nPlease fix these issues and push again.`;
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: context.payload.pull_request.number,
+                body,
+              });
+              await github.rest.issues.addLabels({
+                ...context.repo,
+                issue_number: context.payload.pull_request.number,
+                labels: ['needs-changes'],
+              });
+              core.setFailed('Validation failed');
+            } else {
+              const body = `## Validation Passed\n\nAll entries look good! Ready for maintainer review.`;
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: context.payload.pull_request.number,
+                body,
+              });
+              await github.rest.issues.addLabels({
+                ...context.repo,
+                issue_number: context.payload.pull_request.number,
+                labels: ['ready-for-review'],
+              });
+            }

@@ -1,0 +1,6 @@
+# Community-submitted MCP servers
+# Add your server by opening a PR. See CONTRIBUTING.md for guidelines.
+#
+# Required fields: name, github_url, package_name, description
+# Optional fields: package_type (npm|pypi|docker), category
+servers: []
