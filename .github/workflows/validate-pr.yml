@@ -43,7 +43,7 @@ jobs:
                 if (!server.github_url) errors.push(`${prefix}: missing \`github_url\``);
                 if (!server.package_name) errors.push(`${prefix}: missing \`package_name\``);
                 if (!server.description) errors.push(`${prefix}: missing \`description\``);
-                if (server.github_url && !/^https:\/\/github\.com\/[^\/]+\/[^\/]+/.test(server.github_url))
+                if (server.github_url && !/^https:\/\/github\.com\/[^\/]+\/[^\/]+\/?$/.test(server.github_url))
                   errors.push(`${prefix}: \`github_url\` must be a valid GitHub repo URL (https://github.com/owner/repo)`);
                 if (server.description && server.description.length < 20)
                   errors.push(`${prefix}: \`description\` must be at least 20 characters`);

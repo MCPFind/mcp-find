@@ -80,6 +80,7 @@ Common validation errors:
 - `github_url` does not start with `https://github.com/`
 - Invalid `package_type` — must be `npm`, `pypi`, or `docker`
 - Invalid `category` — must be one of the values listed above
+- `description` must be at least 20 characters
 
 ## Review Timeline
 
