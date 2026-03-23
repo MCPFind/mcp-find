@@ -6,3 +6,7 @@ dist/
 .env.local
 .vercel
 *.tsbuildinfo
+*.log
+.DS_Store
+.env.*
+coverage/

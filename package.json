@@ -1,6 +1,7 @@
 {
   "name": "mcp-find",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "build": "turbo build",
     "dev": "turbo dev",
