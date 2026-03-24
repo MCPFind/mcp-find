@@ -1,3 +1,5 @@
+import { safeJsonLd } from '@/lib/json-ld';
+
 export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-24">
@@ -8,7 +10,7 @@ export default function Home() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
+          __html: safeJsonLd({
             '@context': 'https://schema.org',
             '@type': 'WebSite',
             name: 'MCP Find',

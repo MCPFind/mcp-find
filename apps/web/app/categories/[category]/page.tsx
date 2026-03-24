@@ -1,5 +1,6 @@
 import { getServersByCategory } from '@/lib/queries';
 import { generateCategoryMetadata, generateCategoryJsonLd } from '@/lib/metadata';
+import { safeJsonLd } from '@/lib/json-ld';
 import { CATEGORIES, CATEGORY_LABELS } from '@mcpfind/shared';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
@@ -42,7 +43,7 @@ export default async function CategoryPage({
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(generateCategoryJsonLd(category, label, servers)),
+          __html: safeJsonLd(generateCategoryJsonLd(category, label, servers)),
         }}
       />
 

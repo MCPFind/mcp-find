@@ -38,18 +38,26 @@ export async function enrichWithGitHub(
     if (!parsed) continue;
 
     try {
-      // Fetch repo metadata
-      const repoRes = await fetch(
-        `${GITHUB_API_BASE}/repos/${parsed.owner}/${parsed.repo}`,
-        { headers }
-      );
-
-      // Fix 4: Handle 403 rate limit with retry-after header
-      if (repoRes.status === 403) {
-        const retryAfter = repoRes.headers.get('retry-after');
-        const waitMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : 60000;
-        console.warn(`Rate limited, waiting ${waitMs}ms`);
-        await sleep(waitMs);
+      // Fetch repo metadata with retry on rate limit
+      let repoRes: Response | null = null;
+      const MAX_RETRIES = 3;
+      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+        repoRes = await fetch(
+          `${GITHUB_API_BASE}/repos/${parsed.owner}/${parsed.repo}`,
+          { headers }
+        );
+        if (repoRes.status === 403) {
+          const retryAfter = repoRes.headers.get('retry-after');
+          const waitMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : 60000;
+          console.warn(`Rate limited (attempt ${attempt + 1}/${MAX_RETRIES}), waiting ${waitMs}ms`);
+          await sleep(waitMs);
+          // retry the same server
+        } else {
+          break;
+        }
+      }
+      if (!repoRes || repoRes.status === 403) {
+        console.warn(`Skipping ${parsed.owner}/${parsed.repo} after ${MAX_RETRIES} rate-limit retries`);
         continue;
       }
 

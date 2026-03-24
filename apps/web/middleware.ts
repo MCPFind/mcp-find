@@ -42,6 +42,14 @@ export function middleware(request: NextRequest) {
     );
   }
 
+  // Evict stale entries every 1000 requests
+  if (rateMap.size > 1000) {
+    const now = Date.now();
+    for (const [key, entry] of rateMap) {
+      if (entry.resetAt < now) rateMap.delete(key);
+    }
+  }
+
   return NextResponse.next();
 }
 

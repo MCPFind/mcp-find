@@ -1,5 +1,6 @@
 import { getServerBySlug, getTopServers } from '@/lib/queries';
 import { generateServerMetadata, generateServerJsonLd } from '@/lib/metadata';
+import { safeJsonLd } from '@/lib/json-ld';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 
@@ -41,7 +42,7 @@ export default async function ServerDetailPage({
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(generateServerJsonLd(server)),
+          __html: safeJsonLd(generateServerJsonLd(server)),
         }}
       />
 

@@ -69,7 +69,13 @@ export async function syncFromRegistry(supabase: SupabaseClient<any, any, any>):
         tool_count: Array.isArray(capabilities.tools) ? capabilities.tools.length : 0,
         github_url: githubUrl,
         is_official: isOfficial(packageName),
-        registry_status: (['active', 'deprecated'] as const).includes(server._meta?.status) ? server._meta.status : 'active',
+        registry_status: (() => {
+          const s = server._meta?.status;
+          if (s && !(['active', 'deprecated'] as const).includes(s)) {
+            console.warn(`Unrecognized registry status "${s}" for server ${server.id || server.name}, defaulting to "active"`);
+          }
+          return (['active', 'deprecated'] as const).includes(s) ? s : 'active';
+        })(),
         registry_published_at: server._meta?.publishedAt || null,
         registry_updated_at: server._meta?.updatedAt || null,
         registry_tags: server._meta?.tags || [],

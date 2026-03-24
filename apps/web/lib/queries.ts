@@ -3,6 +3,9 @@ import { supabase } from './supabase';
 import type { Server, ServerWithTools, ServerListParams, ServerListResponse } from '@mcpfind/shared';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@mcpfind/shared';
 
+// Excludes readme_content and search_vector to avoid pulling large blobs in list queries
+const SERVER_LIST_COLUMNS = 'id,slug,name,description,version,category,source,package_name,package_type,package_url,has_tools,has_resources,has_prompts,tool_count,github_url,github_stars,github_forks,github_open_issues,github_last_push,github_license,github_language,github_contributors,github_archived,npm_weekly_downloads,registry_status,registry_published_at,registry_updated_at,registry_tags,is_official,featured,created_at,updated_at,last_synced_at';
+
 export async function listServers(params: ServerListParams): Promise<ServerListResponse> {
   const page = Math.max(1, params.page || 1);
   const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, params.limit || DEFAULT_PAGE_SIZE));
@@ -12,7 +15,7 @@ export async function listServers(params: ServerListParams): Promise<ServerListR
 
   let query = supabase
     .from('servers')
-    .select('*', { count: 'exact' })
+    .select(SERVER_LIST_COLUMNS, { count: 'exact' })
     .eq('registry_status', status);
 
   // Full-text search
@@ -75,7 +78,7 @@ export async function getServerCount(): Promise<number> {
 export async function getTopServers(limit: number): Promise<Server[]> {
   const { data } = await supabase
     .from('servers')
-    .select('*')
+    .select(SERVER_LIST_COLUMNS)
     .eq('registry_status', 'active')
     .order('github_stars', { ascending: false })
     .limit(limit);
@@ -85,7 +88,7 @@ export async function getTopServers(limit: number): Promise<Server[]> {
 export const getServersByCategory = cache(async (category: string): Promise<Server[]> => {
   const { data } = await supabase
     .from('servers')
-    .select('*')
+    .select(SERVER_LIST_COLUMNS)
     .eq('category', category)
     .eq('registry_status', 'active')
     .order('github_stars', { ascending: false })

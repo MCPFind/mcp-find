@@ -56,10 +56,11 @@ export async function categorizeServers(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: SupabaseClient<any, any, any>
 ): Promise<number> {
-  // Get servers without categories or with 'other' that might be recategorized
+  // Only fetch uncategorized servers to avoid re-processing already-categorized ones
   const { data: rawServers, error } = await supabase
     .from('servers')
-    .select('id, name, description, registry_tags, package_name, category');
+    .select('id, name, description, registry_tags, package_name, category')
+    .is('category', null);
 
   if (error || !rawServers) {
     console.error('Failed to fetch servers for categorization:', error?.message);

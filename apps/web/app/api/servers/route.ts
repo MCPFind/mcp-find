@@ -7,15 +7,18 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
 
   const q = searchParams.get('q') || undefined;
-  const category = searchParams.get('category') as Category | undefined;
-  const sort = (searchParams.get('sort') || 'stars') as SortOption;
   const page = parseInt(searchParams.get('page') || '1', 10);
-  const limit = parseInt(searchParams.get('limit') || '24', 10);
+  let limit = parseInt(searchParams.get('limit') || '24', 10);
 
   if (isNaN(page) || isNaN(limit) || page < 1 || limit < 1) {
     return NextResponse.json({ error: 'Invalid page or limit' }, { status: 400 });
   }
 
+  // Defense-in-depth: cap limit before any further processing
+  limit = Math.min(limit, 100);
+
+  const category = searchParams.get('category') as Category | undefined;
+  const sort = (searchParams.get('sort') || 'stars') as SortOption;
   const status = (searchParams.get('status') || 'active') as 'active' | 'deprecated';
 
   // Validate category

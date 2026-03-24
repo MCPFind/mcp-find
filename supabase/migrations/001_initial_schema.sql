@@ -56,14 +56,23 @@ CREATE TABLE servers (
   last_synced_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Full-text search vector (generated column)
-ALTER TABLE servers ADD COLUMN search_vector tsvector
-  GENERATED ALWAYS AS (
-    setweight(to_tsvector('english', coalesce(name, '')), 'A') ||
-    setweight(to_tsvector('english', coalesce(description, '')), 'B') ||
-    setweight(to_tsvector('english', coalesce(array_to_string(registry_tags, ' '), '')), 'B') ||
-    setweight(to_tsvector('english', coalesce(category, '')), 'C')
-  ) STORED;
+-- Full-text search vector (trigger-maintained — array_to_string is not immutable)
+ALTER TABLE servers ADD COLUMN search_vector tsvector;
+
+CREATE OR REPLACE FUNCTION servers_search_vector_update() RETURNS trigger AS $$
+BEGIN
+  NEW.search_vector :=
+    setweight(to_tsvector('english', coalesce(NEW.name, '')), 'A') ||
+    setweight(to_tsvector('english', coalesce(NEW.description, '')), 'B') ||
+    setweight(to_tsvector('english', coalesce(array_to_string(NEW.registry_tags, ' '), '')), 'B') ||
+    setweight(to_tsvector('english', coalesce(NEW.category, '')), 'C');
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER servers_search_vector_trigger
+  BEFORE INSERT OR UPDATE ON servers
+  FOR EACH ROW EXECUTE FUNCTION servers_search_vector_update();
 
 -- Indexes
 CREATE INDEX idx_servers_category ON servers(category);
@@ -100,6 +109,8 @@ CREATE TABLE sync_log (
 -- Row Level Security
 ALTER TABLE servers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE server_tools ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sync_log ENABLE ROW LEVEL SECURITY;
+-- No public read policy — sync_log is service-role only
 
 CREATE POLICY "Public read servers" ON servers FOR SELECT USING (true);
 CREATE POLICY "Public read tools" ON server_tools FOR SELECT USING (true);
