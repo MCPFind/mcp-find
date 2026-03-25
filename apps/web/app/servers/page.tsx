@@ -1,5 +1,6 @@
 import { listServers } from '@/lib/queries';
-import { SITE_NAME } from '@mcpfind/shared';
+import { CATEGORIES, SITE_NAME } from '@mcpfind/shared';
+import type { Category } from '@mcpfind/shared';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
@@ -15,10 +16,24 @@ export default async function ServersPage({
   searchParams: Promise<{ q?: string; category?: string; sort?: string; page?: string }>;
 }) {
   const params = await searchParams;
+
+  const SORT_ALLOWLIST = ['stars', 'updated', 'name', 'downloads'] as const;
+  type SortOption = typeof SORT_ALLOWLIST[number];
+
+  const rawCategory = params.category;
+  const validCategory: Category | undefined = rawCategory && (CATEGORIES as readonly string[]).includes(rawCategory)
+    ? rawCategory as Category
+    : undefined;
+
+  const rawSort = params.sort;
+  const validSort: SortOption = rawSort && (SORT_ALLOWLIST as readonly string[]).includes(rawSort)
+    ? rawSort as SortOption
+    : 'stars';
+
   const result = await listServers({
     q: params.q,
-    category: params.category as import('@mcpfind/shared').Category | undefined,
-    sort: (params.sort as 'stars' | 'updated' | 'name' | 'downloads') || 'stars',
+    category: validCategory,
+    sort: validSort,
     page: params.page ? parseInt(params.page, 10) : 1,
   });
 

@@ -43,8 +43,8 @@ async function runSyncPipeline() {
       enriched = await enrichWithGitHub(supabase, githubToken);
       console.log(`[Stage 2] Enriched ${enriched} servers`);
     } else {
-      console.warn('[Stage 2] Skipped — no GITHUB_TOKEN set');
-      errors.push('GitHub enrichment skipped: no GITHUB_TOKEN');
+      console.warn('[Stage 2] Skipped — no GH_ENRICHMENT_TOKEN set');
+      errors.push('GitHub enrichment skipped: no GH_ENRICHMENT_TOKEN');
     }
 
     // Stage 3: Categorization
