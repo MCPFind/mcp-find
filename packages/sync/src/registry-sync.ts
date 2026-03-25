@@ -16,6 +16,14 @@ function isOfficial(packageName: string | null): boolean {
   return OFFICIAL_SCOPES.some(scope => packageName.startsWith(scope));
 }
 
+interface RegistryPackage {
+  name?: string;
+  registry_url?: string;
+  source_url?: string;
+  version?: string;
+  repository?: string;
+}
+
 // Main sync function - paginate through registry
 export async function syncFromRegistry(supabase: SupabaseClient<any, any, any>): Promise<number> { // eslint-disable-line @typescript-eslint/no-explicit-any
   let cursor: string | undefined;
@@ -98,7 +106,7 @@ export async function syncFromRegistry(supabase: SupabaseClient<any, any, any>):
   return totalSynced;
 }
 
-function detectPackageType(pkg: any): 'npm' | 'pypi' | 'docker' | 'other' | null {
+function detectPackageType(pkg: RegistryPackage | null): 'npm' | 'pypi' | 'docker' | 'other' | null {
   if (!pkg) return null;
   const url = pkg.registry_url || '';
   const name = pkg.name || '';
@@ -114,7 +122,7 @@ function detectPackageType(pkg: any): 'npm' | 'pypi' | 'docker' | 'other' | null
   return 'other';
 }
 
-function extractGithubUrl(server: any): string | null {
+function extractGithubUrl(server: { source?: { url?: string }; repository?: { url?: string }; packages?: RegistryPackage[] }): string | null {
   // Check source field
   if (server.source?.url?.includes('github.com')) return server.source.url;
   // Check repository field
