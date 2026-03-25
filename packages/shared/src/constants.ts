@@ -6,7 +6,7 @@ export const SITE_DESCRIPTION = 'The open-source way to find MCP servers. AI-age
 export const REPO_URL = 'https://github.com/gusmar2017/mcp-find';
 
 export const REGISTRY_API_BASE = 'https://registry.modelcontextprotocol.io';
-export const REGISTRY_SERVERS_ENDPOINT = '/v0/servers';
+export const REGISTRY_SERVERS_ENDPOINT = '/v0.1/servers';
 export const REGISTRY_PAGE_SIZE = 100;
 
 export const GITHUB_API_BASE = 'https://api.github.com';

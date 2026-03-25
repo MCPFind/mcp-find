@@ -16,6 +16,29 @@ function isOfficial(packageName: string | null): boolean {
   return OFFICIAL_SCOPES.some(scope => packageName.startsWith(scope));
 }
 
+// Actual API response shape from registry.modelcontextprotocol.io/v0.1/servers
+interface RegistryItem {
+  server: {
+    name?: string;
+    title?: string;
+    description?: string;
+    version?: string;
+    websiteUrl?: string;
+    repository?: { url?: string };
+    packages?: RegistryPackage[];
+    remotes?: { type?: string; url?: string }[];
+    capabilities?: Record<string, unknown>;
+  };
+  _meta: {
+    'io.modelcontextprotocol.registry/official'?: {
+      status?: string;
+      publishedAt?: string;
+      updatedAt?: string;
+      tags?: string[];
+    };
+  };
+}
+
 interface RegistryPackage {
   name?: string;
   registry_url?: string;
@@ -38,19 +61,23 @@ export async function syncFromRegistry(supabase: SupabaseClient<any, any, any>):
     if (!response.ok) throw new Error(`Registry API error: ${response.status}`);
 
     const data = await response.json();
-    const servers = data.servers || data.items || [];
-    cursor = data.nextCursor || data.cursor;
+    // v0.1 API: items are { server, _meta } objects; pagination is under data.metadata.nextCursor
+    const items: RegistryItem[] = data.servers || data.items || [];
+    cursor = data.metadata?.nextCursor || data.nextCursor || data.cursor;
 
     const records = [];
-    for (const server of servers) {
-      // Fix 8: Guard against missing id and name
-      if (!server.id && !server.name) {
-        console.warn('Skipping server with no id or name');
+    for (const item of items) {
+      const server = item.server;
+      const officialMeta = item._meta?.['io.modelcontextprotocol.registry/official'];
+
+      // name is the unique identifier in v0.1 (e.g. "agency.lona/trading")
+      if (!server.name) {
+        console.warn('Skipping server with no name');
         continue;
       }
 
-      // Extract package info from the packages array
-      const pkg = server.packages?.[0];
+      // Extract package info from the packages array (may not exist in v0.1)
+      const pkg = server.packages?.[0] || null;
       const packageName = pkg?.name || null;
       const packageType = detectPackageType(pkg);
       const packageUrl = pkg?.registry_url || null;
@@ -58,13 +85,13 @@ export async function syncFromRegistry(supabase: SupabaseClient<any, any, any>):
       // Extract capabilities
       const capabilities = server.capabilities || {};
 
-      // Extract GitHub URL from source or packages
+      // Extract GitHub URL from repository or packages
       const githubUrl = extractGithubUrl(server);
 
       const record = {
-        id: server.id || server.name,
-        slug: generateSlug(server.name || server.id),
-        name: server.name || server.id,
+        id: server.name,
+        slug: generateSlug(server.name),
+        name: server.title || server.name,
         description: server.description || null,
         version: server.version || pkg?.version || null,
         source: 'registry' as const,
@@ -78,29 +105,36 @@ export async function syncFromRegistry(supabase: SupabaseClient<any, any, any>):
         github_url: githubUrl,
         is_official: isOfficial(packageName),
         registry_status: (() => {
-          const s = server._meta?.status;
-          if (s && !(['active', 'deprecated'] as const).includes(s)) {
-            console.warn(`Unrecognized registry status "${s}" for server ${server.id || server.name}, defaulting to "active"`);
+          const s = officialMeta?.status;
+          const valid = ['active', 'deprecated'] as const;
+          type ValidStatus = typeof valid[number];
+          const isValid = (v: string | undefined): v is ValidStatus => valid.includes(v as ValidStatus);
+          if (s && !isValid(s)) {
+            console.warn(`Unrecognized registry status "${s}" for server ${server.name}, defaulting to "active"`);
           }
-          return (['active', 'deprecated'] as const).includes(s) ? s : 'active';
+          return isValid(s) ? s : 'active';
         })(),
-        registry_published_at: server._meta?.publishedAt || null,
-        registry_updated_at: server._meta?.updatedAt || null,
-        registry_tags: server._meta?.tags || [],
+        registry_published_at: officialMeta?.publishedAt || null,
+        registry_updated_at: officialMeta?.updatedAt || null,
+        registry_tags: officialMeta?.tags || [],
         last_synced_at: new Date().toISOString(),
       };
 
       records.push(record);
     }
 
-    // Fix 1: Batch upsert all records for this page at once
-    if (records.length > 0) {
-      const { error } = await supabase.from('servers').upsert(records, { onConflict: 'id' });
+    // Deduplicate within batch — keep last occurrence of each id
+    const deduped = Object.values(
+      records.reduce((acc, r) => { acc[r.id] = r; return acc; }, {} as Record<string, typeof records[0]>)
+    );
+
+    if (deduped.length > 0) {
+      const { error } = await supabase.from('servers').upsert(deduped, { onConflict: 'id' });
       if (error) console.error(`Batch upsert failed:`, error.message);
-      else totalSynced += records.length;
+      else totalSynced += deduped.length;
     }
 
-    console.log(`Synced batch: ${servers.length} servers (total: ${totalSynced})`);
+    console.log(`Synced batch: ${items.length} servers (total: ${totalSynced})`);
   } while (cursor);
 
   return totalSynced;
@@ -122,9 +156,7 @@ function detectPackageType(pkg: RegistryPackage | null): 'npm' | 'pypi' | 'docke
   return 'other';
 }
 
-function extractGithubUrl(server: { source?: { url?: string }; repository?: { url?: string }; packages?: RegistryPackage[] }): string | null {
-  // Check source field
-  if (server.source?.url?.includes('github.com')) return server.source.url;
+function extractGithubUrl(server: { repository?: { url?: string }; packages?: RegistryPackage[] }): string | null {
   // Check repository field
   if (server.repository?.url?.includes('github.com')) return server.repository.url;
   // Check packages for GitHub URLs
