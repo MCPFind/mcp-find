@@ -1,6 +1,6 @@
 import { cache } from 'react';
 import { supabase } from './supabase';
-import type { Server, ServerWithTools, ServerListParams, ServerListResponse } from '@mcpfind/shared';
+import type { Server, ServerListItem, ServerWithTools, ServerListParams, ServerListResponse } from '@mcpfind/shared';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@mcpfind/shared';
 
 // Excludes readme_content and search_vector to avoid pulling large blobs in list queries
@@ -42,7 +42,7 @@ export async function listServers(params: ServerListParams): Promise<ServerListR
   if (error) throw new Error(`Query failed: ${error.message}`);
 
   return {
-    servers: (data || []) as Server[],
+    servers: (data || []) as ServerListItem[],
     total: count || 0,
     page,
     limit,
@@ -75,17 +75,17 @@ export async function getServerCount(): Promise<number> {
   return count || 0;
 }
 
-export async function getTopServers(limit: number): Promise<Server[]> {
+export async function getTopServers(limit: number): Promise<ServerListItem[]> {
   const { data } = await supabase
     .from('servers')
     .select(SERVER_LIST_COLUMNS)
     .eq('registry_status', 'active')
     .order('github_stars', { ascending: false })
     .limit(limit);
-  return (data || []) as Server[];
+  return (data || []) as ServerListItem[];
 }
 
-export const getServersByCategory = cache(async (category: string): Promise<Server[]> => {
+export const getServersByCategory = cache(async (category: string): Promise<ServerListItem[]> => {
   const { data } = await supabase
     .from('servers')
     .select(SERVER_LIST_COLUMNS)
@@ -93,7 +93,7 @@ export const getServersByCategory = cache(async (category: string): Promise<Serv
     .eq('registry_status', 'active')
     .order('github_stars', { ascending: false })
     .limit(200);
-  return (data || []) as Server[];
+  return (data || []) as ServerListItem[];
 });
 
 export async function getLastSyncTime(): Promise<string | null> {

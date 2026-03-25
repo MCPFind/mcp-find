@@ -68,6 +68,8 @@ export interface ServerTool {
   created_at: string;
 }
 
+export type ServerListItem = Omit<Server, 'readme_content'>;
+
 export interface ServerWithTools extends Server {
   tools: ServerTool[];
 }
@@ -92,7 +94,7 @@ export interface ServerListParams {
 }
 
 export interface ServerListResponse {
-  servers: Server[];
+  servers: ServerListItem[];
   total: number;
   page: number;
   limit: number;

@@ -80,11 +80,9 @@ export async function categorizeServers(
       server.package_name
     );
 
-    if (newCategory !== server.category) {
-      const ids = updates.get(newCategory) || [];
-      ids.push(server.id);
-      updates.set(newCategory, ids);
-    }
+    const ids = updates.get(newCategory) || [];
+    ids.push(server.id);
+    updates.set(newCategory, ids);
   }
 
   for (const [category, ids] of updates) {

@@ -110,10 +110,10 @@ CREATE TABLE sync_log (
 ALTER TABLE servers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE server_tools ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sync_log ENABLE ROW LEVEL SECURITY;
--- No public read policy — sync_log is service-role only
 
 CREATE POLICY "Public read servers" ON servers FOR SELECT USING (true);
 CREATE POLICY "Public read tools" ON server_tools FOR SELECT USING (true);
+CREATE POLICY "Public read sync status" ON sync_log FOR SELECT USING (true);
 
 -- Fix 6: CHECK constraints for enum-like columns
 ALTER TABLE servers ADD CONSTRAINT chk_source CHECK (source IN ('registry', 'community'));

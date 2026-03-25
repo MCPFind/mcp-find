@@ -48,7 +48,8 @@ export async function enrichWithGitHub(
         );
         if (repoRes.status === 403) {
           const retryAfter = repoRes.headers.get('retry-after');
-          const waitMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : 60000;
+          let waitMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : 60000;
+          waitMs = Math.min(waitMs, 300_000); // Cap at 5 minutes
           console.warn(`Rate limited (attempt ${attempt + 1}/${MAX_RETRIES}), waiting ${waitMs}ms`);
           await sleep(waitMs);
           // retry the same server

@@ -1,3 +1,3 @@
 export function safeJsonLd(data: object): string {
-  return JSON.stringify(data).replace(/</g, '\\u003c');
+  return JSON.stringify(data).replace(/</g, '\\u003c').replace(/>/g, '\\u003e');
 }

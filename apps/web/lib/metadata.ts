@@ -1,4 +1,4 @@
-import type { Server, ServerWithTools } from '@mcpfind/shared';
+import type { Server, ServerListItem, ServerWithTools } from '@mcpfind/shared';
 import { SITE_NAME, SITE_URL, CATEGORY_LABELS } from '@mcpfind/shared';
 import type { Metadata } from 'next';
 
@@ -31,7 +31,7 @@ export function generateServerJsonLd(server: ServerWithTools): object {
 export function generateCategoryJsonLd(
   category: string,
   categoryLabel: string,
-  servers: Server[]
+  servers: ServerListItem[]
 ): object {
   return {
     '@context': 'https://schema.org',
