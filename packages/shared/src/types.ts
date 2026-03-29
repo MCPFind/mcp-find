@@ -87,6 +87,13 @@ export interface SyncLog {
 export interface ServerListParams {
   q?: string;
   category?: Category;
+  packageTypes?: PackageType[];
+  languages?: string[];
+  hasTools?: boolean;
+  hasResources?: boolean;
+  hasPrompts?: boolean;
+  isOfficial?: boolean;
+  featured?: boolean;
   sort?: SortOption;
   page?: number;
   limit?: number;

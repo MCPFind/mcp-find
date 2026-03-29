@@ -1,7 +1,9 @@
 import Link from "next/link";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 import type { ServerListItem } from "@mcpfind/shared";
 import { CategoryBadge } from "./category-badge";
+import { languageColors } from "./language-badge";
 import { formatNumber } from "./stat-badge";
 import {
   IconStar,
@@ -9,22 +11,9 @@ import {
   IconBrandGithub,
   IconShieldCheck,
   IconSparkles,
+  IconServer,
 } from "@tabler/icons-react";
 
-const languageColors: Record<string, string> = {
-  TypeScript: "text-blue-400 bg-blue-400/10 border-blue-400/20",
-  Python: "text-yellow-400 bg-yellow-400/10 border-yellow-400/20",
-  Go: "text-cyan-400 bg-cyan-400/10 border-cyan-400/20",
-  Rust: "text-orange-400 bg-orange-400/10 border-orange-400/20",
-  JavaScript: "text-yellow-300 bg-yellow-300/10 border-yellow-300/20",
-};
-
-// package_type maps to the "transport" concept in the original design
-const transportColors: Record<string, string> = {
-  npm: "text-green-400 bg-green-400/10 border-green-400/20",
-  pypi: "text-purple-400 bg-purple-400/10 border-purple-400/20",
-  docker: "text-blue-400 bg-blue-400/10 border-blue-400/20",
-};
 
 interface ServerCardProps {
   server: ServerListItem;
@@ -34,16 +23,20 @@ interface ServerCardProps {
 export function ServerCard({ server, className }: ServerCardProps) {
   const tags = server.registry_tags ?? [];
   const language = server.github_language;
-  const transport = server.package_type;
-  // Derive author display from github_url, e.g. "org/repo"
+// Derive author display from github_url, e.g. "org/repo"
   const author = server.github_url
     ? server.github_url.replace("https://github.com/", "")
     : server.package_name ?? null;
+  const githubOwner = author?.split("/")[0] ?? null;
+  const avatarUrl = githubOwner
+    ? `https://github.com/${githubOwner}.png?size=80`
+    : null;
 
   return (
-    <div
+    <Link
+      href={`/servers/${server.slug}`}
       className={cn(
-        "group relative bg-neutral-900 border border-neutral-800 hover:border-neutral-700 rounded-xl p-5 transition-all duration-200 hover:bg-neutral-900/80 hover:shadow-lg hover:shadow-black/20",
+        "group relative block bg-neutral-900 border border-neutral-800 hover:border-neutral-700 rounded-xl p-5 transition-all duration-200 hover:bg-neutral-900/80 hover:shadow-lg hover:shadow-black/20 cursor-pointer",
         className
       )}
     >
@@ -64,18 +57,42 @@ export function ServerCard({ server, className }: ServerCardProps) {
       </div>
 
       {/* Header */}
-      <div className="pr-24 mb-3">
-        <div className="flex items-center gap-2 mb-1">
+      <div className="flex items-start gap-3 pr-24 mb-3">
+        {avatarUrl ? (
+          <Image
+            src={avatarUrl}
+            alt={githubOwner ?? ""}
+            width={36}
+            height={36}
+            className="rounded-lg shrink-0 bg-neutral-800"
+            unoptimized
+          />
+        ) : (
+          <div className="w-9 h-9 rounded-lg bg-neutral-800 border border-neutral-700 flex items-center justify-center shrink-0">
+            <IconServer size={16} className="text-neutral-500" />
+          </div>
+        )}
+        <div className="min-w-0">
           <h3 className="text-white font-semibold text-base group-hover:text-blue-300 transition-colors duration-200">
             {server.name}
           </h3>
         </div>
+      </div>
+
+      {/* Repo & Stars row */}
+      <div className="flex items-center gap-3 mb-2 text-xs text-neutral-500">
         {author && (
-          <p className="text-neutral-500 text-xs flex items-center gap-1">
+          <span className="flex items-center gap-1">
             <IconBrandGithub size={12} />
             {author}
-          </p>
+          </span>
         )}
+        <span className="flex items-center gap-1.5">
+          <IconStar size={13} className="text-amber-400" />
+          <span className="font-medium text-neutral-300">
+            {formatNumber(server.github_stars)}
+          </span>
+        </span>
       </div>
 
       {/* Description */}
@@ -103,6 +120,7 @@ export function ServerCard({ server, className }: ServerCardProps) {
       {/* Meta row */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
+<CategoryBadge category={server.category} />
           {language && (
             <span
               className={cn(
@@ -114,31 +132,13 @@ export function ServerCard({ server, className }: ServerCardProps) {
               {language}
             </span>
           )}
-          {transport && (
-            <span
-              className={cn(
-                "text-xs px-2 py-0.5 rounded-md border",
-                transportColors[transport] ||
-                  "text-neutral-400 bg-neutral-800 border-neutral-700"
-              )}
-            >
-              {transport}
-            </span>
-          )}
-          <CategoryBadge category={server.category} />
         </div>
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-between mt-4 pt-4 border-t border-neutral-800">
-        <div className="flex items-center gap-4 text-xs text-neutral-500">
-          <span className="flex items-center gap-1.5">
-            <IconStar size={13} className="text-amber-400" />
-            <span className="font-medium text-neutral-300">
-              {formatNumber(server.github_stars)}
-            </span>
-          </span>
-          {server.npm_weekly_downloads > 0 && (
+      {server.npm_weekly_downloads > 0 && (
+        <div className="flex items-center mt-4 pt-4">
+          <div className="flex items-center gap-4 text-xs text-neutral-500">
             <span className="flex items-center gap-1.5">
               <IconDownload size={13} className="text-green-400" />
               <span className="font-medium text-neutral-300">
@@ -146,15 +146,9 @@ export function ServerCard({ server, className }: ServerCardProps) {
               </span>
               <span>/wk</span>
             </span>
-          )}
+          </div>
         </div>
-        <Link
-          href={`/servers/${server.slug}`}
-          className="text-xs text-blue-400 hover:text-blue-300 font-medium transition-colors duration-200 group-hover:underline"
-        >
-          View Details →
-        </Link>
-      </div>
-    </div>
+      )}
+    </Link>
   );
 }

@@ -28,6 +28,25 @@ export async function listServers(params: ServerListParams): Promise<ServerListR
     query = query.eq('category', params.category);
   }
 
+  // Package type filter (OR within group)
+  if (params.packageTypes?.length) {
+    query = query.in('package_type', params.packageTypes);
+  }
+
+  // Language filter (OR within group)
+  if (params.languages?.length) {
+    query = query.in('github_language', params.languages);
+  }
+
+  // Capability filters
+  if (params.hasTools) query = query.eq('has_tools', true);
+  if (params.hasResources) query = query.eq('has_resources', true);
+  if (params.hasPrompts) query = query.eq('has_prompts', true);
+
+  // Badge filters
+  if (params.isOfficial) query = query.eq('is_official', true);
+  if (params.featured) query = query.eq('featured', true);
+
   // Sort
   switch (sort) {
     case 'stars': query = query.order('github_stars', { ascending: false }); break;

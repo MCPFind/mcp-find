@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Spotlight } from "@/components/aceternity/spotlight";
+import { AuroraBackground } from "@/components/aceternity/aurora-background";
 import { ServerCard } from "@/components/ui/server-card";
 import { Navbar } from "@/components/ui/navbar";
 import { HeroSearch } from "@/components/ui/hero-search";
@@ -72,11 +72,7 @@ export default async function HomePage() {
       <Navbar variant="fixed" />
 
       {/* ── 1. Hero ── */}
-      <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16">
-        <Spotlight
-          className="-top-40 left-0 md:left-60 md:-top-20"
-          fill="blue"
-        />
+      <AuroraBackground className="min-h-screen !h-auto bg-black dark:bg-black pt-16">
         {/* Grid background */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff08_1px,transparent_1px),linear-gradient(to_bottom,#ffffff08_1px,transparent_1px)] bg-[size:4rem_4rem]" />
         {/* Bottom fade */}
@@ -160,7 +156,7 @@ export default async function HomePage() {
             </div>
           </div>
         </div>
-      </section>
+      </AuroraBackground>
 
       {/* ── 2. Features (Bento) ── */}
       <section className="py-24 px-4 sm:px-6 lg:px-8">

@@ -1,60 +1,106 @@
 "use client";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { IconPlug } from "@tabler/icons-react";
+import { motion, AnimatePresence } from "motion/react";
+import { IconPlug, IconServer, IconBook } from "@tabler/icons-react";
+import { cn } from "@/lib/utils";
 
 interface NavbarProps {
   variant?: "fixed" | "sticky";
 }
 
-export function Navbar({ variant = "fixed" }: NavbarProps) {
+export function Navbar({ variant: _variant }: NavbarProps) {
   const pathname = usePathname();
+  const [visible, setVisible] = useState(true);
+  const lastScrollY = useRef(0);
+
+  // Reset visibility on route change
+  useEffect(() => {
+    setVisible(true);
+    lastScrollY.current = 0;
+  }, [pathname]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+
+      if (currentScrollY < 100) {
+        setVisible(true);
+      } else if (currentScrollY < lastScrollY.current) {
+        setVisible(true);
+      } else if (currentScrollY > lastScrollY.current) {
+        setVisible(false);
+      }
+
+      lastScrollY.current = currentScrollY;
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   return (
-    <nav
-      className={`${
-        variant === "fixed" ? "fixed top-0 left-0 right-0" : "sticky top-0"
-      } z-50 border-b border-white/5 bg-black/80 backdrop-blur-md`}
-    >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-              <IconPlug size={15} className="text-white" />
+    <AnimatePresence mode="wait">
+      <motion.nav
+        initial={{ opacity: 1, y: 0 }}
+        animate={{
+          y: visible ? 0 : -100,
+          opacity: visible ? 1 : 0,
+        }}
+        transition={{ duration: 0.2 }}
+        className="fixed top-6 inset-x-0 z-[5000] max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
+      >
+        <div className="flex items-center justify-between gap-2 rounded-full border border-white/10 bg-black/50 px-2 py-1.5 shadow-lg shadow-black/20 backdrop-blur-md">
+          {/* Logo */}
+          <Link
+            href="/"
+            className="flex items-center gap-2 rounded-full px-3 py-2"
+          >
+            <div className="w-6 h-6 rounded-md bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+              <IconPlug size={13} className="text-white" />
             </div>
-            <span className="font-bold text-white text-lg tracking-tight">
+            <span className="hidden sm:block font-bold text-white text-sm tracking-tight">
               MCP Find
             </span>
           </Link>
-          <div className="hidden md:flex items-center gap-6">
+
+
+          {/* Nav items */}
+          <div className="flex items-center gap-1">
             <Link
               href="/servers"
-              className={`text-sm transition-colors duration-200 ${
+              className={cn(
+                "relative flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-colors",
                 pathname === "/servers"
-                  ? "text-white"
-                  : "text-neutral-400 hover:text-white"
-              }`}
+                  ? "text-white bg-white/10"
+                  : "text-neutral-300 hover:bg-white/10 hover:text-white"
+              )}
             >
-              Browse Servers
+              <IconServer size={16} className="block sm:hidden" />
+              <span className="hidden sm:block">Browse Servers</span>
             </Link>
             <a
               href="https://modelcontextprotocol.io"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-neutral-400 hover:text-white text-sm transition-colors duration-200"
+              className="relative flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium text-neutral-300 transition-colors hover:bg-white/10 hover:text-white"
             >
-              Docs
+              <IconBook size={16} className="block sm:hidden" />
+              <span className="hidden sm:block">Docs</span>
             </a>
           </div>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/submit"
-              className="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors duration-200"
-            >
-              Submit Server
-            </Link>
-          </div>
+
+
+          {/* CTA */}
+          <Link
+            href="/submit"
+            className="rounded-full bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-all hover:bg-blue-500 hover:shadow-lg hover:shadow-blue-600/20"
+          >
+            Submit Server
+          </Link>
         </div>
-      </div>
-    </nav>
+      </motion.nav>
+    </AnimatePresence>
   );
 }

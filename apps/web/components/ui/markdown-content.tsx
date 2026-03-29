@@ -101,7 +101,9 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
             );
           },
         }}
-      />
+      >
+        {content}
+      </ReactMarkdown>
     </div>
   );
 }

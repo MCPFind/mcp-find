@@ -6,8 +6,9 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CategoryBadge } from "@/components/ui/category-badge";
+import { LanguageBadge } from "@/components/ui/language-badge";
 import { CodeBlock } from "@/components/ui/code-block";
-import { MarkdownContent } from "@/components/ui/markdown-content";
+import { ReadmeSection } from "@/components/ui/readme-section";
 import { ServerCard } from "@/components/ui/server-card";
 import { formatNumber } from "@/components/ui/stat-badge";
 import { Navbar } from "@/components/ui/navbar";
@@ -20,7 +21,6 @@ import {
   IconSparkles,
   IconTag,
   IconCalendar,
-  IconServer,
   IconExternalLink,
   IconCode,
   IconTerminal,
@@ -51,19 +51,6 @@ export async function generateMetadata({
   return generateServerMetadata(server);
 }
 
-const languageColors: Record<string, string> = {
-  TypeScript: "text-blue-400 bg-blue-400/10 border-blue-400/20",
-  Python: "text-yellow-400 bg-yellow-400/10 border-yellow-400/20",
-  Go: "text-cyan-400 bg-cyan-400/10 border-cyan-400/20",
-  Rust: "text-orange-400 bg-orange-400/10 border-orange-400/20",
-  JavaScript: "text-yellow-300 bg-yellow-300/10 border-yellow-300/20",
-};
-
-const transportColors: Record<string, string> = {
-  npm: "text-green-400 bg-green-400/10 border-green-400/20",
-  pypi: "text-purple-400 bg-purple-400/10 border-purple-400/20",
-  docker: "text-blue-400 bg-blue-400/10 border-blue-400/20",
-};
 
 export default async function ServerDetailPage({
   params,
@@ -123,7 +110,7 @@ export default async function ServerDetailPage({
       <Navbar variant="sticky" />
 
       {/* Hero */}
-      <div className="border-b border-neutral-900 bg-neutral-950/50">
+      <div className="border-b border-neutral-900 bg-neutral-950/50 pt-28">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
           {/* Breadcrumb */}
           <div className="flex items-center gap-2 text-sm text-neutral-500 mb-8">
@@ -161,27 +148,10 @@ export default async function ServerDetailPage({
                 {server.description}
               </p>
               <div className="flex items-center gap-3 flex-wrap">
-                {server.github_language && (
-                  <span
-                    className={`text-sm px-3 py-1 rounded-lg border font-mono ${
-                      languageColors[server.github_language] ||
-                      "text-neutral-400 bg-neutral-800 border-neutral-700"
-                    }`}
-                  >
-                    {server.github_language}
-                  </span>
-                )}
-                {server.package_type && (
-                  <span
-                    className={`text-sm px-3 py-1 rounded-lg border font-mono ${
-                      transportColors[server.package_type] ||
-                      "text-neutral-400 bg-neutral-800 border-neutral-700"
-                    }`}
-                  >
-                    {server.package_type}
-                  </span>
-                )}
                 <CategoryBadge category={server.category} />
+                {server.github_language && (
+                  <LanguageBadge language={server.github_language} />
+                )}
                 {server.version && (
                   <span className="text-sm text-neutral-500 font-mono">
                     v{server.version}
@@ -215,36 +185,10 @@ export default async function ServerDetailPage({
           {/* Left: Main content */}
           <div className="lg:col-span-2 space-y-10">
             {/* Overview / README */}
-            {server.readme_content && (
-              <section>
-                <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                  <IconServer size={20} className="text-blue-400" />
-                  Overview
-                </h2>
-                <div className="max-h-[600px] overflow-y-auto pr-2 scrollbar-hide">
-                  <MarkdownContent
-                    content={
-                      server.readme_content.length > 6000
-                        ? server.readme_content.slice(0, 6000)
-                        : server.readme_content
-                    }
-                  />
-                  {server.readme_content.length > 6000 && server.github_url && (
-                    <p className="mt-4 text-sm text-neutral-600">
-                      README truncated.{" "}
-                      <a
-                        href={server.github_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-400 hover:text-blue-300 transition-colors duration-200"
-                      >
-                        Read the full README on GitHub →
-                      </a>
-                    </p>
-                  )}
-                </div>
-              </section>
-            )}
+            <ReadmeSection
+              readmeContent={server.readme_content}
+              githubUrl={server.github_url}
+            />
 
             {/* Tools */}
             {server.tools.length > 0 && (

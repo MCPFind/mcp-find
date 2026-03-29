@@ -1,50 +1,55 @@
 "use client";
 
 import { useCallback, useEffect, useState, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { SearchBar } from "./search-bar";
+import { FilterSection } from "./filter-section";
+import { FilterCheckboxGroup } from "./filter-checkbox-group";
+import { ActiveFilterChips } from "./active-filter-chips";
+import { MobileFilterDrawer } from "./mobile-filter-drawer";
 import { cn } from "@/lib/utils";
 import { CATEGORIES, CATEGORY_LABELS } from "@mcpfind/shared";
-import type { Category } from "@mcpfind/shared";
-import { IconChevronDown, IconFilter, IconX } from "@tabler/icons-react";
-
-type SortOption = "stars" | "updated" | "name" | "downloads";
+import type { Category, SortOption } from "@mcpfind/shared";
+import { IconChevronDown, IconFilter } from "@tabler/icons-react";
+import {
+  buildFilterUrl,
+  getActiveFilterCount,
+  KNOWN_LANGUAGES,
+  type ParsedFilters,
+} from "@/lib/filter-utils";
 
 interface ServersFiltersProps {
-  initialQ: string;
-  initialCategory: string;
-  initialSort: SortOption;
+  initialFilters: ParsedFilters;
   totalCount: number;
   children: React.ReactNode;
 }
 
+const LANGUAGE_OPTIONS = KNOWN_LANGUAGES.map((v) => ({
+  value: v,
+  label: v,
+}));
+
 export function ServersFilters({
-  initialQ,
-  initialCategory,
-  initialSort,
+  initialFilters,
   totalCount,
   children,
 }: ServersFiltersProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const [search, setSearch] = useState(initialQ);
-  const [selectedCategory, setSelectedCategory] = useState(initialCategory);
-  const [sortKey, setSortKey] = useState<SortOption>(initialSort);
-  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState<ParsedFilters>(initialFilters);
+  const [showMobileDrawer, setShowMobileDrawer] = useState(false);
+  // Mobile drawer uses local state that only applies on "Show results"
+  const [mobileFilters, setMobileFilters] = useState<ParsedFilters>(initialFilters);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isFirstRender = useRef(true);
 
-  const buildUrl = useCallback(
-    (q: string, category: string, sort: SortOption) => {
-      const params = new URLSearchParams();
-      if (q) params.set("q", q);
-      if (category) params.set("category", category);
-      if (sort !== "stars") params.set("sort", sort);
-      return `/servers${params.toString() ? `?${params.toString()}` : ""}`;
+  const navigate = useCallback(
+    (newFilters: ParsedFilters) => {
+      router.push(buildFilterUrl(newFilters));
     },
-    []
+    [router]
   );
 
+  // Debounced navigation on desktop filter changes
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false;
@@ -52,39 +57,184 @@ export function ServersFilters({
     }
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      router.push(buildUrl(search, selectedCategory, sortKey));
+      navigate(filters);
     }, 400);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [search, selectedCategory, sortKey, buildUrl, router]);
+  }, [filters, navigate]);
 
-  const clearFilters = () => {
-    setSearch("");
-    setSelectedCategory("");
-    setSortKey("stars");
+  // Sync mobile filters when drawer opens
+  const openMobileDrawer = () => {
+    setMobileFilters(filters);
+    setShowMobileDrawer(true);
   };
 
-  const activeFilterCount = [selectedCategory].filter(Boolean).length;
+  const applyMobileFilters = () => {
+    setFilters(mobileFilters);
+    setShowMobileDrawer(false);
+  };
+
+  const clearAllFilters = () => {
+    const cleared: ParsedFilters = {
+      q: filters.q, // preserve search
+      category: "",
+      packageTypes: [],
+      languages: [],
+      hasTools: false,
+      hasResources: false,
+      hasPrompts: false,
+      isOfficial: false,
+      featured: false,
+      sort: filters.sort, // preserve sort
+      page: 1,
+    };
+    setFilters(cleared);
+  };
+
+  const clearAllMobileFilters = () => {
+    setMobileFilters({
+      ...mobileFilters,
+      category: "",
+      packageTypes: [],
+      languages: [],
+      hasTools: false,
+      hasResources: false,
+      hasPrompts: false,
+      isOfficial: false,
+      featured: false,
+      page: 1,
+    });
+  };
+
+  const removeFilter = (key: string, value?: string) => {
+    setFilters((prev) => {
+      const next = { ...prev, page: 1 };
+      switch (key) {
+        case "category":
+          next.category = "";
+          break;
+        case "packageTypes":
+          next.packageTypes = prev.packageTypes.filter((v) => v !== value);
+          break;
+        case "languages":
+          next.languages = prev.languages.filter((v) => v !== value);
+          break;
+        case "hasTools":
+          next.hasTools = false;
+          break;
+        case "hasResources":
+          next.hasResources = false;
+          break;
+        case "hasPrompts":
+          next.hasPrompts = false;
+          break;
+        case "isOfficial":
+          next.isOfficial = false;
+          break;
+        case "featured":
+          next.featured = false;
+          break;
+      }
+      return next;
+    });
+  };
+
+  const updateFilter = <K extends keyof ParsedFilters>(
+    key: K,
+    value: ParsedFilters[K]
+  ) => {
+    setFilters((prev) => ({ ...prev, [key]: value, page: 1 }));
+  };
+
+  const updateMobileFilter = <K extends keyof ParsedFilters>(
+    key: K,
+    value: ParsedFilters[K]
+  ) => {
+    setMobileFilters((prev) => ({ ...prev, [key]: value, page: 1 }));
+  };
+
+  const activeFilterCount = getActiveFilterCount(filters);
+  const mobileActiveCount = getActiveFilterCount(mobileFilters);
+
+  // Shared filter group renderer (used by both desktop sidebar and mobile drawer)
+  const renderFilterGroups = (
+    currentFilters: ParsedFilters,
+    update: <K extends keyof ParsedFilters>(key: K, value: ParsedFilters[K]) => void
+  ) => (
+    <>
+      {/* Category — single-select */}
+      <FilterSection
+        title="Category"
+        activeCount={currentFilters.category ? 1 : 0}
+      >
+        <div className="space-y-0.5">
+          <button
+            onClick={() => update("category", "")}
+            className={cn(
+              "w-full text-left px-3 py-1.5 rounded-lg text-sm transition-colors duration-200",
+              !currentFilters.category
+                ? "bg-blue-600/20 text-blue-300"
+                : "text-neutral-400 hover:text-white hover:bg-neutral-900"
+            )}
+          >
+            All Categories
+          </button>
+          {CATEGORIES.map((cat: string) => (
+            <button
+              key={cat}
+              onClick={() =>
+                update(
+                  "category",
+                  currentFilters.category === cat ? "" : (cat as Category)
+                )
+              }
+              className={cn(
+                "w-full text-left px-3 py-1.5 rounded-lg text-sm transition-colors duration-200",
+                currentFilters.category === cat
+                  ? "bg-blue-600/20 text-blue-300"
+                  : "text-neutral-400 hover:text-white hover:bg-neutral-900"
+              )}
+            >
+              {CATEGORY_LABELS[cat as Category]}
+            </button>
+          ))}
+        </div>
+      </FilterSection>
+
+      {/* Language — multi-select with "Show more" */}
+      <FilterSection
+        title="Language"
+        activeCount={currentFilters.languages.length}
+      >
+        <FilterCheckboxGroup
+          options={LANGUAGE_OPTIONS}
+          selected={currentFilters.languages}
+          onChange={(v) => update("languages", v)}
+          showMoreThreshold={8}
+        />
+      </FilterSection>
+    </>
+  );
 
   return (
     <>
       {/* Search + Sort row */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+      <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <div className="flex-1">
           <SearchBar
-            value={search}
-            onChange={setSearch}
+            value={filters.q}
+            onChange={(q) => updateFilter("q", q)}
             placeholder="Search servers, descriptions, or tags..."
           />
         </div>
 
         <div className="relative">
           <select
-            value={sortKey}
-            onChange={(e) => {
-              setSortKey(e.target.value as SortOption);
-            }}
+            value={filters.sort}
+            onChange={(e) =>
+              updateFilter("sort", e.target.value as SortOption)
+            }
             className="appearance-none bg-neutral-900 border border-neutral-800 text-white text-sm rounded-xl px-4 py-3 pr-10 outline-none hover:border-neutral-700 focus:border-blue-500/50 transition-colors duration-200 cursor-pointer"
           >
             <option value="stars">Sort: Most Stars</option>
@@ -98,11 +248,12 @@ export function ServersFilters({
           />
         </div>
 
+        {/* Mobile filter button */}
         <button
-          onClick={() => setShowFilters(!showFilters)}
+          onClick={openMobileDrawer}
           className={cn(
             "flex items-center gap-2 px-4 py-3 rounded-xl border text-sm font-medium transition-colors duration-200 sm:hidden",
-            showFilters
+            activeFilterCount > 0
               ? "bg-blue-600 border-blue-500 text-white"
               : "bg-neutral-900 border-neutral-800 text-neutral-400 hover:border-neutral-700"
           )}
@@ -110,76 +261,40 @@ export function ServersFilters({
           <IconFilter size={16} />
           Filters
           {activeFilterCount > 0 && (
-            <span className="ml-1 bg-blue-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+            <span className="ml-1 bg-white/20 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
               {activeFilterCount}
             </span>
           )}
         </button>
       </div>
 
-      <div className="flex gap-8">
-        {/* Sidebar */}
-        <aside
-          className={cn(
-            "shrink-0 w-52 space-y-6",
-            showFilters ? "block" : "hidden sm:block"
-          )}
-        >
-          {activeFilterCount > 0 && (
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-neutral-400 font-medium uppercase tracking-wider">
-                {activeFilterCount} filter active
-              </span>
-              <button
-                onClick={clearFilters}
-                className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors duration-200"
-              >
-                <IconX size={12} />
-                Clear
-              </button>
-            </div>
-          )}
+      {/* Active filter chips */}
+      <ActiveFilterChips
+        filters={filters}
+        onRemove={removeFilter}
+        onClearAll={clearAllFilters}
+      />
 
-          <div>
-            <h3 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-3">
-              Category
-            </h3>
-            <div className="space-y-1">
-              <button
-                onClick={() => setSelectedCategory("")}
-                className={cn(
-                  "w-full text-left px-3 py-1.5 rounded-lg text-sm transition-colors duration-200 flex items-center justify-between",
-                  !selectedCategory
-                    ? "bg-blue-600/20 text-blue-300"
-                    : "text-neutral-400 hover:text-white hover:bg-neutral-900"
-                )}
-              >
-                All Categories
-                <span className="text-neutral-600 text-xs">{totalCount}</span>
-              </button>
-              {CATEGORIES.map((cat: string) => (
-                <button
-                  key={cat}
-                  onClick={() =>
-                    setSelectedCategory(selectedCategory === cat ? "" : cat)
-                  }
-                  className={cn(
-                    "w-full text-left px-3 py-1.5 rounded-lg text-sm transition-colors duration-200",
-                    selectedCategory === cat
-                      ? "bg-blue-600/20 text-blue-300"
-                      : "text-neutral-400 hover:text-white hover:bg-neutral-900"
-                  )}
-                >
-                  {CATEGORY_LABELS[cat as Category]}
-                </button>
-              ))}
-            </div>
-          </div>
+      <div className="flex gap-8">
+        {/* Desktop sidebar */}
+        <aside className="shrink-0 w-52 space-y-6 hidden sm:block">
+          {renderFilterGroups(filters, updateFilter)}
         </aside>
 
         {/* Server grid — server-rendered */}
         <main className="flex-1 min-w-0">{children}</main>
       </div>
+
+      {/* Mobile filter drawer */}
+      <MobileFilterDrawer
+        isOpen={showMobileDrawer}
+        onClose={() => setShowMobileDrawer(false)}
+        onApply={applyMobileFilters}
+        onClear={clearAllMobileFilters}
+        activeCount={mobileActiveCount}
+      >
+        {renderFilterGroups(mobileFilters, updateMobileFilter)}
+      </MobileFilterDrawer>
     </>
   );
 }

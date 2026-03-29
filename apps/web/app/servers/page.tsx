@@ -8,15 +8,13 @@ import { Navbar } from "@/components/ui/navbar";
 import { ServerCard } from "@/components/ui/server-card";
 import { ServersFilters } from "@/components/ui/servers-filters";
 import { IconFilter, IconArrowLeft, IconArrowRight } from "@tabler/icons-react";
+import { parseFilterParams } from "@/lib/filter-utils";
 
 export const metadata: Metadata = {
   title: `Browse MCP Servers | ${SITE_NAME}`,
   description:
     "Search and filter 2000+ MCP servers. Get instant install configs for Claude Desktop, Cursor, VS Code, Windsurf, and Claude Code.",
 };
-
-const SORT_ALLOWLIST = ["stars", "updated", "name", "downloads"] as const;
-type SortOption = (typeof SORT_ALLOWLIST)[number];
 
 export default async function ServersPage({
   searchParams,
@@ -26,23 +24,17 @@ export default async function ServersPage({
     category?: string;
     sort?: string;
     page?: string;
+    pkg?: string;
+    lang?: string;
+    tools?: string;
+    resources?: string;
+    prompts?: string;
+    official?: string;
+    featured?: string;
   }>;
 }) {
   const params = await searchParams;
-
-  const rawCategory = params.category;
-  const validCategory: Category | undefined =
-    rawCategory && (CATEGORIES as readonly string[]).includes(rawCategory)
-      ? (rawCategory as Category)
-      : undefined;
-
-  const rawSort = params.sort;
-  const validSort: SortOption =
-    rawSort && (SORT_ALLOWLIST as readonly string[]).includes(rawSort)
-      ? (rawSort as SortOption)
-      : "stars";
-
-  const currentPage = params.page ? parseInt(params.page, 10) : 1;
+  const filters = parseFilterParams(params);
 
   let result: Awaited<ReturnType<typeof listServers>> = {
     servers: [],
@@ -54,10 +46,17 @@ export default async function ServersPage({
 
   try {
     result = await listServers({
-      q: params.q,
-      category: validCategory,
-      sort: validSort,
-      page: currentPage,
+      q: filters.q || undefined,
+      category: (filters.category as Category) || undefined,
+      packageTypes: filters.packageTypes.length ? filters.packageTypes : undefined,
+      languages: filters.languages.length ? filters.languages : undefined,
+      hasTools: filters.hasTools || undefined,
+      hasResources: filters.hasResources || undefined,
+      hasPrompts: filters.hasPrompts || undefined,
+      isOfficial: filters.isOfficial || undefined,
+      featured: filters.featured || undefined,
+      sort: filters.sort,
+      page: filters.page,
     });
   } catch {
     // Supabase not available (e.g., during build without credentials)
@@ -67,7 +66,7 @@ export default async function ServersPage({
     <div className="min-h-screen bg-black text-white">
       <Navbar variant="sticky" />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-12">
         {/* Page header */}
         <div className="mb-10">
           <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-neutral-400 mb-2">
@@ -76,12 +75,12 @@ export default async function ServersPage({
           <p className="text-neutral-500 text-lg">
             {result.total.toLocaleString()} servers available across{" "}
             {CATEGORIES.length} categories
-            {validCategory && (
+            {filters.category && (
               <span>
                 {" "}
                 in{" "}
                 <span className="text-blue-400">
-                  {CATEGORY_LABELS[validCategory]}
+                  {CATEGORY_LABELS[filters.category as Category]}
                 </span>
               </span>
             )}
@@ -90,9 +89,7 @@ export default async function ServersPage({
 
         <Suspense fallback={<ServersLoadingSkeleton />}>
           <ServersFilters
-            initialQ={params.q ?? ""}
-            initialCategory={validCategory ?? ""}
-            initialSort={validSort}
+            initialFilters={filters}
             totalCount={result.total}
           >
             {/* Results */}
@@ -108,11 +105,11 @@ export default async function ServersPage({
                     {result.total.toLocaleString()}
                   </span>{" "}
                   server{result.total !== 1 ? "s" : ""}
-                  {params.q && (
+                  {filters.q && (
                     <span>
                       {" "}
                       for &ldquo;
-                      <span className="text-blue-400">{params.q}</span>&rdquo;
+                      <span className="text-blue-400">{filters.q}</span>&rdquo;
                     </span>
                   )}
                 </p>
@@ -149,9 +146,9 @@ export default async function ServersPage({
               {result.totalPages > 1 && (
                 <div className="flex items-center justify-between mt-10 pt-6 border-t border-neutral-900">
                   <div className="flex items-center gap-2">
-                    {currentPage > 1 && (
+                    {filters.page > 1 && (
                       <PaginationLink
-                        href={buildPageUrl(params, currentPage - 1)}
+                        href={buildPageUrl(params, filters.page - 1)}
                         icon={<IconArrowLeft size={16} />}
                         label="Previous"
                       />
@@ -160,7 +157,7 @@ export default async function ServersPage({
                   <span className="text-sm text-neutral-500">
                     Page{" "}
                     <span className="text-white font-semibold">
-                      {currentPage}
+                      {filters.page}
                     </span>{" "}
                     of{" "}
                     <span className="text-white font-semibold">
@@ -168,9 +165,9 @@ export default async function ServersPage({
                     </span>
                   </span>
                   <div className="flex items-center gap-2">
-                    {currentPage < result.totalPages && (
+                    {filters.page < result.totalPages && (
                       <PaginationLink
-                        href={buildPageUrl(params, currentPage + 1)}
+                        href={buildPageUrl(params, filters.page + 1)}
                         icon={<IconArrowRight size={16} />}
                         label="Next"
                         iconRight
@@ -188,12 +185,19 @@ export default async function ServersPage({
 }
 
 function buildPageUrl(
-  params: { q?: string; category?: string; sort?: string },
+  params: Record<string, string | undefined>,
   page: number
 ) {
   const p = new URLSearchParams();
   if (params.q) p.set("q", params.q);
   if (params.category) p.set("category", params.category);
+  if (params.pkg) p.set("pkg", params.pkg);
+  if (params.lang) p.set("lang", params.lang);
+  if (params.tools) p.set("tools", params.tools);
+  if (params.resources) p.set("resources", params.resources);
+  if (params.prompts) p.set("prompts", params.prompts);
+  if (params.official) p.set("official", params.official);
+  if (params.featured) p.set("featured", params.featured);
   if (params.sort && params.sort !== "stars") p.set("sort", params.sort);
   if (page > 1) p.set("page", String(page));
   return `/servers${p.toString() ? `?${p.toString()}` : ""}`;
