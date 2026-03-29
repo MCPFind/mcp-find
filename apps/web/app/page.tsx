@@ -72,7 +72,7 @@ export default async function HomePage() {
       <Navbar variant="fixed" />
 
       {/* ── 1. Hero ── */}
-      <AuroraBackground className="min-h-screen !h-auto bg-black dark:bg-black pt-16">
+      <AuroraBackground className="min-h-screen !h-auto bg-black dark:bg-black pt-24">
         {/* Grid background */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff08_1px,transparent_1px),linear-gradient(to_bottom,#ffffff08_1px,transparent_1px)] bg-[size:4rem_4rem]" />
         {/* Bottom fade */}

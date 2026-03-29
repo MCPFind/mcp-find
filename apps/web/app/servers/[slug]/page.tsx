@@ -98,7 +98,7 @@ export default async function ServerDetailPage({
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-black text-white overflow-x-hidden">
       {/* JSON-LD */}
       <script
         type="application/ld+json"

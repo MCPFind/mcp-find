@@ -235,7 +235,7 @@ export function ServersFilters({
             onChange={(e) =>
               updateFilter("sort", e.target.value as SortOption)
             }
-            className="appearance-none bg-neutral-900 border border-neutral-800 text-white text-sm rounded-xl px-4 py-3 pr-10 outline-none hover:border-neutral-700 focus:border-blue-500/50 transition-colors duration-200 cursor-pointer"
+            className="w-full appearance-none bg-neutral-900 border border-neutral-800 text-white text-sm rounded-xl px-4 py-3 pr-10 outline-none hover:border-neutral-700 focus:border-blue-500/50 transition-colors duration-200 cursor-pointer"
           >
             <option value="stars">Sort: Most Stars</option>
             <option value="downloads">Sort: Most Downloads</option>
