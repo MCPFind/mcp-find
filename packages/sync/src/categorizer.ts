@@ -1,6 +1,20 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { CATEGORIES, CATEGORY_KEYWORDS, type Category } from '@mcpfind/shared';
 
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function matchesKeyword(text: string, keyword: string): boolean {
+  // Multi-word keywords (e.g., "google drive") use literal match — spaces act as natural boundaries
+  if (keyword.includes(' ')) {
+    return text.includes(keyword);
+  }
+  // Single-word keywords use word-boundary regex
+  const pattern = new RegExp(`\\b${escapeRegex(keyword)}\\b`, 'i');
+  return pattern.test(text);
+}
+
 function categorizeServer(
   name: string,
   description: string | null,
@@ -13,7 +27,7 @@ function categorizeServer(
   for (const category of CATEGORIES) {
     if (category === 'other') continue;
     const keywords = CATEGORY_KEYWORDS[category];
-    if (tags.some(tag => keywords.some(kw => tag.toLowerCase().includes(kw)))) {
+    if (tags.some(tag => keywords.some(kw => matchesKeyword(tag.toLowerCase(), kw)))) {
       return category;
     }
   }
@@ -22,7 +36,7 @@ function categorizeServer(
   for (const category of CATEGORIES) {
     if (category === 'other') continue;
     const keywords = CATEGORY_KEYWORDS[category];
-    if (keywords.some(kw => searchText.includes(kw))) {
+    if (keywords.some(kw => matchesKeyword(searchText, kw))) {
       return category;
     }
   }
@@ -34,7 +48,7 @@ function categorizeServer(
     for (const category of CATEGORIES) {
       if (category === 'other') continue;
       const keywords = CATEGORY_KEYWORDS[category];
-      if (keywords.some(kw => officialName.includes(kw))) {
+      if (keywords.some(kw => matchesKeyword(officialName, kw))) {
         return category;
       }
     }
