@@ -1,0 +1,127 @@
+# Category Copy
+
+## Page Descriptions
+
+### databases
+Connect your AI agent to the databases it needs. This category covers MCP servers for PostgreSQL, MySQL, SQLite, MongoDB, Redis, and more. Whether you're querying production data, running migrations, or letting an agent manage a local dev database, you'll find integrations here. Most servers support both read-only and read-write modes so you can pick the right level of access.
+
+### cloud
+MCP servers for the big cloud providers — AWS, GCP, Azure — plus platforms like Vercel, Fly.io, and Cloudflare. Use these to let your agent provision resources, query logs, manage deployments, or inspect infrastructure state. Useful when you want an agent that can actually do things in your cloud environment, not just talk about it.
+
+### devtools
+Integrations that plug your AI agent into the tools you already use to build software. Think GitHub, GitLab, Docker, terminal access, package registries, and CI systems. If it's part of your development workflow and you want an agent to interact with it directly, it probably lives here.
+
+### communication
+The places where work conversations happen: Slack, Discord, email, SMS, and more. These MCP servers let agents send messages, read threads, post to channels, and fire off notifications. Handy if you're building something that surfaces information where your team already looks — no new tool required.
+
+### filesystems
+MCP servers for reading and writing files — local disk, cloud storage (S3, GCS, R2), and shared drives (Google Drive, Dropbox). Agents can read docs, write outputs, manage directories, or sync files between locations. The building block for most agents that need to work with documents or data files.
+
+### search
+Give your agent the ability to find things. This category includes web search engines (Brave, Tavily, Exa), semantic and vector search, knowledge bases, and Wikipedia/docs integrations. Use these when your agent needs to look something up rather than rely solely on what's already in its context.
+
+### ai-ml
+Servers for integrating AI services directly into your agent workflows. Image generation, speech-to-text, embeddings, model APIs, and vector stores all live here. Useful when you're building agents that chain multiple AI capabilities together or need to call specialized models for specific subtasks.
+
+### finance
+Financial data and services for your agent stack — market data feeds, stock prices, crypto APIs, accounting platforms like QuickBooks, and payment processors. Building a trading assistant? An expense tracker? Something that generates financial reports? Start here.
+
+### crm
+Your CRM and sales tools, connected to agents: Salesforce, HubSpot, Pipedrive, and the like. These integrations let agents read contacts, update records, log activities, and pull pipeline data. They're most valuable for sales automation and customer research — especially keeping CRM data accurate without someone doing manual entry.
+
+### productivity
+The catch-all for tools that help people get work done: Notion, Airtable, Todoist, Google Workspace, Jira, and more. If you want an agent that can manage tasks, update project trackers, or coordinate information across your productivity stack, this is the place to look.
+
+### monitoring
+Servers for observability platforms — Datadog, Grafana, Sentry, PagerDuty, New Relic, and similar tools. Let your agent query metrics, inspect error logs, check alert status, or pull APM traces. Particularly useful for on-call workflows or agents that need to diagnose production issues without someone manually pulling dashboards.
+
+### automation
+Integrations with workflow and automation platforms: Zapier, Make (formerly Integromat), n8n, Pipedream, and similar tools. Use these to trigger existing automations from an agent, or to build agents that orchestrate multi-step workflows across services that don't have their own MCP servers yet.
+
+### media
+Everything images, video, audio, and design. Covers image generation (DALL-E, Stable Diffusion), editing APIs, video processing, screenshot capture, and design tools like Figma and Canva. Basically — if your agent works with media files or creative assets, look here first.
+
+### security
+Integrations with security and auth infrastructure: identity providers (Auth0, Okta), secrets managers (Vault, AWS Secrets Manager), vulnerability scanners, and compliance tools. Use these when building agents that need to handle credentials safely, audit access, or interact with security tooling in your stack.
+
+### testing
+Testing frameworks, QA tools, and code quality platforms. You'll find unit test runners, end-to-end tools like Playwright and Cypress, coverage reporters, and static analysis services. The idea: agents that can write tests, run suites, interpret what broke, and flag regressions on their own.
+
+### analytics
+Your analytics and BI infrastructure, wired up for agents: Google Analytics, Mixpanel, Amplitude, BigQuery, dbt, and more. Pull usage metrics, run queries, check dashboards, or surface insights without writing one-off scripts. Especially handy when you'd rather not be the one manually running analyst queries every week.
+
+### documentation
+MCP servers for documentation platforms and tools: Confluence, Gitbook, ReadMe, Mintlify, and similar. Agents can read existing docs, create or update pages, search knowledge bases, and keep documentation in sync with code changes. Particularly useful for teams trying to reduce doc rot.
+
+### social
+Social media platform integrations — Twitter/X, LinkedIn, Instagram, YouTube, Reddit, and others. Your agent can read posts, publish content, track mentions, and pull analytics. Works well for content scheduling, social listening, or really anything that needs programmatic access to public platform APIs.
+
+### ecommerce
+Shopify, WooCommerce, Stripe, and similar e-commerce platform servers. Agents can manage products, read orders, handle inventory, process refunds, and pull sales data. Whether it's store management, customer service automation, or reporting — the commerce backend integrations live here.
+
+### maps
+Mapping and location services: Google Maps, Mapbox, OpenStreetMap, geocoding APIs, and routing engines. Good for resolving addresses, calculating distances, finding nearby places, or building anything location-aware. Also covers geospatial data services for more advanced use cases.
+
+---
+
+## LLMs.txt Descriptions
+
+### databases
+PostgreSQL, MySQL, MongoDB, Redis, SQLite, and relational/NoSQL database MCP integrations for querying and managing data.
+
+### cloud
+AWS, GCP, Azure, Vercel, Cloudflare, and cloud infrastructure MCP integrations for provisioning and deployment.
+
+### devtools
+GitHub, GitLab, Docker, terminal access, CI/CD systems, and developer workflow MCP integrations.
+
+### communication
+Slack, Discord, email (Gmail, SMTP), SMS (Twilio), and messaging platform MCP integrations.
+
+### filesystems
+Local disk, S3, Google Drive, Dropbox, R2, and cloud storage MCP integrations for file read/write operations.
+
+### search
+Brave Search, Tavily, Exa, vector search, Wikipedia, and knowledge base MCP integrations for information retrieval.
+
+### ai-ml
+OpenAI, Replicate, Hugging Face, Pinecone, and AI model/embedding/image-generation MCP integrations.
+
+### finance
+Stock market data, crypto APIs, QuickBooks, Stripe, and financial data platform MCP integrations.
+
+### crm
+Salesforce, HubSpot, Pipedrive, and customer relationship management platform MCP integrations.
+
+### productivity
+Notion, Airtable, Jira, Google Workspace, Todoist, and productivity tool MCP integrations.
+
+### monitoring
+Datadog, Grafana, Sentry, PagerDuty, New Relic, and observability platform MCP integrations.
+
+### automation
+Zapier, Make, n8n, Pipedream, and workflow automation platform MCP integrations.
+
+### media
+DALL-E, Stable Diffusion, Figma, Canva, FFmpeg, and image/video/design tool MCP integrations.
+
+### security
+Auth0, Okta, HashiCorp Vault, AWS Secrets Manager, and security/identity platform MCP integrations.
+
+### testing
+Playwright, Cypress, Jest, Sentry, and testing framework/QA tool MCP integrations.
+
+### analytics
+Google Analytics, Mixpanel, Amplitude, BigQuery, dbt, and analytics/BI platform MCP integrations.
+
+### documentation
+Confluence, Gitbook, ReadMe, Mintlify, and documentation platform MCP integrations.
+
+### social
+Twitter/X, LinkedIn, Instagram, YouTube, Reddit, and social media platform MCP integrations.
+
+### ecommerce
+Shopify, WooCommerce, Stripe, and e-commerce platform MCP integrations for store and order management.
+
+### maps
+Google Maps, Mapbox, OpenStreetMap, geocoding APIs, and location/routing service MCP integrations.

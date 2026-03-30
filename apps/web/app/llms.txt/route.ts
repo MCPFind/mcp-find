@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerCount, getTopServers } from '@/lib/queries';
-import { SITE_NAME, SITE_URL, CATEGORY_LABELS } from '@mcpfind/shared';
+import { SITE_NAME, SITE_URL, CATEGORY_LABELS, CATEGORY_LLM_DESCRIPTIONS } from '@mcpfind/shared';
+import type { Category } from '@mcpfind/shared';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,9 +11,8 @@ export async function GET() {
     getTopServers(20),
   ]);
 
-  const categoryLines = Object.entries(CATEGORY_LABELS)
-    .filter(([key]) => key !== 'other')
-    .map(([key, label]) => `- [${label} Servers](${SITE_URL}/categories/${key}): ${label} MCP servers`)
+  const categoryLines = Object.entries(CATEGORY_LLM_DESCRIPTIONS)
+    .map(([key, description]) => `- [${CATEGORY_LABELS[key as Category]} Servers](${SITE_URL}/categories/${key}): ${description}`)
     .join('\n');
 
   const topServerLines = topServers

@@ -1,5 +1,5 @@
 import type { Server, ServerListItem, ServerWithTools } from '@mcpfind/shared';
-import { SITE_NAME, SITE_URL, CATEGORY_LABELS, CATEGORY_FAQS } from '@mcpfind/shared';
+import { SITE_NAME, SITE_URL, CATEGORY_LABELS, CATEGORY_DESCRIPTIONS, CATEGORY_FAQS } from '@mcpfind/shared';
 import type { Category } from '@mcpfind/shared';
 import type { Metadata } from 'next';
 
@@ -44,6 +44,7 @@ export function generateCategoryJsonLd(
         name: `${categoryLabel} MCP Servers`,
         description: `Browse ${servers.length}+ ${categoryLabel.toLowerCase()} MCP servers with instant install configs.`,
         url: `${SITE_URL}/categories/${category}`,
+        breadcrumb: { '@id': `${SITE_URL}/categories/${category}#breadcrumb` },
         mainEntity: {
           '@type': 'ItemList',
           numberOfItems: servers.length,
@@ -57,10 +58,11 @@ export function generateCategoryJsonLd(
       },
       {
         '@type': 'BreadcrumbList',
+        '@id': `${SITE_URL}/categories/${category}#breadcrumb`,
         itemListElement: [
           { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
           { '@type': 'ListItem', position: 2, name: 'Categories', item: `${SITE_URL}/categories` },
-          { '@type': 'ListItem', position: 3, name: categoryLabel, item: `${SITE_URL}/categories/${category}` },
+          { '@type': 'ListItem', position: 3, name: `${categoryLabel} MCP Servers`, item: `${SITE_URL}/categories/${category}` },
         ],
       },
       {
@@ -110,7 +112,15 @@ export function generateCategoryMetadata(
   count: number
 ): Metadata {
   const title = `${categoryLabel} MCP Servers`;
-  const description = `Browse ${count}+ ${categoryLabel.toLowerCase()} MCP servers. Get instant install configs for Claude Desktop, Cursor, VS Code, and Windsurf.`.slice(0, 160);
+  const fullDesc = CATEGORY_DESCRIPTIONS[category as Category] || `Browse ${count}+ ${categoryLabel.toLowerCase()} MCP servers.`;
+  // Truncate at sentence boundary (split on ". " not bare "." to avoid splitting Fly.io, e.g., etc.)
+  const sentences = fullDesc.split(/(?<=[.!?])\s+/);
+  let description = '';
+  for (const sentence of sentences) {
+    if ((description ? description + ' ' : '') .length + sentence.length > 160) break;
+    description = description ? description + ' ' + sentence : sentence;
+  }
+  if (!description) description = fullDesc.slice(0, 157) + '...';
   return {
     title,
     description,

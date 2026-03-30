@@ -1,7 +1,7 @@
 import { getServersByCategory } from '@/lib/queries';
 import { generateCategoryMetadata, generateCategoryJsonLd } from '@/lib/metadata';
 import { safeJsonLd } from '@/lib/json-ld';
-import { CATEGORIES, CATEGORY_LABELS, CATEGORY_FAQS } from '@mcpfind/shared';
+import { CATEGORIES, CATEGORY_LABELS, CATEGORY_DESCRIPTIONS, CATEGORY_FAQS } from '@mcpfind/shared';
 import type { Category } from '@mcpfind/shared';
 import { CategoryFaq } from '@/components/ui/category-faq';
 import { ServerCard } from '@/components/ui/server-card';
@@ -57,6 +57,9 @@ export default async function CategoryPage({
           <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-neutral-400 mb-2">
             {label} MCP Servers
           </h1>
+          <p className="text-neutral-400 text-base max-w-2xl mb-2">
+            {CATEGORY_DESCRIPTIONS[category as Category]}
+          </p>
           <p className="text-neutral-500 text-lg">
             {servers.length} servers in this category
           </p>
