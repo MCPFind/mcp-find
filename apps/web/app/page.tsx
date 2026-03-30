@@ -9,6 +9,7 @@ import { CATEGORIES, CATEGORY_LABELS, SITE_URL } from "@mcpfind/shared";
 import type { Category, ServerListItem } from "@mcpfind/shared";
 import { HomeFaq } from "@/components/ui/home-faq";
 import { HOME_FAQS } from "@/lib/home-faqs";
+import { KNOWN_LANGUAGES } from "@/lib/filter-utils";
 import {
   IconDatabase,
   IconCode,
@@ -171,7 +172,7 @@ export default async function HomePage() {
             <div className="w-px h-12 bg-neutral-800 hidden sm:block self-center" />
             <div className="flex flex-col items-center">
               <span className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">
-                4
+                {KNOWN_LANGUAGES.length}+
               </span>
               <span className="text-neutral-500 mt-1">Languages</span>
             </div>
