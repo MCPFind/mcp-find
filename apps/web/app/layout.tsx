@@ -20,9 +20,18 @@ export const metadata: Metadata = {
     siteName: "MCP Find",
     type: "website",
     locale: "en_US",
+    images: [
+      {
+        url: "https://mcpfind.org/og-image-mcp.png",
+        width: 1200,
+        height: 630,
+        alt: "MCP Find — The open-source way to find MCP servers",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
+    images: ["https://mcpfind.org/og-image-mcp.png"],
   },
   robots: {
     index: true,

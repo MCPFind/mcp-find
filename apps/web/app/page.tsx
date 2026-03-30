@@ -30,6 +30,15 @@ import {
   IconBriefcase,
   IconCurrencyDollar,
   IconUsers,
+  IconActivityHeartbeat,
+  IconTestPipe,
+  IconChartBar,
+  IconAutomation,
+  IconPhoto,
+  IconFileText,
+  IconShare,
+  IconShoppingCart,
+  IconMapPin,
 } from "@tabler/icons-react";
 
 const categoryIconMap: Record<string, React.ReactNode> = {
@@ -43,6 +52,16 @@ const categoryIconMap: Record<string, React.ReactNode> = {
   finance: <IconCurrencyDollar size={20} className="text-emerald-400" />,
   crm: <IconUsers size={20} className="text-indigo-400" />,
   productivity: <IconCheckbox size={20} className="text-teal-400" />,
+  monitoring: <IconActivityHeartbeat size={20} className="text-red-400" />,
+  security: <IconShield size={20} className="text-amber-400" />,
+  testing: <IconTestPipe size={20} className="text-lime-400" />,
+  analytics: <IconChartBar size={20} className="text-violet-400" />,
+  automation: <IconAutomation size={20} className="text-sky-400" />,
+  media: <IconPhoto size={20} className="text-fuchsia-400" />,
+  documentation: <IconFileText size={20} className="text-slate-400" />,
+  social: <IconShare size={20} className="text-blue-300" />,
+  ecommerce: <IconShoppingCart size={20} className="text-rose-400" />,
+  maps: <IconMapPin size={20} className="text-emerald-300" />,
   other: <IconBriefcase size={20} className="text-neutral-400" />,
 };
 
