@@ -1,5 +1,6 @@
 import type { Server, ServerListItem, ServerWithTools } from '@mcpfind/shared';
-import { SITE_NAME, SITE_URL, CATEGORY_LABELS } from '@mcpfind/shared';
+import { SITE_NAME, SITE_URL, CATEGORY_LABELS, CATEGORY_DESCRIPTIONS } from '@mcpfind/shared';
+import type { Category } from '@mcpfind/shared';
 import type { Metadata } from 'next';
 
 export function generateServerJsonLd(server: ServerWithTools): object {
@@ -35,20 +36,34 @@ export function generateCategoryJsonLd(
 ): object {
   return {
     '@context': 'https://schema.org',
-    '@type': 'CollectionPage',
-    name: `${categoryLabel} MCP Servers`,
-    description: `Browse ${servers.length}+ ${categoryLabel.toLowerCase()} MCP servers with instant install configs.`,
-    url: `${SITE_URL}/categories/${category}`,
-    mainEntity: {
-      '@type': 'ItemList',
-      numberOfItems: servers.length,
-      itemListElement: servers.slice(0, 50).map((s, i) => ({
-        '@type': 'ListItem',
-        position: i + 1,
-        url: `${SITE_URL}/servers/${s.slug}`,
-        name: s.name,
-      })),
-    },
+    '@graph': [
+      {
+        '@type': 'CollectionPage',
+        name: `${categoryLabel} MCP Servers`,
+        description: `Browse ${servers.length}+ ${categoryLabel.toLowerCase()} MCP servers with instant install configs.`,
+        url: `${SITE_URL}/categories/${category}`,
+        breadcrumb: { '@id': `${SITE_URL}/categories/${category}#breadcrumb` },
+        mainEntity: {
+          '@type': 'ItemList',
+          numberOfItems: servers.length,
+          itemListElement: servers.slice(0, 50).map((s, i) => ({
+            '@type': 'ListItem',
+            position: i + 1,
+            url: `${SITE_URL}/servers/${s.slug}`,
+            name: s.name,
+          })),
+        },
+      },
+      {
+        '@type': 'BreadcrumbList',
+        '@id': `${SITE_URL}/categories/${category}#breadcrumb`,
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
+          { '@type': 'ListItem', position: 2, name: 'Categories', item: `${SITE_URL}/categories` },
+          { '@type': 'ListItem', position: 3, name: `${categoryLabel} MCP Servers` },
+        ],
+      },
+    ],
   };
 }
 
@@ -83,7 +98,7 @@ export function generateCategoryMetadata(
   count: number
 ): Metadata {
   const title = `${categoryLabel} MCP Servers`;
-  const description = `Browse ${count}+ ${categoryLabel.toLowerCase()} MCP servers. Get instant install configs for Claude Desktop, Cursor, VS Code, and Windsurf.`.slice(0, 160);
+  const description = (CATEGORY_DESCRIPTIONS[category as Category] || `Browse ${count}+ ${categoryLabel.toLowerCase()} MCP servers.`).slice(0, 160);
   return {
     title,
     description,

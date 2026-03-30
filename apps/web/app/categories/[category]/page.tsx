@@ -1,7 +1,8 @@
 import { getServersByCategory } from '@/lib/queries';
 import { generateCategoryMetadata, generateCategoryJsonLd } from '@/lib/metadata';
 import { safeJsonLd } from '@/lib/json-ld';
-import { CATEGORIES, CATEGORY_LABELS } from '@mcpfind/shared';
+import { CATEGORIES, CATEGORY_LABELS, CATEGORY_DESCRIPTIONS } from '@mcpfind/shared';
+import type { Category } from '@mcpfind/shared';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -48,6 +49,7 @@ export default async function CategoryPage({
       />
 
       <h1 className="text-3xl font-bold">{label} MCP Servers</h1>
+      <p className="text-gray-600 mt-2 max-w-2xl">{CATEGORY_DESCRIPTIONS[category as Category]}</p>
       <p className="text-gray-600 mt-2">{servers.length} servers in this category</p>
 
       {/* TODO: Adam — Reuse ServerCard grid from /servers page */}
