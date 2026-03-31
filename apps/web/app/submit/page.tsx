@@ -13,9 +13,9 @@ import {
 export default function SubmitPage() {
   return (
     <div className="min-h-screen bg-black text-white">
-      <Navbar />
+      <Navbar variant="sticky" />
 
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-20">
         <div className="text-center mb-12">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-sm font-medium mb-6">
             <IconSparkles size={14} />

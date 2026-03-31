@@ -9,6 +9,8 @@ import { Navbar } from '@/components/ui/navbar';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 
+export const revalidate = 3600;
+
 export function generateStaticParams() {
   // Skip pre-building static category pages when Supabase credentials are absent (e.g., CI).
   // Pages will be rendered on-demand at runtime.
