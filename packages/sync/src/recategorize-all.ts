@@ -11,7 +11,7 @@
  *
  * Usage: npx tsx packages/sync/src/recategorize-all.ts
  */
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { categorizeServers } from './categorizer';
 
 async function main() {
@@ -109,7 +109,7 @@ async function main() {
 }
 
 async function rollback(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient<any, any, any>,
   snapshot: Map<string, string | null>
 ) {
   console.log(`Rolling back ${snapshot.size} servers to original categories...`);
