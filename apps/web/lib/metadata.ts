@@ -83,7 +83,14 @@ export function generateCategoryJsonLd(
 export function generateServerMetadata(server: ServerWithTools): Metadata {
   const categoryLabel = server.category ? (CATEGORY_LABELS[server.category as keyof typeof CATEGORY_LABELS] || server.category) : 'Developer Tools';
   const title = `${server.name} — MCP Server for ${categoryLabel}`;
-  const description = `Install ${server.name} in Claude Desktop, Cursor, or VS Code. ${(server.description || '').slice(0, 100)}. ${server.github_stars}+ GitHub stars. Open source.`.slice(0, 160);
+  const fullDesc = `Install ${server.name} in Claude Desktop, Cursor, or VS Code. ${(server.description || '').slice(0, 100)}. ${server.github_stars ? server.github_stars + '+ GitHub stars.' : ''} Open source.`;
+  const serverSentences = fullDesc.split(/(?<=[.!?])\s+/);
+  let description = '';
+  for (const sentence of serverSentences) {
+    if ((description ? description + ' ' : '').length + sentence.length > 160) break;
+    description = description ? description + ' ' + sentence : sentence;
+  }
+  if (!description) description = fullDesc.slice(0, 157) + '...';
   return {
     title,
     description,

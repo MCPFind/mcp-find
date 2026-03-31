@@ -31,6 +31,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
+    site: "@mcpfind",
+    creator: "@mcpfind",
     images: ["https://mcpfind.org/og-image-mcp.png"],
   },
   robots: {
@@ -44,6 +46,13 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "https://mcpfind.org",
   },
+  verification: {
+    google: '', // TODO: add Google Search Console verification code
+    other: {
+      'msvalidate.01': '', // TODO: add Bing Webmaster Tools verification code
+    },
+  },
+  keywords: ['MCP servers', 'Model Context Protocol', 'Claude Desktop', 'Cursor', 'VS Code', 'AI tools', 'MCP directory', 'MCP integrations', 'AI agent tools'],
 };
 
 export default function RootLayout({
@@ -54,6 +63,23 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className={`${inter.variable} font-sans antialiased bg-black text-white`}>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'WebSite',
+              name: 'MCP Find',
+              url: 'https://mcpfind.org',
+              description: 'Open-source directory of MCP servers. AI-agent optimized.',
+              potentialAction: {
+                '@type': 'SearchAction',
+                target: 'https://mcpfind.org/servers?q={search_term_string}',
+                'query-input': 'required name=search_term_string',
+              },
+            }),
+          }}
+        />
         {children}
       </body>
     </html>
