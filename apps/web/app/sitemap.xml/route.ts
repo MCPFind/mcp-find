@@ -56,7 +56,14 @@ export async function GET() {
   const allPages = [...staticPages, ...categoryPages, ...serverPages, ...blogIndexPage, ...blogPages];
 
   const renderUrl = (p: { url: string; changefreq: string; priority: string; lastmod?: string }) => {
-    const lastmodStr = p.lastmod ? `\n    <lastmod>${new Date(p.lastmod).toISOString().split('T')[0]}</lastmod>` : '';
+    let lastmodStr = '';
+    if (p.lastmod) {
+      try {
+        lastmodStr = `\n    <lastmod>${new Date(p.lastmod).toISOString().split('T')[0]}</lastmod>`;
+      } catch {
+        // Skip lastmod for invalid dates
+      }
+    }
     return `  <url>
     <loc>${escapeXml(p.url)}</loc>
     <changefreq>${p.changefreq}</changefreq>

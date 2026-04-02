@@ -8,7 +8,7 @@ export async function GET() {
   const posts = getAllPosts();
 
   const items = posts.map(post => {
-    const description = post.frontmatter.excerpt ?? post.frontmatter.description;
+    const description = post.frontmatter.excerpt ?? post.frontmatter.description ?? '';
     const link = `${SITE_URL}/blog/${post.slug}`;
     const pubDate = new Date(post.frontmatter.date).toUTCString();
     const categories = post.frontmatter.tags

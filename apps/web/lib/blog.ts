@@ -5,6 +5,13 @@ import type { BlogPost, BlogFrontmatter } from '@/types/blog';
 
 const CONTENT_DIR = path.join(process.cwd(), 'content/blog');
 
+/** Ensure required fields have safe defaults */
+function normalizeFrontmatter(data: Record<string, unknown>): BlogFrontmatter {
+  const fm = data as unknown as BlogFrontmatter;
+  if (!Array.isArray(fm.tags)) fm.tags = [];
+  return fm;
+}
+
 /** Strip frontmatter, code blocks, and HTML/JSX tags from MDX content */
 export function stripMdx(content: string): string {
   return content
@@ -29,9 +36,7 @@ export function getAllPosts(options?: { limit?: number; offset?: number }): Blog
     const fileContent = fs.readFileSync(filePath, 'utf-8');
     const { data, content } = matter(fileContent);
 
-    const frontmatter = data as BlogFrontmatter;
-    // Ensure required array fields have defaults
-    if (!Array.isArray(frontmatter.tags)) frontmatter.tags = [];
+    const frontmatter = normalizeFrontmatter(data);
 
     return {
       slug,
@@ -80,7 +85,7 @@ export function getPostBySlug(slug: string): BlogPost | null {
 
   return {
     slug: sanitized,
-    frontmatter: data as BlogFrontmatter,
+    frontmatter: normalizeFrontmatter(data),
     content,
     readingTime: calculateReadingTime(content),
   };

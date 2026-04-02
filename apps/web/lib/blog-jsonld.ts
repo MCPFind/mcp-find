@@ -32,7 +32,6 @@ export function generateBlogPostJsonLd(post: BlogPost): object {
       inLanguage: 'en-US',
       wordCount,
       keywords: post.frontmatter.tags,
-      ...(post.frontmatter.faqItems?.length ? { hasPart: { '@id': `${SITE_URL}/blog/${post.slug}#faqpage` } } : {}),
     },
     {
       '@type': 'BreadcrumbList',
@@ -50,6 +49,12 @@ export function generateBlogPostJsonLd(post: BlogPost): object {
       name: post.frontmatter.title,
       isPartOf: { '@id': `${SITE_URL}/#website` },
       breadcrumb: { '@id': `${SITE_URL}/blog/${post.slug}#breadcrumb` },
+    },
+    {
+      '@type': 'WebSite',
+      '@id': `${SITE_URL}/#website`,
+      url: SITE_URL,
+      name: 'MCP Find',
     },
   ];
 
