@@ -47,6 +47,9 @@ export const metadata: Metadata = {
   },
   alternates: {
     canonical: SITE_URL,
+    types: {
+      'application/rss+xml': `${SITE_URL}/blog/feed.xml`,
+    },
   },
   // Verified via DNS (domain name provider) for both Google and Bing — no HTML meta tags needed
   keywords: ['MCP servers', 'Model Context Protocol', 'Claude Desktop', 'Cursor', 'VS Code', 'AI tools', 'MCP directory', 'MCP integrations', 'AI agent tools'],

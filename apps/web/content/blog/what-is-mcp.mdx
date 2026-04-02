@@ -1,0 +1,56 @@
+---
+title: "What Is the Model Context Protocol (MCP)?"
+description: "Learn what the Model Context Protocol is, how it works, and why it matters for AI development. A comprehensive guide to MCP servers and integrations."
+excerpt: "The Model Context Protocol (MCP) is an open standard that lets AI assistants like Claude connect to external tools and data sources. Learn how MCP servers work and how to find the right ones for your workflow."
+date: "2026-04-01"
+author: "MCP Find Team"
+authorUrl: "https://mcpfind.org"
+authorSameAs:
+  - "https://github.com/MCPFind"
+  - "https://twitter.com/mcpfind"
+tags:
+  - "mcp"
+  - "model-context-protocol"
+  - "ai-tools"
+  - "tutorial"
+category: "devtools"
+focusKeyword: "model context protocol"
+cornerstone: true
+faqItems:
+  - question: "What is the Model Context Protocol?"
+    answer: "The Model Context Protocol (MCP) is an open standard created by Anthropic that allows AI assistants like Claude to securely connect to external tools, databases, and services. It provides a standardized way for AI models to access real-time data and perform actions beyond their training data."
+  - question: "How do I install an MCP server?"
+    answer: "MCP servers can be installed by adding a configuration snippet to your AI client's config file. Tools like MCP Find provide copy-paste install configs for Claude Desktop, Cursor, VS Code, and other supported clients. Most servers install via npm or pip with a single command."
+  - question: "Is MCP free to use?"
+    answer: "Yes, MCP is an open-source protocol and most MCP servers are free and open-source. You can browse thousands of free MCP servers on mcpfind.org, filter by category, and get instant install configurations for your preferred AI client."
+---
+
+## What Is the Model Context Protocol?
+
+The Model Context Protocol (MCP) is an open standard that lets AI assistants connect to external tools and data sources through a unified interface. Created by Anthropic, MCP provides a standardized way for AI models to access databases, APIs, file systems, and developer tools in real time.
+
+Before MCP, connecting an AI assistant to external services required custom integrations for each tool. MCP solves this by defining a common protocol that any AI client can use to communicate with any compatible server. This means a single MCP server for PostgreSQL works with Claude Desktop, Cursor, VS Code, and any other MCP-compatible client without modification.
+
+## How Does MCP Work?
+
+MCP uses a client-server architecture where your AI assistant acts as the client and MCP servers provide access to specific tools or data sources. When you ask Claude to query a database or read a file, the client sends a standardized request to the appropriate MCP server, which executes the action and returns the result.
+
+Each MCP server exposes a set of tools that the AI can call. For example, a database MCP server might expose tools like `query`, `list_tables`, and `describe_schema`. The AI model sees these tools and can decide when to use them based on your requests. This tool-based approach keeps the interaction secure and predictable.
+
+## Why Does MCP Matter for Developers?
+
+MCP eliminates the integration tax that previously made connecting AI assistants to development workflows impractical. Instead of building custom plugins for each AI tool, developers can install a single MCP server that works everywhere. This dramatically reduces the friction of adopting AI-assisted development.
+
+The ecosystem is growing rapidly. MCP Find currently indexes over 10,000 MCP servers across categories like databases, cloud infrastructure, monitoring, security, and testing. Whether you need to query PostgreSQL, manage AWS resources, or run automated tests, there is likely an MCP server available. Browse the full directory at [mcpfind.org/servers](/servers) to find servers for your stack.
+
+## How Do I Get Started with MCP?
+
+Getting started with MCP takes less than five minutes. First, choose an AI client that supports MCP — Claude Desktop, Cursor, and VS Code with the Claude extension are the most popular options. Next, find an MCP server that connects to the tool you want to use.
+
+MCP Find makes this easy by providing copy-paste install configurations for every server in its directory. Visit any server page, select your client, and copy the configuration snippet into your client's config file. No manual setup or API key management required for most servers. Start by browsing the most popular categories like [databases](/categories/databases) or [devtools](/categories/devtools).
+
+## What MCP Servers Should I Try First?
+
+The best MCP servers to start with depend on your workflow, but several categories are universally useful for developers. Database servers like the PostgreSQL and SQLite MCP servers let Claude query and analyze your data directly. File system servers give Claude access to read and navigate your project files.
+
+For web developers, the browser automation and search MCP servers are particularly powerful. For DevOps engineers, cloud provider servers for AWS, GCP, and Azure bring infrastructure management into your AI workflow. Check the trending servers on [MCP Find](/servers) sorted by GitHub stars to see what the community finds most valuable.

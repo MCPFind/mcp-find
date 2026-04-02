@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerCount, getTopServers } from '@/lib/queries';
 import { SITE_NAME, SITE_URL, CATEGORY_LABELS, CATEGORY_LLM_DESCRIPTIONS } from '@mcpfind/shared';
 import type { Category } from '@mcpfind/shared';
+import { getAllPosts } from '@/lib/blog';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,6 +11,7 @@ export async function GET() {
     getServerCount(),
     getTopServers(20),
   ]);
+  const blogPosts = getAllPosts({ limit: 10 });
 
   const categoryLines = Object.entries(CATEGORY_LLM_DESCRIPTIONS)
     .map(([key, description]) => `- [${CATEGORY_LABELS[key as Category]} Servers](${SITE_URL}/categories/${key}): ${description}`)
@@ -17,6 +19,10 @@ export async function GET() {
 
   const topServerLines = topServers
     .map(s => `- [${s.name}](${SITE_URL}/servers/${s.slug}): ${(s.description || '').slice(0, 100)}`)
+    .join('\n');
+
+  const blogLines = blogPosts
+    .map(p => `- [${p.frontmatter.title}](${SITE_URL}/blog/${p.slug}): ${p.frontmatter.description.slice(0, 100)}`)
     .join('\n');
 
   const content = `# ${SITE_NAME}
@@ -35,6 +41,9 @@ ${categoryLines}
 
 ## Top Servers
 ${topServerLines}
+
+## Blog
+${blogLines}
 `;
 
   return new NextResponse(content, {
