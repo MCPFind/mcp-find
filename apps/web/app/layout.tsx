@@ -59,23 +59,6 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className={`${inter.variable} font-sans antialiased bg-black text-white`}>
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              '@context': 'https://schema.org',
-              '@type': 'WebSite',
-              name: 'MCP Find',
-              url: 'https://mcpfind.org',
-              description: 'Open-source directory of MCP servers. AI-agent optimized.',
-              potentialAction: {
-                '@type': 'SearchAction',
-                target: 'https://mcpfind.org/servers?q={search_term_string}',
-                'query-input': 'required name=search_term_string',
-              },
-            }),
-          }}
-        />
         {children}
         {/* Google Analytics 4 */}
         <Script

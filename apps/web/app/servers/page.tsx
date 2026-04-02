@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { listServers } from "@/lib/queries";
-import { CATEGORIES, SITE_NAME, CATEGORY_LABELS } from "@mcpfind/shared";
+import { CATEGORIES, SITE_NAME, CATEGORY_LABELS, SITE_URL } from "@mcpfind/shared";
 import type { Category } from "@mcpfind/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -9,11 +9,13 @@ import { ServerCard } from "@/components/ui/server-card";
 import { ServersFilters } from "@/components/ui/servers-filters";
 import { IconFilter, IconArrowLeft, IconArrowRight } from "@tabler/icons-react";
 import { parseFilterParams } from "@/lib/filter-utils";
+import { safeJsonLd } from "@/lib/json-ld";
 
 export const metadata: Metadata = {
   title: `Browse MCP Servers | ${SITE_NAME}`,
   description:
     "Search and filter 2000+ MCP servers. Get instant install configs for Claude Desktop, Cursor, VS Code, Windsurf, and Claude Code.",
+  alternates: { canonical: `${SITE_URL}/servers` },
 };
 
 export default async function ServersPage({
@@ -180,6 +182,28 @@ export default async function ServersPage({
           </ServersFilters>
         </Suspense>
       </div>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: safeJsonLd({
+            "@context": "https://schema.org",
+            "@type": "CollectionPage",
+            name: "MCP Server Directory",
+            url: `${SITE_URL}/servers`,
+            description: "Browse 2000+ MCP servers with instant install configs for Claude Desktop, Cursor, VS Code, Windsurf, and Claude Code.",
+            mainEntity: {
+              "@type": "ItemList",
+              numberOfItems: result.total,
+              itemListElement: result.servers.slice(0, 50).map((s, i) => ({
+                "@type": "ListItem",
+                position: i + 1,
+                url: `${SITE_URL}/servers/${s.slug}`,
+                name: s.name,
+              })),
+            },
+          }),
+        }}
+      />
     </div>
   );
 }

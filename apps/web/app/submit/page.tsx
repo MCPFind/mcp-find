@@ -1,7 +1,8 @@
+import type { Metadata } from "next";
+import { SITE_URL, SITE_NAME, CATEGORIES, CATEGORY_LABELS } from "@mcpfind/shared";
+import type { Category } from "@mcpfind/shared";
 import Link from "next/link";
 import { Navbar } from "@/components/ui/navbar";
-import { CATEGORIES, CATEGORY_LABELS } from "@mcpfind/shared";
-import type { Category } from "@mcpfind/shared";
 import {
   IconBrandGithub,
   IconSparkles,
@@ -9,6 +10,12 @@ import {
   IconRocket,
   IconArrowUpRight,
 } from "@tabler/icons-react";
+
+export const metadata: Metadata = {
+  title: `Submit Your MCP Server | ${SITE_NAME}`,
+  description: "Share your MCP server with the open-source MCP community. Submit via GitHub PR.",
+  alternates: { canonical: `${SITE_URL}/submit` },
+};
 
 export default function SubmitPage() {
   return (
@@ -71,7 +78,7 @@ export default function SubmitPage() {
             file in our GitHub repository.
           </p>
           <a
-            href="https://github.com/adambushman/mcp-find/blob/main/community-servers.yml"
+            href="https://github.com/gusmar2017/mcp-find/blob/main/community-servers.yml"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors duration-200 text-sm"
@@ -138,7 +145,7 @@ export default function SubmitPage() {
           </div>
 
           <a
-            href="https://github.com/adambushman/mcp-find/blob/main/CONTRIBUTING.md"
+            href="https://github.com/gusmar2017/mcp-find/blob/main/CONTRIBUTING.md"
             target="_blank"
             rel="noopener noreferrer"
             className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3.5 rounded-xl transition-colors duration-200 text-base"
@@ -150,7 +157,7 @@ export default function SubmitPage() {
           <p className="text-center text-neutral-600 text-xs">
             By submitting you agree that your server meets our{" "}
             <a
-              href="https://github.com/adambushman/mcp-find/blob/main/CONTRIBUTING.md"
+              href="https://github.com/gusmar2017/mcp-find/blob/main/CONTRIBUTING.md"
               target="_blank"
               rel="noopener noreferrer"
               className="text-neutral-400 hover:text-white transition-colors duration-200"

@@ -6,26 +6,39 @@ import type { Metadata } from 'next';
 export function generateServerJsonLd(server: ServerWithTools): object {
   return {
     '@context': 'https://schema.org',
-    '@type': 'SoftwareApplication',
-    name: server.name,
-    description: server.description || '',
-    url: `${SITE_URL}/servers/${server.slug}`,
-    applicationCategory: 'DeveloperApplication',
-    operatingSystem: ['Windows', 'macOS', 'Linux'],
-    version: server.version || undefined,
-    downloadUrl: server.package_url || undefined,
-    license: server.github_license
-      ? `https://spdx.org/licenses/${server.github_license}`
-      : undefined,
-    dateModified: server.github_last_push || server.updated_at,
-    creator: server.github_url
-      ? { '@type': 'Organization', url: server.github_url }
-      : undefined,
-    offers: {
-      '@type': 'Offer',
-      price: '0',
-      priceCurrency: 'USD',
-    },
+    '@graph': [
+      {
+        '@type': 'SoftwareApplication',
+        name: server.name,
+        description: server.description || '',
+        url: `${SITE_URL}/servers/${server.slug}`,
+        applicationCategory: 'DeveloperApplication',
+        operatingSystem: ['Windows', 'macOS', 'Linux'],
+        version: server.version || undefined,
+        downloadUrl: server.package_url || undefined,
+        license: server.github_license
+          ? `https://spdx.org/licenses/${server.github_license}`
+          : undefined,
+        dateModified: server.github_last_push || server.updated_at,
+        creator: server.github_url
+          ? { '@type': 'Organization', url: server.github_url }
+          : undefined,
+        offers: {
+          '@type': 'Offer',
+          price: '0',
+          priceCurrency: 'USD',
+        },
+      },
+      {
+        '@type': 'BreadcrumbList',
+        '@id': `${SITE_URL}/servers/${server.slug}#breadcrumb`,
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
+          { '@type': 'ListItem', position: 2, name: 'MCP Servers', item: `${SITE_URL}/servers` },
+          { '@type': 'ListItem', position: 3, name: server.name, item: `${SITE_URL}/servers/${server.slug}` },
+        ],
+      },
+    ],
   };
 }
 

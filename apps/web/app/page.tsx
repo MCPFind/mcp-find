@@ -537,15 +537,24 @@ export default async function HomePage() {
             "@context": "https://schema.org",
             "@graph": [
               {
+                "@type": "Organization",
+                "@id": `${SITE_URL}/#organization`,
+                "name": "MCP Find",
+                "url": SITE_URL,
+                "sameAs": ["https://github.com/gusmar2017/mcp-find", "https://x.com/mcpfind"],
+              },
+              {
                 "@type": "WebSite",
+                "@id": `${SITE_URL}/#website`,
                 name: "MCP Find",
-                url: "https://mcpfind.org",
+                url: SITE_URL,
                 description:
                   "Open-source directory of MCP servers. AI-agent optimized. Get instant install configs for Claude Desktop, Cursor, VS Code, Windsurf, and Claude Code.",
-                publisher: {
-                  "@type": "Organization",
-                  name: "MCP Find",
-                  url: "https://mcpfind.org",
+                publisher: { "@id": `${SITE_URL}/#organization` },
+                potentialAction: {
+                  "@type": "SearchAction",
+                  target: `${SITE_URL}/servers?q={search_term_string}`,
+                  "query-input": "required name=search_term_string",
                 },
               },
               {
