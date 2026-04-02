@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
+import { SITE_URL } from "@mcpfind/shared";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -16,14 +17,14 @@ export const metadata: Metadata = {
   },
   description:
     "Open-source directory of MCP servers. AI-agent optimized. Get instant install configs for Claude Desktop, Cursor, VS Code, Windsurf, and Claude Code.",
-  metadataBase: new URL("https://mcpfind.org"),
+  metadataBase: new URL(SITE_URL),
   openGraph: {
     siteName: "MCP Find",
     type: "website",
     locale: "en_US",
     images: [
       {
-        url: "https://mcpfind.org/og-image-mcp.png",
+        url: `${SITE_URL}/og-image-mcp.png`,
         width: 1200,
         height: 630,
         alt: "MCP Find — The open-source way to find MCP servers",
@@ -34,7 +35,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     site: "@mcpfind",
     creator: "@mcpfind",
-    images: ["https://mcpfind.org/og-image-mcp.png"],
+    images: [`${SITE_URL}/og-image-mcp.png`],
   },
   robots: {
     index: true,
@@ -45,7 +46,7 @@ export const metadata: Metadata = {
     },
   },
   alternates: {
-    canonical: "https://mcpfind.org",
+    canonical: SITE_URL,
   },
   // Verified via DNS (domain name provider) for both Google and Bing — no HTML meta tags needed
   keywords: ['MCP servers', 'Model Context Protocol', 'Claude Desktop', 'Cursor', 'VS Code', 'AI tools', 'MCP directory', 'MCP integrations', 'AI agent tools'],

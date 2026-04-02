@@ -13,7 +13,7 @@ import {
 
 export const metadata: Metadata = {
   title: `Submit Your MCP Server | ${SITE_NAME}`,
-  description: "Share your MCP server with the open-source MCP community. Submit via GitHub PR.",
+  description: "Add your MCP server to the open-source directory used by thousands of AI developers. Submit via GitHub PR — no account required, reviewed within 48 hours.",
   alternates: { canonical: `${SITE_URL}/submit` },
 };
 

@@ -402,7 +402,7 @@ export default async function HomePage() {
                 Built an MCP server?
               </h2>
               <p className="text-neutral-400 text-lg mb-8 max-w-xl mx-auto">
-                Share it with the community. MCP Hub makes it easy for
+                Share it with the community. MCP Find makes it easy for
                 developers to discover your integration and start using it in
                 minutes.
               </p>
@@ -437,7 +437,7 @@ export default async function HomePage() {
                   <IconPlug size={15} className="text-white" />
                 </div>
                 <span className="font-bold text-white tracking-tight">
-                  MCP Hub
+                  MCP Find
                 </span>
               </Link>
               <p className="text-neutral-500 text-sm leading-relaxed">
@@ -521,7 +521,7 @@ export default async function HomePage() {
 
           <div className="border-t border-neutral-900 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
             <p className="text-neutral-600 text-sm">
-              &copy; 2026 MCP Hub. Open source.
+              &copy; 2026 MCP Find. Open source.
             </p>
             <p className="text-neutral-600 text-sm">
               Model Context Protocol is an open standard by Anthropic.
@@ -559,6 +559,7 @@ export default async function HomePage() {
               },
               {
                 "@type": "FAQPage",
+                "@id": `${SITE_URL}/#faqpage`,
                 mainEntity: HOME_FAQS.map((faq) => ({
                   "@type": "Question",
                   name: faq.question,

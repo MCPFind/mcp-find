@@ -187,20 +187,34 @@ export default async function ServersPage({
         dangerouslySetInnerHTML={{
           __html: safeJsonLd({
             "@context": "https://schema.org",
-            "@type": "CollectionPage",
-            name: "MCP Server Directory",
-            url: `${SITE_URL}/servers`,
-            description: "Browse 2000+ MCP servers with instant install configs for Claude Desktop, Cursor, VS Code, Windsurf, and Claude Code.",
-            mainEntity: {
-              "@type": "ItemList",
-              numberOfItems: result.total,
-              itemListElement: result.servers.slice(0, 50).map((s, i) => ({
-                "@type": "ListItem",
-                position: i + 1,
-                url: `${SITE_URL}/servers/${s.slug}`,
-                name: s.name,
-              })),
-            },
+            "@graph": [
+              {
+                "@type": "CollectionPage",
+                "@id": `${SITE_URL}/servers`,
+                name: "MCP Server Directory",
+                url: `${SITE_URL}/servers`,
+                description: "Browse 2000+ MCP servers with instant install configs for Claude Desktop, Cursor, VS Code, Windsurf, and Claude Code.",
+                mainEntity: {
+                  "@type": "ItemList",
+                  numberOfItems: result.total,
+                  itemListElement: result.servers.slice(0, 50).map((s, i) => ({
+                    "@type": "ListItem",
+                    position: i + 1,
+                    url: `${SITE_URL}/servers/${s.slug}`,
+                    name: s.name,
+                  })),
+                },
+                breadcrumb: { "@id": `${SITE_URL}/servers#breadcrumb` },
+              },
+              {
+                "@type": "BreadcrumbList",
+                "@id": `${SITE_URL}/servers#breadcrumb`,
+                itemListElement: [
+                  { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
+                  { "@type": "ListItem", position: 2, name: "MCP Server Directory", item: `${SITE_URL}/servers` },
+                ],
+              },
+            ],
           }),
         }}
       />
