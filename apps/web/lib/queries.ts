@@ -1,3 +1,6 @@
+// Two-layer caching:
+// - React cache(): deduplicates within a single request/render
+// - unstable_cache(): persists across requests with tag-based on-demand revalidation
 import { cache } from 'react';
 import { unstable_cache } from 'next/cache';
 import { supabase } from './supabase';
@@ -119,33 +122,37 @@ export const getServerBySlug = cache(
     )()
 );
 
-export const getServerCount = unstable_cache(
-  async (): Promise<number> => {
-    const { count } = await supabase
-      .from('servers')
-      .select('*', { count: 'exact', head: true })
-      .eq('registry_status', 'active');
-    return count || 0;
-  },
-  ['server-count'],
-  { tags: ['servers'], revalidate: 3600 }
+export const getServerCount = cache(
+  (): Promise<number> =>
+    unstable_cache(
+      async () => {
+        const { count } = await supabase
+          .from('servers')
+          .select('*', { count: 'exact', head: true })
+          .eq('registry_status', 'active');
+        return count || 0;
+      },
+      ['server-count'],
+      { tags: ['servers'], revalidate: 3600 }
+    )()
 );
 
-export async function getTopServers(limit: number): Promise<ServerListItem[]> {
-  return unstable_cache(
-    async () => {
-      const { data } = await supabase
-        .from('servers')
-        .select(SERVER_LIST_COLUMNS)
-        .eq('registry_status', 'active')
-        .order('github_stars', { ascending: false })
-        .limit(limit);
-      return (data || []) as ServerListItem[];
-    },
-    ['top-servers', String(limit)],
-    { tags: ['servers'], revalidate: 3600 }
-  )();
-}
+export const getTopServers = cache(
+  (limit: number): Promise<ServerListItem[]> =>
+    unstable_cache(
+      async () => {
+        const { data } = await supabase
+          .from('servers')
+          .select(SERVER_LIST_COLUMNS)
+          .eq('registry_status', 'active')
+          .order('github_stars', { ascending: false })
+          .limit(limit);
+        return (data || []) as ServerListItem[];
+      },
+      ['top-servers', String(limit)],
+      { tags: ['servers'], revalidate: 3600 }
+    )()
+);
 
 // React cache() for request-level dedup; unstable_cache for cross-request persistence with tags.
 export const getServersByCategory = cache(
@@ -166,37 +173,43 @@ export const getServersByCategory = cache(
     )()
 );
 
-export const getCategoryLastUpdated = unstable_cache(
-  async (): Promise<Record<string, string>> => {
-    const { data } = await supabase
-      .from('servers')
-      .select('category, updated_at')
-      .eq('registry_status', 'active')
-      .order('updated_at', { ascending: false });
+export const getCategoryLastUpdated = cache(
+  (): Promise<Record<string, string>> =>
+    unstable_cache(
+      async () => {
+        const { data } = await supabase
+          .from('servers')
+          .select('category, updated_at')
+          .eq('registry_status', 'active')
+          .order('updated_at', { ascending: false });
 
-    const result: Record<string, string> = {};
-    for (const row of data || []) {
-      if (row.category && !result[row.category]) {
-        result[row.category] = row.updated_at;
-      }
-    }
-    return result;
-  },
-  ['category-last-updated'],
-  { tags: ['servers'], revalidate: 3600 }
+        const result: Record<string, string> = {};
+        for (const row of data || []) {
+          if (row.category && !result[row.category]) {
+            result[row.category] = row.updated_at;
+          }
+        }
+        return result;
+      },
+      ['category-last-updated'],
+      { tags: ['servers'], revalidate: 3600 }
+    )()
 );
 
-export const getLastSyncTime = unstable_cache(
-  async (): Promise<string | null> => {
-    const { data } = await supabase
-      .from('sync_log')
-      .select('completed_at')
-      .eq('status', 'completed')
-      .order('completed_at', { ascending: false })
-      .limit(1)
-      .single();
-    return data?.completed_at || null;
-  },
-  ['last-sync-time'],
-  { tags: ['servers'], revalidate: 3600 }
+export const getLastSyncTime = cache(
+  (): Promise<string | null> =>
+    unstable_cache(
+      async () => {
+        const { data } = await supabase
+          .from('sync_log')
+          .select('completed_at')
+          .eq('status', 'completed')
+          .order('completed_at', { ascending: false })
+          .limit(1)
+          .single();
+        return data?.completed_at || null;
+      },
+      ['last-sync-time'],
+      { tags: ['servers'], revalidate: 3600 }
+    )()
 );
