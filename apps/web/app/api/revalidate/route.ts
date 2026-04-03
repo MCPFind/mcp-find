@@ -4,18 +4,27 @@ import { timingSafeEqual } from 'crypto';
 
 const RATE_LIMIT_WINDOW = 60_000; // 1 minute
 const RATE_LIMIT_MAX = 10; // max 10 requests per minute
+// In-memory rate limiter — soft guardrail only. On Vercel serverless, each
+// cold-start instance gets its own Map, so this does not provide hard protection
+// against distributed attacks. Sufficient for accidental abuse prevention.
 const requestLog = new Map<string, number[]>();
 
 function isRateLimited(ip: string): boolean {
   const now = Date.now();
   const timestamps = requestLog.get(ip)?.filter(t => now - t < RATE_LIMIT_WINDOW) ?? [];
+  if (timestamps.length === 0) {
+    requestLog.delete(ip);
+    return false;
+  }
   timestamps.push(now);
   requestLog.set(ip, timestamps);
+  // Safety cap: prevent unbounded growth from distinct IPs
+  if (requestLog.size > 10_000) requestLog.clear();
   return timestamps.length > RATE_LIMIT_MAX;
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+  const ip = request.headers.get('x-real-ip') ?? request.headers.get('x-forwarded-for')?.split(',').pop()?.trim() ?? 'unknown';
   if (isRateLimited(ip)) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
   }

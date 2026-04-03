@@ -73,25 +73,16 @@ async function _listServers(params: ServerListParams): Promise<ServerListRespons
   };
 }
 
-export async function listServers(params: ServerListParams): Promise<ServerListResponse> {
-  // Use unstable_cache with a deterministic key derived from params so each unique
-  // query gets its own cache entry, all tagged "servers" for bulk invalidation.
-  // Explicit ordered array avoids key collisions from JSON.stringify key ordering.
-  const cacheKey = [
-    'list-servers',
-    params.category ?? '',
-    params.q ?? '',
-    String(params.page ?? 1),
-    String(params.limit ?? DEFAULT_PAGE_SIZE),
-    params.sort ?? '',
-  ];
-  const cached = unstable_cache(
-    () => _listServers(params),
-    cacheKey,
-    { tags: ['servers'], revalidate: 3600 }
-  );
-  return cached();
-}
+export const listServers = cache(
+  (params: ServerListParams): Promise<ServerListResponse> => {
+    const cacheKey = [params.category ?? '', params.q ?? '', String(params.page ?? 1), String(params.limit ?? DEFAULT_PAGE_SIZE), params.sort ?? ''].join('|');
+    return unstable_cache(
+      () => _listServers(params),
+      ['list-servers', cacheKey],
+      { tags: ['servers'], revalidate: 3600 }
+    )();
+  }
+);
 
 // Inner function — does the actual Supabase fetch
 async function _getServerBySlug(slug: string): Promise<ServerWithTools | null> {
