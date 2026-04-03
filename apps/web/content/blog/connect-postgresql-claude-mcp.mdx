@@ -44,13 +44,9 @@ Most PostgreSQL MCP servers expose a standard set of tools: `query`, `list_table
 
 ## How to Connect Postgres with MCP: Install and Configure
 
-The most widely used option is `@modelcontextprotocol/server-postgres`, available on npm. Install it globally or use `npx` to run it without a global install.
+The most widely used option is `@modelcontextprotocol/server-postgres`, available on npm. You don't need to install anything globally. The `npx -y` flag in the config below downloads the package automatically on first run.
 
-```bash
-npm install -g @modelcontextprotocol/server-postgres
-```
-
-Then add the server to your Claude Desktop config at `~/Library/Application Support/Claude/claude_desktop_config.json`:
+Add the server to your Claude Desktop config at `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
 {
@@ -75,7 +71,7 @@ For Cursor, add the same block to `.cursor/mcp.json` in your project root.
 
 PostgreSQL is the most commonly configured relational database in MCP setups, but it is not always the right choice. The [databases category on MCPFind](/categories/databases) indexes 227 servers covering everything from SQLite to distributed NoSQL stores.
 
-[Supabase](/servers/supabase) is the most starred database server in the entire directory at 2,556 GitHub stars. It wraps PostgreSQL with an API layer and managed auth, which makes setup faster if you are already using Supabase in production.
+[Supabase](/servers/com-supabase-mcp) is the most starred database server in the entire directory at 2,556 GitHub stars. It wraps PostgreSQL with an API layer and managed auth, which makes setup faster if you are already using Supabase in production.
 
 SQLite is the right choice for local development. The database is a single file, there is no server process to manage, and several MCP servers support it with zero configuration beyond the file path. For prototyping an agent workflow without a production database, SQLite is the fastest path.
 
