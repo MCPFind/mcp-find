@@ -1,0 +1,98 @@
+---
+title: "How to Connect PostgreSQL to Claude Using MCP"
+description: "Step-by-step guide to connect Postgres with MCP and Claude. Covers config setup, connection strings, client options, and database alternatives across 227 servers."
+excerpt: "You can connect Claude directly to a PostgreSQL database using an MCP server. This guide walks through the exact config, connection string format, and how PostgreSQL compares to Supabase, MySQL, and SQLite in the database category."
+date: "2026-04-02"
+updatedAt: "2026-04-02"
+author: "Gus Marquez"
+authorUrl: "https://mcpfind.org/authors/gus-marquez"
+authorSameAs:
+  - "https://linkedin.com/in/PLACEHOLDER"
+  - "https://github.com/PLACEHOLDER"
+tags:
+  - "mcp"
+  - "developer"
+  - "postgresql"
+  - "databases"
+  - "claude"
+category: "databases"
+focusKeyword: "connect postgres with MCP"
+draft: true
+cornerstone: false
+faqItems:
+  - question: "Do I need a running PostgreSQL server to use a database MCP server?"
+    answer: "Yes. The MCP server is a connector, not a database itself. You need an accessible PostgreSQL instance (local, cloud-hosted, or a service like Supabase) and provide its connection string in the config."
+  - question: "Can the PostgreSQL MCP server modify data, or is it read-only?"
+    answer: "Most PostgreSQL MCP servers support both read and write operations. You can restrict the database user to SELECT-only if you want the agent to query without making changes. Check the specific server's documentation for write capabilities."
+  - question: "Will the MCP server expose my entire database to Claude?"
+    answer: "Only the schemas and tables the connection string user has access to are visible. Use a dedicated database role with minimal permissions. Grant access to only the tables the agent needs."
+  - question: "Is there a latency cost to querying Postgres through MCP versus a direct query?"
+    answer: "There is a small overhead because the agent constructs the query, the MCP server executes it, and results pass through the stdio transport layer. For interactive workflows this is negligible, but batch processing is better handled directly."
+---
+
+Connecting a relational database to an AI agent used to mean writing custom API layers or pasting query results into chat manually. With MCP, you add a JSON config block, and Claude can query your PostgreSQL database directly in a conversation.
+
+This guide covers the exact steps to wire up PostgreSQL to Claude Desktop or Cursor, explains the config in detail, and compares your options across the 227 database servers indexed on [MCPFind](/categories/databases).
+
+## What Is an MCP Server for PostgreSQL?
+
+A PostgreSQL MCP server is a small process that sits between your AI client and your database. It translates natural language tool calls from Claude into SQL queries, executes them against your Postgres instance, and returns the results back to the conversation.
+
+The server runs locally on your machine using the MCP stdio transport. Claude does not connect to your database directly. The flow is: Claude issues a tool call, the MCP server receives it, the server runs the query, and the result comes back as a tool response. Your database credentials never leave your machine.
+
+Most PostgreSQL MCP servers expose a standard set of tools: `query`, `list_tables`, `describe_table`, and sometimes `execute` for write operations. Some add schema introspection and explain-plan analysis.
+
+## How to Connect Postgres with MCP: Install and Configure
+
+The most widely used option is `@modelcontextprotocol/server-postgres`, available on npm. Install it globally or use `npx` to run it without a global install.
+
+```bash
+npm install -g @modelcontextprotocol/server-postgres
+```
+
+Then add the server to your Claude Desktop config at `~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "postgres": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres",
+        "postgresql://YOUR_USER:YOUR_PASSWORD@localhost:5432/YOUR_DB"
+      ]
+    }
+  }
+}
+```
+
+Replace `YOUR_USER`, `YOUR_PASSWORD`, and `YOUR_DB` with your actual credentials. For a cloud database, replace `localhost:5432` with your host and port. Restart Claude Desktop after saving, and you should see the database tools appear in the tool list.
+
+For Cursor, add the same block to `.cursor/mcp.json` in your project root.
+
+## How Does PostgreSQL Compare to Other Database MCP Options?
+
+PostgreSQL is the most commonly configured relational database in MCP setups, but it is not always the right choice. The [databases category on MCPFind](/categories/databases) indexes 227 servers covering everything from SQLite to distributed NoSQL stores.
+
+[Supabase](/servers/supabase) is the most starred database server in the entire directory at 2,556 GitHub stars. It wraps PostgreSQL with an API layer and managed auth, which makes setup faster if you are already using Supabase in production.
+
+SQLite is the right choice for local development. The database is a single file, there is no server process to manage, and several MCP servers support it with zero configuration beyond the file path. For prototyping an agent workflow without a production database, SQLite is the fastest path.
+
+MySQL is a solid alternative for teams on existing MySQL infrastructure. The MCP server ecosystem covers it, though the PostgreSQL tooling tends to be more mature and actively maintained.
+
+MongoDB and Redis have their own dedicated servers for document and key-value use cases. If your data model does not fit relational tables, check the [databases category](/categories/databases) for the right fit before defaulting to Postgres.
+
+## What Can Claude Do Once Connected to PostgreSQL?
+
+Once connected, Claude can run queries, inspect schemas, and reason over your data as part of a conversation. You do not write SQL manually.
+
+Ask "which customers signed up last week and have not placed an order" and Claude will construct the join, execute it, and summarize the results. Ask "describe the users table" and Claude will return columns, types, and constraints. For write-enabled setups, Claude can insert or update records when you approve the action.
+
+The practical limit is query complexity. Claude is good at straightforward SELECT and JOIN queries against schemas it has inspected. For multi-step migrations or complex aggregations, it helps to provide the schema upfront by asking Claude to run `list_tables` first so it has context before you ask the substantive question.
+
+This is a step up from pasting data into chat manually. If you are new to MCP and want to understand the full protocol before configuring your first server, read [what is MCP](/blog/what-is-mcp) first. For Cursor-specific setup, see [how to use MCP with Cursor](/blog/how-to-use-mcp-with-cursor). If you want to go further and write your own MCP server for a custom database schema, [building your first MCP server in Python](/blog/building-your-first-mcp-server) walks through the full process.
+
+## Frequently Asked Questions
+
+{/* Rendered from faqItems by CMS */}

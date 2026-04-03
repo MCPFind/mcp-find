@@ -1,0 +1,98 @@
+---
+title: "How to Set Up MCP Servers in VS Code"
+description: "Configure MCP servers VS Code setup with exact JSON snippets, workspace vs global scope, and the best devtools and search servers to connect first in 2026."
+excerpt: "VS Code supports MCP servers through its AI extension layer. This guide covers the config file location, JSON format, workspace vs user scope, and which servers from the MCPFind devtools and search categories are worth connecting first."
+date: "2026-04-02"
+updatedAt: "2026-04-02"
+author: "Gus Marquez"
+authorUrl: "https://mcpfind.org/authors/gus-marquez"
+authorSameAs:
+  - "https://linkedin.com/in/PLACEHOLDER"
+  - "https://github.com/PLACEHOLDER"
+tags:
+  - "mcp"
+  - "developer"
+  - "vscode"
+  - "devtools"
+  - "configuration"
+category: "devtools"
+focusKeyword: "MCP servers VS Code setup"
+cornerstone: false
+draft: true
+faqItems:
+  - question: "Which VS Code extension enables MCP support?"
+    answer: "The GitHub Copilot extension and the Claude for VS Code extension both support MCP. The config format is the same across both. Check the extension's documentation for the minimum version that introduced MCP tool support."
+  - question: "Can I scope an MCP server to one VS Code workspace only?"
+    answer: "Yes. Place your mcp.json inside the .vscode/ folder at the root of your workspace. That config applies only when that workspace is open. User-level config in your VS Code settings applies globally across all workspaces."
+  - question: "Does VS Code MCP config support environment variable substitution?"
+    answer: "Yes. You can reference VS Code variables like ${workspaceFolder} and ${env:MY_VAR} in the args and env fields of your MCP server config. This is useful for pointing a filesystem server at the current project root automatically."
+  - question: "How is VS Code MCP config different from Cursor MCP config?"
+    answer: "The JSON structure is nearly identical, but the file location differs. Cursor uses .cursor/mcp.json at the project level or ~/.cursor/mcp.json globally. VS Code uses .vscode/mcp.json at the workspace level or the VS Code user settings JSON globally."
+  - question: "Can I share MCP config with my team through version control?"
+    answer: "Yes. Committing .vscode/mcp.json to your repository shares the server list with your whole team. Use environment variables for secrets so no credentials are stored in the file. Any teammate who opens the repo gets the same server configuration automatically."
+---
+
+VS Code added MCP support as AI-assisted coding became a first-class workflow in the editor. The config format is close to what Cursor uses, with a few differences in file location and variable substitution syntax. This guide covers the exact setup so you are not guessing at file paths.
+
+For background on the protocol, see [What Is the Model Context Protocol](/blog/what-is-mcp). If you have already configured MCP in Cursor, [the Cursor guide](/blog/how-to-use-mcp-with-cursor) covers the same JSON patterns with Cursor-specific details. The MCPFind [devtools category](/categories/devtools) has 2,349 servers - this guide helps you identify which ones are worth connecting to VS Code first. If you are newer to MCP and want a gentler introduction, [getting started with MCP in Claude Desktop](/blog/getting-started-with-mcp-in-claude) walks through the same install pattern without the editor-specific complexity.
+
+## Where VS Code Reads MCP Config
+
+VS Code resolves MCP config from two locations depending on the scope you want.
+
+Workspace-level config lives at `.vscode/mcp.json` inside your project root. Commit this file to version control and every developer who clones the repo gets the same server list automatically - with no secrets included, since those come from environment variables. User-level config lives in your VS Code `settings.json` under the `mcp.servers` key. Open the command palette, run "Preferences: Open User Settings (JSON)", and add your servers there. User-level servers are available in every workspace you open.
+
+Most setups use both: user-level for general tools like search and documentation, workspace-level for project-specific servers like a database or internal API.
+
+## The JSON Config Format for VS Code
+
+The workspace-level `.vscode/mcp.json` format uses a `servers` key rather than `mcpServers`:
+
+```json
+{
+  "servers": {
+    "supabase": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@supabase/mcp-server-supabase@latest"],
+      "env": {
+        "SUPABASE_URL": "${env:SUPABASE_URL}",
+        "SUPABASE_SERVICE_ROLE_KEY": "${env:SUPABASE_SERVICE_ROLE_KEY}"
+      }
+    }
+  }
+}
+```
+
+The `type: "stdio"` field is required in VS Code's schema - it tells the editor how to communicate with the server process. The `${env:VAR_NAME}` syntax pulls values from your shell environment or a `.env` file, keeping credentials out of the committed config. For a search server with no authentication, the config is simpler:
+
+```json
+{
+  "servers": {
+    "brave-search": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+      "env": {
+        "BRAVE_API_KEY": "${env:BRAVE_API_KEY}"
+      }
+    }
+  }
+}
+```
+
+Browse [/categories/search](/categories/search) on MCPFind for the 416 available search servers - each server page shows the exact package name to use in your args array.
+
+## MCP Servers VS Code Setup: Which Servers to Connect First
+
+The best starting point depends on whether you are debugging, writing, or researching inside VS Code.
+
+For debugging workflows, the Chrome DevTools MCP server (31,292 GitHub stars) lets VS Code's AI layer inspect live browser state during a debugging session without switching windows. For documentation lookup, a search server that queries your framework's official docs prevents the AI from hallucinating outdated method signatures. Both of these are in [/categories/devtools](/categories/devtools), which has the deepest server selection of any MCPFind category. For teams working with databases, the Supabase server (2,556 stars) is the most battle-tested option and works identically in VS Code and Cursor. Check [/categories/databases](/categories/databases) for alternatives if you are on PostgreSQL, MySQL, or a different provider.
+
+## Verifying the Setup and Troubleshooting
+
+After saving your config, reload VS Code with "Developer: Reload Window" from the command palette.
+
+Open a new Copilot or Claude chat panel inside VS Code and send a prompt that requires the server you just configured. If the tool call appears in the response, the connection is working. If not, open the VS Code output panel (View > Output) and select the MCP or Copilot channel to read connection logs. The most common failure modes are a `type` field missing from the config (VS Code requires it, Cursor does not), an `npx` binary not found in the PATH that VS Code inherits (fix with an absolute path like `/usr/local/bin/npx`), and JSON syntax errors from a trailing comma. A JSON linter catches that last one in under a second.
+
+## Frequently Asked Questions

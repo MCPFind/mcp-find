@@ -1,0 +1,151 @@
+---
+title: "Building Your First MCP Server With Python"
+description: "Step-by-step tutorial for building custom MCP servers with Python. Covers SDK setup, tool registration, testing with Claude Desktop, and submitting to community directories."
+excerpt: "Python is the second most common language for MCP servers in the MCPFind directory, with 233 servers indexed. This tutorial walks through building a minimal working server from scratch, registering custom tools, testing with Claude Desktop, and submitting your server to the community."
+date: "2026-04-02"
+updatedAt: "2026-04-02"
+author: "Gus Marquez"
+authorUrl: "https://mcpfind.org/authors/gus-marquez"
+authorSameAs:
+  - "https://linkedin.com/in/PLACEHOLDER"
+  - "https://github.com/PLACEHOLDER"
+tags:
+  - "mcp"
+  - "developer"
+  - "python"
+  - "tutorial"
+  - "custom-server"
+category: "general"
+focusKeyword: "building custom MCP servers Python"
+draft: true
+cornerstone: false
+faqItems:
+  - question: "Do I need to publish my MCP server to use it with Claude?"
+    answer: "No. You can run a local MCP server by pointing your AI client config at the script path directly. Publishing to PyPI or a directory is optional and only needed if you want others to use it."
+  - question: "Can a Python MCP server call external APIs or make network requests?"
+    answer: "Yes. The server runs as a normal Python process, so you can use requests, httpx, or any async HTTP client. Just import them as usual and call them inside your tool handler functions."
+  - question: "How do I pass secrets like API keys to my custom MCP server?"
+    answer: "Pass them as environment variables in your claude_desktop_config.json under the 'env' key for that server entry. Avoid hardcoding credentials in the script itself."
+  - question: "What is the difference between a tool and a resource in the MCP Python SDK?"
+    answer: "Tools are functions the agent can call to take actions or fetch data on demand. Resources are static or semi-static content the agent can read, like a file or a config document. Most custom servers start with tools and add resources later if needed."
+  - question: "Can I write an MCP server that wraps an existing Python script I already have?"
+    answer: "Yes, and it is one of the most common use cases. Wrap your existing functions as MCP tool handlers, add the server boilerplate, and your script becomes accessible to any MCP-compatible AI client."
+---
+
+Python is the second most common language in the MCPFind directory. We index 233 Python MCP servers, behind TypeScript at 315 but well ahead of JavaScript at 109 and Go at 17. The Python SDK is mature, the tooling is familiar to most backend developers, and the path from idea to working server is short.
+
+This tutorial walks through building a minimal but functional MCP server in Python: setting up the SDK, registering tools, testing locally with Claude Desktop, and submitting to community directories. If you want to understand what MCP is before building, read [what is MCP](/blog/what-is-mcp) first.
+
+## Setting Up the Python MCP SDK
+
+The official Python SDK is `mcp`, available on PyPI. Install it in a virtual environment to keep your project isolated.
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install mcp
+```
+
+The SDK requires Python 3.10 or later. Verify your version with `python --version` before installing. The `mcp` package pulls in `anyio` for async support and `pydantic` for input validation, both of which you will use when defining tool schemas.
+
+Create a file called `server.py` at the root of your project. This is where the server logic lives. The entry point is small.
+
+```python
+from mcp.server.fastmcp import FastMCP
+
+mcp = FastMCP("my-server")
+
+if __name__ == "__main__":
+    mcp.run()
+```
+
+That is a complete, runnable MCP server. It registers no tools yet, but it starts, speaks the MCP protocol over stdio, and shuts down cleanly. Run it with `python server.py` to confirm there are no import errors before adding tools.
+
+## How to Register Custom Tools When Building Custom MCP Servers
+
+Tools are the functions your server exposes to the agent. Each tool has a name, a description, typed input parameters, and a return value. The SDK uses decorators to register them.
+
+```python
+from mcp.server.fastmcp import FastMCP
+
+mcp = FastMCP("my-server")
+
+@mcp.tool()
+def get_word_count(text: str) -> int:
+    """Count the number of words in a string."""
+    return len(text.split())
+
+@mcp.tool()
+def reverse_string(text: str) -> str:
+    """Reverse the characters in a string."""
+    return text[::-1]
+
+if __name__ == "__main__":
+    mcp.run()
+```
+
+The docstring becomes the tool description that the agent sees. Write it as a clear, one-sentence explanation of what the tool does. Claude uses the description to decide when to call the tool, so specificity matters more than brevity.
+
+For tools that need external data, add your HTTP calls inside the handler:
+
+```python
+import httpx
+
+@mcp.tool()
+def fetch_url_title(url: str) -> str:
+    """Fetch the HTML title tag from a URL."""
+    response = httpx.get(url, follow_redirects=True, timeout=10)
+    from html.parser import HTMLParser
+    class TitleParser(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.title = ""
+            self._in_title = False
+        def handle_starttag(self, tag, attrs):
+            if tag == "title":
+                self._in_title = True
+        def handle_data(self, data):
+            if self._in_title:
+                self.title += data
+        def handle_endtag(self, tag):
+            if tag == "title":
+                self._in_title = False
+    parser = TitleParser()
+    parser.feed(response.text)
+    return parser.title.strip()
+```
+
+Keep tool handlers focused on one thing. The agent will chain multiple tool calls together on its own.
+
+## How to Test Your Server With Claude Desktop
+
+Testing requires adding your server to the Claude Desktop config. The key is pointing `command` at your virtual environment's Python binary, not the system Python.
+
+```json
+{
+  "mcpServers": {
+    "my-server": {
+      "command": "/absolute/path/to/.venv/bin/python",
+      "args": ["/absolute/path/to/server.py"]
+    }
+  }
+}
+```
+
+Use absolute paths. Relative paths fail silently because Claude Desktop does not inherit your shell's working directory. After saving, restart Claude Desktop. Open a new conversation and ask Claude to use your tool by name. If it responds with a tool call and a result, the server is working.
+
+For debug output, add `import sys; print("server started", file=sys.stderr)` near the top of your script. Claude Desktop logs stderr from MCP servers to `~/Library/Logs/Claude/mcp-server-my-server.log`.
+
+## How to Submit Your Server to the MCPFind Directory
+
+Once your server works locally, you can submit it so others can find it. The MCPFind index is community-sourced, and submissions go through the [MCPFind directory](/categories/devtools) submission process.
+
+Before submitting, make sure your repository has a README with installation instructions and a working config example. Include the license file (MIT is standard), and tag your repository with `mcp-server` on GitHub so it is discoverable independently of any directory.
+
+A well-documented server in a specific niche will get used. The 233 Python servers in the MCPFind index cover everything from custom API wrappers to local file processors. If you built something that solves a real workflow problem, it belongs in the index.
+
+For a broader view of how your server fits into the MCP server ecosystem, read [MCP server categories explained](/blog/mcp-server-categories-ecosystem-map). If you are deciding whether to build a custom server or use an existing one, [MCP vs API integration](/blog/mcp-vs-api-integration) helps clarify which approach fits your use case.
+
+## Frequently Asked Questions
+
+{/* Rendered from faqItems by CMS */}

@@ -1,0 +1,80 @@
+---
+title: "How to Choose the Right MCP Server for Your Use Case"
+description: "A practical framework to help you choose MCP server options from 4,945 across 21 categories. Matched to coding, writing, data, and productivity use cases with clear guidance."
+excerpt: "With 4,945 MCP servers across 21 categories, knowing where to start is the real challenge. This guide gives you a simple decision framework matched to the most common use cases so you can find the right server without browsing everything."
+date: "2026-04-02"
+updatedAt: "2026-04-02"
+author: "Adam Bush"
+authorUrl: "https://mcpfind.org/authors/adam-bush"
+authorSameAs:
+  - "https://linkedin.com/in/PLACEHOLDER"
+  - "https://github.com/PLACEHOLDER"
+tags:
+  - "mcp"
+  - "beginner"
+  - "getting-started"
+  - "use-cases"
+category: "general"
+focusKeyword: "choose MCP server"
+draft: true
+cornerstone: false
+faqItems:
+  - question: "Can I install more than one MCP server at the same time?"
+    answer: "Yes. Most AI clients support multiple servers running simultaneously. You add each one as a separate entry in your config file, and the agent can use tools from all of them in the same conversation."
+  - question: "What happens if I install an MCP server and never use it?"
+    answer: "Unused servers add a small startup overhead because they launch as background processes when your AI client opens. If you are not actively using a server, remove its config entry to keep startup fast."
+  - question: "How do I know if an MCP server will work with my AI client?"
+    answer: "Most servers that use stdio transport work with Claude Desktop, Cursor, VS Code, and other major clients. Check the server's README for a compatibility note. If it lists a specific client, it likely works with others too since the protocol is standardized."
+  - question: "Should I start with one MCP server or install several at once?"
+    answer: "Start with one that matches your most common task. Get comfortable with how tools show up in your AI client and how to instruct the agent to use them. Adding a second server after that is fast since you already understand the config pattern."
+---
+
+There are 4,945 MCP servers indexed on MCPFind across 21 categories. That number is useful when you are searching for something specific, but it is not helpful when you are just getting started and do not yet know what you need.
+
+This guide cuts through the options with a use-case-first framework. Instead of browsing categories, you identify what you want your AI agent to do, and the right category becomes obvious from there. If you have not set up MCP before, read [what is MCP](/blog/what-is-mcp) first so you understand the basics before picking a server.
+
+## Start With the Task, Not the Tool
+
+The most common mistake when choosing an MCP server is starting with the tool you already use and searching for an integration. That works if you know the tool has an MCP server, but it skips the more useful question: what do you actually want the agent to do?
+
+If you want your agent to look things up on the web, you need a search server. If you want it to read and write files on your computer, you need a filesystem server. If you want it to interact with a SaaS app you use at work, check whether that specific app has a server in the directory before assuming it does.
+
+The [MCPFind directory](/categories/devtools) organizes all 4,945 servers into 21 categories. Knowing which category matches your task narrows 4,945 options down to dozens. That is a manageable list to evaluate.
+
+## Best Servers for Coding and Development Workflows
+
+If you are a developer, the devtools category is where you start. It is also the largest category in the directory at 2,349 servers, covering GitHub, GitLab, Jira, Linear, and the full range of tools that show up in a typical software workflow.
+
+For most developers, a GitHub MCP server is the highest-value first install. It lets Claude create issues, review pull requests, search code, and check CI status without leaving your editor. If you use Cursor or VS Code, see [how to use MCP with Cursor](/blog/how-to-use-mcp-with-cursor) for the exact config steps.
+
+Beyond devtools, developers often add a database server next. The [databases category](/categories/databases) has 227 servers. PostgreSQL and SQLite are the most common starting points depending on whether you are working with a production database or a local dev setup.
+
+## Best Servers for Writing and Knowledge Work
+
+For knowledge workers and writers, two categories stand out: productivity (8 servers) and documentation (50 servers).
+
+If your notes live in Notion, a Notion MCP server lets Claude search your workspace, summarize pages, and create new content without copy-pasting. If your team documents in Confluence or Gitbook, the documentation category covers those integrations.
+
+The search category (416 servers) is a strong complement for any writing workflow. A Brave Search or Tavily server gives Claude live web access so it can pull current information rather than relying only on its training data. This is especially useful for research-heavy tasks where you want up-to-date sources.
+
+For anything communication-related, the [communication category](/categories/communication) has 92 servers covering Slack, Discord, and email. If you want an agent that can draft and send messages to your team, that is the place to look.
+
+## Best Servers for Data and Analytics Work
+
+Data practitioners have a clear path. Start with the [databases category](/categories/databases) for direct database access, then add an analytics server if you want the agent to work with your BI tools.
+
+The analytics category has 25 servers covering Google Analytics, Mixpanel, Amplitude, BigQuery, and dbt. These let Claude run queries, pull dashboards, and summarize trends in plain language. Combined with a database server, you get an agent that can work across both raw data and processed metrics.
+
+For finance-specific data, the finance category has 20 servers. Stripe's MCP server is the most commonly used, letting agents check payment status, pull revenue data, and manage subscriptions.
+
+## How to Choose MCP Server Options When Two Do the Same Thing
+
+Once you have narrowed to a category and found two or three candidates, look at three signals: star count, last commit date, and who maintains it.
+
+Star count is a rough proxy for how many people have found the server useful. Higher is generally better, but a newer server with fewer stars can still be excellent. Last commit date tells you whether the project is actively maintained. A server that has not been updated in a year may have broken against API changes.
+
+The strongest signal is the maintainer. A server published and maintained by the company whose product it connects to (Supabase maintaining their own MCP server, Stripe maintaining theirs) will stay current with API changes far more reliably than a community-built wrapper. When in doubt, prefer the official server. For a full breakdown of every functional area in the directory, [MCP server categories explained](/blog/mcp-server-categories-ecosystem-map) covers all 21 categories with real counts and named examples.
+
+## Frequently Asked Questions
+
+{/* Rendered from faqItems by CMS */}

@@ -1,0 +1,70 @@
+---
+title: "MCP vs API Integration: When to Use Each"
+description: "MCP vs API integration: learn when to use each approach, with concrete trade-offs and real examples from the MCPFind directory of 4,945 servers across 21 categories."
+excerpt: "MCP is not a replacement for REST APIs - it is a different layer of the stack. This guide compares the two approaches with concrete examples, covering TypeScript and Python server patterns from the MCPFind directory."
+date: "2026-04-02"
+updatedAt: "2026-04-02"
+author: "Gus Marquez"
+authorUrl: "https://mcpfind.org/authors/gus-marquez"
+authorSameAs:
+  - "https://linkedin.com/in/PLACEHOLDER"
+  - "https://github.com/PLACEHOLDER"
+tags:
+  - "mcp"
+  - "developer"
+  - "api-integration"
+  - "architecture"
+category: "general"
+focusKeyword: "MCP vs API integration"
+cornerstone: false
+draft: true
+faqItems:
+  - question: "Does using an MCP server replace the underlying API?"
+    answer: "No. MCP servers call the underlying API on your behalf. The Supabase MCP server, for example, makes standard Supabase API calls internally. MCP is the interface layer between the AI client and the API, not a replacement for it."
+  - question: "Can I build my own MCP server for an internal API?"
+    answer: "Yes. The MCP SDK is available in TypeScript and Python. You define tools that correspond to your API endpoints, handle authentication inside the server, and expose clean tool names to the AI client. This is the standard pattern for internal tooling."
+  - question: "Is MCP more secure than giving an AI direct API access?"
+    answer: "MCP can be more secure because you control exactly which operations the server exposes. A read-only MCP server for your database prevents writes even if the underlying credentials allow them. That scoping is harder to enforce with a raw API key."
+  - question: "What languages are MCP servers written in?"
+    answer: "MCPFind indexes servers written in TypeScript (315 servers), Python (233), JavaScript (109), and Go (17), among others. TypeScript dominates because the official Anthropic SDK has first-class TypeScript support."
+  - question: "When is a direct API integration better than MCP?"
+    answer: "When you are building a deterministic application - not an AI agent - direct API calls are simpler and more predictable. MCP shines when the caller is an AI that needs to decide dynamically which tools to use based on user intent."
+---
+
+The question of MCP vs direct API integration comes up constantly when teams start building AI-assisted workflows. They are not competing approaches - they operate at different levels of the stack. Knowing which one to reach for depends on who or what is calling the integration.
+
+We analyzed the 4,945 servers in the MCPFind directory to understand where MCP adds real leverage and where a direct API call is still the right answer. For background on the protocol itself, start with [What Is the Model Context Protocol](/blog/what-is-mcp). If you want to jump straight into setup, see [How to Configure MCP Servers in Cursor](/blog/how-to-use-mcp-with-cursor). Once you understand when MCP is the right layer, [building your first MCP server in Python](/blog/building-your-first-mcp-server) shows how to write a custom one, and [open source vs commercial MCP servers](/blog/open-source-vs-commercial-mcp-servers) covers what to look for when choosing an existing server.
+
+## The Core Difference in One Sentence
+
+API integration is for code calling a service. MCP is for an AI model calling a service.
+
+When your application needs to fetch data from Stripe or post to Slack, you write code that calls those REST APIs directly. The logic is deterministic - you know at build time what calls will be made and when. MCP flips this: the AI model decides at runtime which tools to call based on what the user asked. That dynamic, intent-driven decision-making is what MCP is designed for. The protocol gives the model a structured way to discover available tools and call them with typed arguments.
+
+## When Direct API Integration Wins
+
+Use direct API integration when the calling code - not an AI model - makes the decisions.
+
+Scheduled jobs, data pipelines, webhooks, and traditional web application backends all belong here. If you know at write time that "on every order, call the Stripe API to charge the card," that is a direct API call. Adding MCP to that flow adds indirection without benefit. The same logic applies to server-side rendering, batch processing, and any workflow where the sequence of API calls is fixed by your business logic. MCPFind indexes 233 Python servers and 315 TypeScript servers - most of them are wrappers built for AI clients specifically, not general-purpose API libraries.
+
+## When MCP vs API Integration Favors MCP
+
+MCP wins when the caller is an AI agent that must decide dynamically which operations to perform.
+
+Consider a developer asking Cursor to "debug the failing test and fix the root cause." That task requires the agent to run tests, read error output, inspect source files, possibly query a database schema, and then write a fix. No static sequence of API calls handles that - the agent must react to each result and decide the next step. MCP gives it a clean interface to each of those capabilities. The [devtools category](/categories/devtools) on MCPFind has 2,349 servers built exactly for this pattern - tools the agent reaches for when it decides it needs them.
+
+The same applies to natural language interfaces over data. "Show me all orders over $500 from last week" is a query an agent can translate into a database call using an MCP server. Hardcoding that into an API endpoint would require knowing the query in advance.
+
+## Language and Ecosystem Considerations
+
+The MCP SDK is available in TypeScript and Python, which explains why those two languages dominate the MCPFind directory. TypeScript has 315 indexed servers and Python has 233.
+
+If your team already builds internal tooling in TypeScript, writing a custom MCP server for your internal API is low-friction. The SDK handles the protocol layer - you define tools as typed functions and the SDK handles transport, serialization, and client discovery. Python teams have the same advantage with the Python SDK. Go is a distant third with 17 servers in the index, mostly community-contributed. For an internal tool that needs to expose a read-only view of your production database to AI agents, a 100-line TypeScript MCP server is faster to ship than any alternative. Browse [/categories/databases](/categories/databases) to see what patterns established servers use before writing your own.
+
+## The Practical Decision Framework
+
+Ask one question: is the caller a human-written program or an AI agent?
+
+Human-written program with fixed logic - use direct API integration. AI agent making runtime decisions based on user intent - use MCP. The two approaches frequently coexist in the same system. Your backend uses direct API calls for all application logic. Your AI coding assistant uses MCP servers to interact with those same services during development and debugging. There is no conflict. The protocol layer and the application layer serve different masters.
+
+## Frequently Asked Questions

@@ -1,0 +1,76 @@
+---
+title: "Open Source vs Commercial MCP Servers: What's the Difference?"
+description: "Compare open source MCP servers vs commercial options across license types, maintenance patterns, and star counts. Data-driven analysis from 4,945 indexed servers on MCPFind."
+excerpt: "All 4,945 servers indexed on MCPFind are community-sourced, but that does not mean they are all equal. This data-driven breakdown compares open source and commercial MCP servers by license type, star count, and maintenance signals so you can make an informed choice."
+date: "2026-04-02"
+updatedAt: "2026-04-02"
+author: "Gus Marquez"
+authorUrl: "https://mcpfind.org/authors/gus-marquez"
+authorSameAs:
+  - "https://linkedin.com/in/PLACEHOLDER"
+  - "https://github.com/PLACEHOLDER"
+tags:
+  - "mcp"
+  - "developer"
+  - "open-source"
+  - "ecosystem"
+category: "general"
+focusKeyword: "open source MCP servers"
+draft: true
+cornerstone: false
+faqItems:
+  - question: "Can I use an open source MCP server in a commercial product?"
+    answer: "It depends on the license. MIT and Apache 2.0 servers allow commercial use. GPL-licensed servers require you to open-source your modifications. Always check the LICENSE file in the server's repository before integrating into a commercial workflow."
+  - question: "Are company-published MCP servers the same as commercial servers?"
+    answer: "Not necessarily. Many companies publish MCP servers as open source under MIT or Apache 2.0 with no usage restrictions. 'Commercial' in this context refers to servers with paid tiers, API key requirements, or usage-based billing attached to the underlying service."
+  - question: "How do I know if an MCP server is actively maintained?"
+    answer: "Check the repository's last commit date, open issue count, and whether recent issues have responses. On MCPFind, star count is a useful signal but not the whole picture. A 200-star server with commits last week beats a 2,000-star server abandoned 18 months ago."
+  - question: "Is there a risk of a popular open source MCP server being abandoned?"
+    answer: "Yes, and it is the main operational risk with open source. Mitigate it by preferring servers maintained by the tool's own company (Supabase maintains their own server, Stripe maintains theirs) or by servers with multiple active contributors rather than a single author."
+---
+
+Every server in the MCPFind directory is community-sourced. We index 4,945 servers across 21 categories, and all of them link back to a public repository. But "community-sourced" covers a wide range: a weekend project someone built and abandoned, a server maintained by a 10-person startup, and a server published by a company with a dedicated SDK team all look similar in a list.
+
+Understanding the differences matters when you are deciding what to put in a production AI workflow. This post breaks down what open source and commercial means in the MCP context, using real data from the directory. For background on what these servers actually do, read [what is MCP](/blog/what-is-mcp).
+
+## What Does "Open Source" Mean for an MCP Server?
+
+An open source MCP server is one where the source code is publicly available and the license permits use, modification, and redistribution under defined terms. In practice, the overwhelming majority of servers in the MCPFind index use MIT or Apache 2.0 licenses, both of which permit commercial use with minimal restrictions.
+
+The key distinction is not open vs. closed source. It is who maintains the server and whether the underlying service has commercial requirements. The official Stripe MCP server is open source under MIT, but you still need a Stripe account and API key to use it. The server code is free; the service it connects to is not.
+
+TypeScript is the dominant implementation language across the directory at 315 servers, followed by Python at 233 and JavaScript at 109. This is relevant because TypeScript and Python servers have the most mature tooling for review and contribution.
+
+## How to Evaluate Open Source MCP Servers: Star Counts as a Maintenance Signal
+
+Star count is the fastest proxy for project health, but it needs context. We track stars across all indexed servers, and the distribution is sharply skewed: a handful of servers have tens of thousands of stars while the median sits well below 100.
+
+The highest-starred server in the directory is Netdata at 78,193 stars, followed by tldraw at 46,031. Chrome DevTools MCP sits at 31,292. These are projects with large existing userbases that added MCP support, not servers built specifically for MCP. Their star counts reflect the parent project, not MCP-specific adoption.
+
+For servers built primarily as MCP integrations, [Supabase](/servers/supabase) at 2,556 stars is the best example of a well-maintained, company-backed open source server. Stripe's server is another. Both are maintained by the teams who built the underlying services, which means they track API changes and update accordingly.
+
+A solo-maintained server at 150 stars can be excellent. Check the commit log, not just the total count.
+
+## What Makes a Server "Commercial" in the MCP Context?
+
+In the MCP context, commercial does not mean the server code costs money. It means the workflow the server enables has a cost attached.
+
+Stripe's MCP server is free to install and open source, but every payment operation it enables goes through Stripe's billing. Cloudflare's server is the same model. The code is yours; the compute is metered. This is the standard pattern for company-published servers in the [cloud category](/categories/cloud) and [finance category](/categories/finance).
+
+Contrast this with a community-built PostgreSQL MCP server. You run the server, you run the database, and nothing is metered. The only cost is your own infrastructure.
+
+The third category is servers that wrap a paid SaaS product where the free tier has meaningful limits. An analytics MCP server for a tool with a paid API means every agent query counts against your quota. Before wiring an MCP server into an automated workflow, verify the underlying service's pricing model, especially for high-frequency operations.
+
+## Which Category Has the Most Open Source vs. Commercial Split?
+
+The devtools category leads the directory with 2,349 servers, the vast majority of which are fully open source with no metering. GitHub, GitLab, and Linear servers connect to services that have free tiers adequate for most development workflows.
+
+The finance and cloud categories skew more commercial by nature since the services themselves are metered. All 20 finance servers and most of the 113 cloud servers connect to paid APIs. This is not a problem, it is just worth knowing before you build an agent that calls them at high frequency.
+
+The ai-ml category at 683 servers sits in the middle. Many wrap OpenAI or Anthropic APIs, which are metered per token. Others wrap local models via Ollama and have no external cost at all. When evaluating an [ai-ml category](/categories/ai-ml) server, check whether it calls an external API or runs inference locally.
+
+For choosing between specific servers, see [how to choose the right MCP server for your use case](/blog/how-to-choose-mcp-server). For a full picture of what categories exist and how many servers each has, [MCP server categories explained](/blog/mcp-server-categories-ecosystem-map) maps the entire ecosystem.
+
+## Frequently Asked Questions
+
+{/* Rendered from faqItems by CMS */}

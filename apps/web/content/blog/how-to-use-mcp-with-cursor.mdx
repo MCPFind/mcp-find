@@ -1,0 +1,96 @@
+---
+title: "How to Configure MCP Servers in Cursor (2026 Guide)"
+description: "Step-by-step guide to how to configure MCP in Cursor. Exact JSON config examples, top devtools servers, and troubleshooting tips for developers in 2026."
+excerpt: "Cursor supports MCP natively. This guide shows you the exact JSON config format, which servers work best with Cursor's agent mode, and how to verify your setup is working correctly."
+date: "2026-04-02"
+updatedAt: "2026-04-02"
+author: "Gus Marquez"
+authorUrl: "https://mcpfind.org/authors/gus-marquez"
+authorSameAs:
+  - "https://linkedin.com/in/PLACEHOLDER"
+  - "https://github.com/PLACEHOLDER"
+tags:
+  - "mcp"
+  - "developer"
+  - "cursor"
+  - "devtools"
+  - "configuration"
+category: "devtools"
+focusKeyword: "how to configure MCP in Cursor"
+cornerstone: false
+draft: true
+faqItems:
+  - question: "Does Cursor support MCP natively?"
+    answer: "Yes. Cursor has built-in MCP support as of 2024. You configure servers via a JSON file at the project or global level, and Cursor's agent mode can call MCP tools automatically during multi-step tasks."
+  - question: "What is the difference between project-level and global MCP config in Cursor?"
+    answer: "A project-level config at .cursor/mcp.json applies only to that repository. A global config at ~/.cursor/mcp.json applies across all projects. Project-level config takes precedence when both exist for the same server name."
+  - question: "Can Cursor MCP servers access environment variables?"
+    answer: "Yes. The env field in the server config block lets you pass environment variables to the server process. This is the standard pattern for API keys - never hardcode credentials in the args array."
+  - question: "Why would an MCP server work in Claude Desktop but not in Cursor?"
+    answer: "Cursor and Claude Desktop use slightly different config schemas. Cursor uses the mcpServers key inside .cursor/mcp.json. Verify the command resolves correctly in your PATH - Cursor may not inherit shell aliases the way a terminal session does."
+  - question: "How do I see which MCP tools Cursor is calling during a task?"
+    answer: "Open the Cursor composer panel and expand the tool call entries in the response. Each MCP tool call is labeled with the server name and tool name, along with the arguments passed and the result returned."
+---
+
+Cursor's agent mode becomes significantly more capable when it can call MCP tools directly during a task. Instead of asking you to run a command or fetch data manually, the agent fetches it inline, uses the result, and continues. This guide shows the exact config format and which servers are worth connecting first.
+
+For background on what MCP is and how the protocol works, read [What Is the Model Context Protocol](/blog/what-is-mcp). The devtools category alone covers 2,349 servers on MCPFind - this guide helps you cut through that and start with what matters. Once you have Cursor configured, the same patterns apply in [VS Code](/blog/how-to-use-mcp-with-vscode). If you are coming from Claude Desktop, [getting started with MCP in Claude](/blog/getting-started-with-mcp-in-claude) explains the same install flow for that client.
+
+## Where Cursor Stores MCP Config
+
+Cursor reads MCP server config from a JSON file. You can place it at the project level or globally.
+
+Project-level config lives at `.cursor/mcp.json` inside your repository root. This is the right choice for project-specific servers like a database server tied to one app. Global config lives at `~/.cursor/mcp.json` and applies across every project you open in Cursor. Most developers use global config for general-purpose servers (search, filesystem, documentation) and project-level for anything tied to a specific stack.
+
+## The JSON Config Format
+
+The config format is straightforward. Here is the structure for a single server:
+
+```json
+{
+  "mcpServers": {
+    "server-name": {
+      "command": "npx",
+      "args": ["-y", "@scope/package-name"],
+      "env": {
+        "API_KEY": "your-key-here"
+      }
+    }
+  }
+}
+```
+
+The `command` field is the executable Cursor will run. `npx` is the standard for Node-based servers. Python servers typically use `uvx` or `python`. The `args` array passes arguments to the command. The `env` field is optional - use it for API keys and secrets so they stay out of your args.
+
+Here is a real example using the Supabase MCP server, which has 2,556 GitHub stars and is the top-rated server in [/categories/databases](/categories/databases):
+
+```json
+{
+  "mcpServers": {
+    "supabase": {
+      "command": "npx",
+      "args": ["-y", "@supabase/mcp-server-supabase@latest"],
+      "env": {
+        "SUPABASE_URL": "https://your-project.supabase.co",
+        "SUPABASE_SERVICE_ROLE_KEY": "your-service-role-key"
+      }
+    }
+  }
+}
+```
+
+## How to Configure MCP in Cursor: Which Servers Work Best
+
+We looked at the 2,349 servers in [/categories/devtools](/categories/devtools) ranked by GitHub stars. Three categories of servers add the most value in Cursor's agent mode.
+
+The first is diagram and whiteboard tools. tldraw leads this group with 46,031 GitHub stars - the most starred server in the entire MCPFind index. It lets Cursor generate architectural diagrams inline during planning tasks. The second is browser and testing tools, where the Chrome DevTools MCP server (31,292 stars) enables Cursor to inspect live browser state during debugging sessions. The third is documentation search, where servers that query your internal docs or public API references let the agent look up correct method signatures without asking you.
+
+For most Cursor setups, start with one database server and one search server. Add devtools-specific servers as you identify gaps in your workflow.
+
+## Verifying the Config Works
+
+After saving your config file, reload Cursor with Cmd+Shift+P and select "Developer: Reload Window." Then open a new composer session and type a prompt that requires the server you just added.
+
+If the server is connected, you will see tool call entries appear in the composer output as the agent runs. If nothing appears, open the Cursor output panel (View > Output) and select "MCP" from the dropdown to see connection errors. The most common issues are a missing `npx` in PATH (fix by using the full path like `/usr/local/bin/npx`) and malformed JSON in your config file. Validate your JSON with a linter before reloading.
+
+## Frequently Asked Questions

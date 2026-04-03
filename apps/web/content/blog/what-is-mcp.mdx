@@ -1,13 +1,14 @@
 ---
 title: "What Is the Model Context Protocol (MCP)?"
-description: "Learn what the Model Context Protocol is, how it works, and why it matters for AI development. A comprehensive guide to MCP servers and integrations."
+description: "Learn what the Model Context Protocol is, how it works, and why it matters for AI development. A practical guide to MCP servers, clients, and integrations."
 excerpt: "The Model Context Protocol (MCP) is an open standard that lets AI assistants like Claude connect to external tools and data sources. Learn how MCP servers work and how to find the right ones for your workflow."
 date: "2026-04-01"
-author: "MCP Find Team"
-authorUrl: "https://mcpfind.org"
+updatedAt: "2026-04-02"
+author: "Gus Marquez"
+authorUrl: "https://mcpfind.org/authors/gus-marquez"
 authorSameAs:
-  - "https://github.com/MCPFind"
-  - "https://twitter.com/mcpfind"
+  - "https://linkedin.com/in/PLACEHOLDER"
+  - "https://github.com/PLACEHOLDER"
 tags:
   - "mcp"
   - "model-context-protocol"
@@ -16,6 +17,7 @@ tags:
 category: "devtools"
 focusKeyword: "model context protocol"
 cornerstone: true
+draft: true
 faqItems:
   - question: "What is the Model Context Protocol?"
     answer: "The Model Context Protocol (MCP) is an open standard created by Anthropic that allows AI assistants like Claude to securely connect to external tools, databases, and services. It provides a standardized way for AI models to access real-time data and perform actions beyond their training data."
@@ -37,15 +39,15 @@ MCP uses a client-server architecture where your AI assistant acts as the client
 
 Each MCP server exposes a set of tools that the AI can call. For example, a database MCP server might expose tools like `query`, `list_tables`, and `describe_schema`. The AI model sees these tools and can decide when to use them based on your requests. This tool-based approach keeps the interaction secure and predictable.
 
-## Why Does MCP Matter for Developers?
+## Why the Model Context Protocol Matters for Developers
 
 MCP eliminates the integration tax that previously made connecting AI assistants to development workflows impractical. Instead of building custom plugins for each AI tool, developers can install a single MCP server that works everywhere. This dramatically reduces the friction of adopting AI-assisted development.
 
-The ecosystem is growing rapidly. MCP Find currently indexes over 10,000 MCP servers across categories like databases, cloud infrastructure, monitoring, security, and testing. Whether you need to query PostgreSQL, manage AWS resources, or run automated tests, there is likely an MCP server available. Browse the full directory at [mcpfind.org/servers](/servers) to find servers for your stack.
+The ecosystem is growing fast. MCPFind currently indexes 4,945 MCP servers across 21 categories including databases, cloud infrastructure, monitoring, security, and testing. Whether you need to query PostgreSQL, manage AWS resources, or run automated tests, there is likely an MCP server available. Browse the full directory at [mcpfind.org/servers](/servers) to find servers for your stack. Once you understand the protocol, see [what MCP servers actually are](/blog/what-are-mcp-servers) to understand how they fit your workflow. When you are ready to install your first one, [getting started with MCP in Claude Desktop](/blog/getting-started-with-mcp-in-claude) walks through the setup in 15 minutes, and [how to choose the right MCP server](/blog/how-to-choose-mcp-server) helps you narrow down which one to try first.
 
 ## How Do I Get Started with MCP?
 
-Getting started with MCP takes less than five minutes. First, choose an AI client that supports MCP — Claude Desktop, Cursor, and VS Code with the Claude extension are the most popular options. Next, find an MCP server that connects to the tool you want to use.
+Getting started with MCP takes less than five minutes. First, choose an AI client that supports MCP. Claude Desktop, Cursor, and VS Code with the Claude extension are the most popular options. Next, find an MCP server that connects to the tool you want to use.
 
 MCP Find makes this easy by providing copy-paste install configurations for every server in its directory. Visit any server page, select your client, and copy the configuration snippet into your client's config file. No manual setup or API key management required for most servers. Start by browsing the most popular categories like [databases](/categories/databases) or [devtools](/categories/devtools).
 

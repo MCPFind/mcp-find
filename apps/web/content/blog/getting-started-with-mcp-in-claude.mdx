@@ -1,0 +1,81 @@
+---
+title: "How to Use MCP With Claude Desktop in 15 Minutes"
+description: "A step-by-step guide to how to use MCP with Claude Desktop. No coding required. Get your first server running in under 15 minutes with copy-paste configs."
+excerpt: "You can connect MCP servers to Claude Desktop without writing a single line of code. This guide walks through picking a server, copying the config, and verifying it works - start to finish in 15 minutes."
+date: "2026-04-02"
+updatedAt: "2026-04-02"
+author: "Adam Bush"
+authorUrl: "https://mcpfind.org/authors/adam-bush"
+authorSameAs:
+  - "https://linkedin.com/in/PLACEHOLDER"
+  - "https://github.com/PLACEHOLDER"
+tags:
+  - "mcp"
+  - "beginner"
+  - "claude-desktop"
+  - "getting-started"
+category: "general"
+focusKeyword: "how to use MCP with Claude"
+cornerstone: false
+draft: true
+faqItems:
+  - question: "Does Claude Desktop support MCP out of the box?"
+    answer: "Yes. Claude Desktop has built-in MCP support. You just need to edit its configuration file to add the servers you want. No extensions or plugins are required."
+  - question: "Can I run multiple MCP servers at the same time in Claude Desktop?"
+    answer: "Yes. Claude Desktop supports multiple simultaneous MCP server connections. You add each server as a separate entry in the mcpServers section of your config file, and Claude can use all of them in the same conversation."
+  - question: "What happens if an MCP server stops working?"
+    answer: "Claude Desktop will show an error if it cannot connect to a configured server. Your other servers and Claude itself continue working normally. You can remove or fix the broken entry in your config file without affecting anything else."
+  - question: "Do MCP servers have access to my entire computer?"
+    answer: "Only what the server is designed to access. A filesystem MCP server, for example, typically limits access to a specific directory you configure. Always read the server documentation to understand exactly what it can and cannot reach."
+  - question: "Where is the Claude Desktop config file located?"
+    answer: "On macOS it is at ~/Library/Application Support/Claude/claude_desktop_config.json. On Windows it is at %APPDATA%\\Claude\\claude_desktop_config.json. Create the file if it does not exist."
+---
+
+If you have Claude Desktop installed and want to make it dramatically more useful, adding MCP servers is the fastest path. You do not need to write code or understand how the protocol works under the hood.
+
+This guide covers picking your first server, adding it to Claude Desktop, and confirming it works. The whole process takes about 15 minutes. If you want to understand what MCP servers are before diving in, read [MCP Servers Explained](/blog/what-are-mcp-servers) first. For background on the protocol itself, see [What Is the Model Context Protocol](/blog/what-is-mcp). If you use Cursor instead of Claude Desktop, [how to configure MCP in Cursor](/blog/how-to-use-mcp-with-cursor) covers the same process with Cursor-specific config details.
+
+## What You Need Before You Start
+
+You need Claude Desktop installed and a terminal available on your machine. That is it.
+
+Claude Desktop is the free desktop app from Anthropic available for macOS and Windows. If you do not have it yet, download it from claude.ai/download. The terminal is built into every Mac (search "Terminal" in Spotlight) and available on Windows via PowerShell or Command Prompt. You will use the terminal to install server packages, but the commands are simple copy-paste steps - nothing to memorize.
+
+## Step 1 - How to Use MCP With Claude: Choose Your First Server
+
+Pick one server to start. Trying to add five at once makes it harder to debug if something goes wrong.
+
+A good first choice for non-developers is a search server, which lets Claude pull live web results into your conversation. MCPFind indexes 416 servers in the [search category](/categories/search). Another strong beginner pick is a filesystem server, which gives Claude read access to a folder on your computer - useful for asking questions about documents you have saved locally. For something more powerful, the [Supabase MCP server](/servers/supabase) has 2,556 GitHub stars and solid documentation. Browse [/categories/devtools](/categories/devtools) if you want to see the full range of developer-focused options, or [/categories/databases](/categories/databases) for data-focused servers.
+
+## Step 2 - Find the Install Config on MCPFind
+
+Every server page on MCPFind shows a ready-to-copy configuration block for Claude Desktop.
+
+Navigate to the server you chose and look for the "Claude Desktop" tab in the install section. You will see a JSON snippet that looks something like this:
+
+```json
+{
+  "mcpServers": {
+    "server-name": {
+      "command": "npx",
+      "args": ["-y", "@scope/server-package"]
+    }
+  }
+}
+```
+
+Copy that entire block. You will paste it into your config file in the next step.
+
+## Step 3 - Edit the Claude Desktop Config File
+
+Open your Claude Desktop config file in any text editor. On macOS, the path is `~/Library/Application Support/Claude/claude_desktop_config.json`. On Windows, it is `%APPDATA%\Claude\claude_desktop_config.json`.
+
+If the file does not exist yet, create it. Paste the JSON snippet you copied from MCPFind. If you already have other servers in your config, add the new server as another entry inside the existing `mcpServers` object - do not replace the whole file. Save the file when you are done.
+
+## Step 4 - Restart Claude Desktop and Test
+
+Close Claude Desktop completely and reopen it. The app reads the config file on startup, so a restart is required.
+
+Once it reopens, start a new conversation and ask Claude to use the server you just added. For a search server, try: "Search the web for the latest MCP server releases." For a filesystem server, try: "List the files in my Documents folder." If Claude uses the tool and returns a result, the connection is working. If you see an error, double-check that your JSON is valid - a missing comma or bracket is the most common issue.
+
+## Frequently Asked Questions
