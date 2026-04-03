@@ -12,18 +12,20 @@ const requestLog = new Map<string, number[]>();
 function isRateLimited(ip: string): boolean {
   const now = Date.now();
   const timestamps = requestLog.get(ip)?.filter(t => now - t < RATE_LIMIT_WINDOW) ?? [];
-  if (timestamps.length === 0) {
-    requestLog.delete(ip);
-    return false;
-  }
   timestamps.push(now);
   requestLog.set(ip, timestamps);
-  // Safety cap: prevent unbounded growth from distinct IPs
-  if (requestLog.size > 10_000) requestLog.clear();
+  // LRU eviction: if too many distinct IPs, delete the oldest entry
+  if (requestLog.size > 10_000) {
+    const oldestKey = requestLog.keys().next().value;
+    if (oldestKey) requestLog.delete(oldestKey);
+  }
   return timestamps.length > RATE_LIMIT_MAX;
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  // x-real-ip: set by some proxies (not Vercel). x-forwarded-for .pop(): last
+  // entry is appended by Vercel and cannot be spoofed by the client (leftmost
+  // entries are client-supplied and untrustworthy).
   const ip = request.headers.get('x-real-ip') ?? request.headers.get('x-forwarded-for')?.split(',').pop()?.trim() ?? 'unknown';
   if (isRateLimited(ip)) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
