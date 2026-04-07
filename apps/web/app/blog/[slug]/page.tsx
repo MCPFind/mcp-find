@@ -13,6 +13,7 @@ import { PostFooter } from "@/components/blog/post-footer";
 import { TableOfContents } from "@/components/blog/table-of-contents";
 import type { TocHeading } from "@/components/blog/table-of-contents";
 import { mdxComponents } from "@/components/blog/mdx-components";
+import { BlogFaq } from "@/components/blog/blog-faq";
 
 export const revalidate = 86400;
 
@@ -150,6 +151,13 @@ export default async function BlogPostPage({
             <TableOfContents headings={headings} />
           </aside>
         </div>
+
+        {/* FAQ accordion — rendered from frontmatter, outside prose */}
+        {post.frontmatter.faqItems && post.frontmatter.faqItems.length > 0 && (
+          <div className="max-w-none lg:max-w-[calc(100%-250px-2.5rem)]">
+            <BlogFaq faqItems={post.frontmatter.faqItems} />
+          </div>
+        )}
 
         {/* Related posts */}
         <PostFooter relatedPosts={relatedPosts} />
