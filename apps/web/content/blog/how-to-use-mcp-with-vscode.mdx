@@ -25,7 +25,7 @@ faqItems:
   - question: "Can I scope an MCP server to one VS Code workspace only?"
     answer: "Yes. Place your mcp.json inside the .vscode/ folder at the root of your workspace. That config applies only when that workspace is open. User-level config in your VS Code settings applies globally across all workspaces."
   - question: "Does VS Code MCP config support environment variable substitution?"
-    answer: "Yes. You can reference VS Code variables like ${workspaceFolder} and ${env:MY_VAR} in the args and env fields of your MCP server config. This is useful for pointing a filesystem server at the current project root automatically."
+    answer: "Yes. You can reference VS Code variables like `${workspaceFolder}` and `${env:MY_VAR}` in the args and env fields of your MCP server config. This is useful for pointing a filesystem server at the current project root automatically."
   - question: "How is VS Code MCP config different from Cursor MCP config?"
     answer: "The JSON structure is nearly identical, but the file location differs. Cursor uses .cursor/mcp.json at the project level or ~/.cursor/mcp.json globally. VS Code uses .vscode/mcp.json at the workspace level or the VS Code user settings JSON globally."
   - question: "Can I share MCP config with my team through version control?"
@@ -107,7 +107,7 @@ Yes. Place your mcp.json inside the .vscode/ folder at the root of your workspac
 
 ### Does VS Code MCP config support environment variable substitution?
 
-Yes. You can reference VS Code variables like ${workspaceFolder} and ${env:MY_VAR} in the args and env fields of your MCP server config. This is useful for pointing a filesystem server at the current project root automatically.
+Yes. You can reference VS Code variables like `${workspaceFolder}` and `${env:MY_VAR}` in the args and env fields of your MCP server config. This is useful for pointing a filesystem server at the current project root automatically.
 
 ### How is VS Code MCP config different from Cursor MCP config?
 
