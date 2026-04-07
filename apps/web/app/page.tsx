@@ -26,7 +26,7 @@ import {
   IconSearch,
   IconPlug,
   IconRocket,
-  IconLock,
+  IconShieldCheck,
   IconArrowRight,
   IconStar,
   IconDownload,
@@ -109,7 +109,7 @@ export default async function HomePage() {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
             </span>
-            Now featuring {serverCount > 0 ? `${serverCount.toLocaleString()}+` : "500+"} MCP servers
+            Now featuring {serverCount > 0 ? `${serverCount.toLocaleString()}+` : "500+"} verified MCP servers
           </div>
 
           {/* Headline */}
@@ -124,8 +124,8 @@ export default async function HomePage() {
           </h1>
 
           <p className="text-neutral-400 text-lg sm:text-xl max-w-2xl mx-auto mb-10 leading-relaxed">
-            The open directory of Model Context Protocol servers — browse,
-            search, and integrate tools into your AI workflows.
+            The open directory of verified Model Context Protocol servers —
+            browse, search, and integrate trusted tools into your AI workflows.
           </p>
 
           <HeroSearch />
@@ -153,7 +153,7 @@ export default async function HomePage() {
               <span className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">
                 {serverCount > 0 ? `${serverCount.toLocaleString()}+` : "500+"}
               </span>
-              <span className="text-neutral-500 mt-1">MCP Servers</span>
+              <span className="text-neutral-500 mt-1">Verified MCP Servers</span>
             </div>
             <div className="w-px h-12 bg-neutral-800 hidden sm:block self-center" />
             <div className="flex flex-col items-center">
@@ -217,12 +217,12 @@ export default async function HomePage() {
               </p>
             </div>
             <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-6">
-              <div className="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center mb-4">
-                <IconLock size={20} className="text-red-400" />
+              <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center mb-4">
+                <IconShieldCheck size={20} className="text-emerald-400" />
               </div>
-              <h3 className="font-bold text-neutral-200 mb-2">Security First</h3>
+              <h3 className="font-bold text-neutral-200 mb-2">Verified &amp; Secure</h3>
               <p className="text-neutral-400 text-sm leading-relaxed">
-                All servers are reviewed for security best practices. Official servers are maintained by Anthropic and verified partners.
+                Every server is reviewed and verified before listing. Official servers are maintained by Anthropic and trusted partners, so you can deploy with confidence.
               </p>
             </div>
             <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-6">

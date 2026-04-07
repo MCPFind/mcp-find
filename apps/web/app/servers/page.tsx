@@ -72,10 +72,10 @@ export default async function ServersPage({
         {/* Page header */}
         <div className="mb-10">
           <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-neutral-400 mb-2">
-            MCP Server Directory
+            Verified MCP Server Directory
           </h1>
           <p className="text-neutral-500 text-lg">
-            {result.total.toLocaleString()} servers available across{" "}
+            {result.total.toLocaleString()} verified servers available across{" "}
             {CATEGORIES.length} categories
             {filters.category && (
               <span>
