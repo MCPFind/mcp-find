@@ -1,0 +1,95 @@
+---
+title: "How to Set Up MCP Servers in Zed Editor (2026 Guide)"
+description: "Configure MCP servers in Zed editor using context_servers settings. Step-by-step guide for developers with working JSON examples and troubleshooting tips."
+excerpt: "Zed added native MCP support via its context_servers configuration block. This guide walks you through connecting any of the 2,824 devtools servers MCPFind indexes to your Zed workspace, with troubleshooting for common setup failures."
+date: "2026-04-13"
+updatedAt: "2026-04-13"
+author: "Gus Marquez"
+authorUrl: "https://mcpfind.org/authors/gus-marquez"
+authorSameAs:
+  - "https://linkedin.com/in/PLACEHOLDER"
+  - "https://github.com/PLACEHOLDER"
+tags:
+  - "mcp"
+  - "developer"
+  - "zed-editor"
+  - "ide-setup"
+  - "devtools"
+category: "devtools"
+focusKeyword: "MCP servers Zed editor setup"
+draft: false
+cornerstone: false
+faqItems:
+  - question: "Does Zed support all MCP transports?"
+    answer: "Zed supports stdio transport for local processes. HTTP and Streamable HTTP transports are not yet supported in Zed's native context_servers integration as of early 2026."
+  - question: "Can I use the same MCP servers in Zed as in Cursor or Claude Desktop?"
+    answer: "Yes, if the server uses stdio transport. Most developer-focused MCP servers support stdio, so the same servers you run in Cursor will work in Zed with a minimal config change."
+  - question: "How do I add environment variables to a Zed MCP server config?"
+    answer: "Add an env block inside the context_servers entry for that server. Zed passes these as environment variables to the spawned process, which is the standard way to supply API keys."
+  - question: "Where is the Zed settings.json file located?"
+    answer: "On macOS, Zed settings live at ~/.config/zed/settings.json. Open it directly with cmd+, or via the Zed menu. Changes take effect when you save the file."
+---
+
+Zed launched native MCP support in 2025, letting developers connect context servers directly inside the editor without switching to Claude Desktop or a separate client. The configuration sits in a single JSON block, and it works with any stdio-based MCP server. MCPFind currently indexes 2,824 servers in the devtools category alone, the largest category in the directory. This guide covers the exact config format, which servers pair well with Zed, and how to debug the most common setup failures.
+
+## How Does Zed Implement MCP?
+
+Zed treats MCP servers as "context servers" that extend its AI assistant with tool-calling capabilities. When you open a conversation in Zed's AI panel, any running context servers appear as available tools the model can call. Configuration lives in `settings.json` under the `context_servers` key. Each entry maps a server ID to a command and optional arguments and environment variables. Zed spawns the server process on launch and communicates over stdio. This approach means no separate daemon or port management. The server lifecycle is tied to the editor session, which simplifies teardown. Zed does not currently support HTTP-based MCP servers in its native integration, so any server requiring network transport must be wrapped in a local stdio proxy.
+
+## How to Configure Context Servers in Zed
+
+Open Zed settings with `cmd+,` on macOS. Find or add the `context_servers` block at the top level of your JSON config:
+
+```json
+{
+  "context_servers": {
+    "github": {
+      "command": {
+        "path": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-github"],
+        "env": {
+          "GITHUB_PERSONAL_ACCESS_TOKEN": "your-token-here"
+        }
+      }
+    },
+    "filesystem": {
+      "command": {
+        "path": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", "/Users/you/projects"]
+      }
+    }
+  }
+}
+```
+
+Save the file and reopen the AI panel. Each server listed in `context_servers` will attempt to start. You can verify the connection status in Zed's output panel under "Context Servers." If a server fails to start, the error message appears there rather than silently failing. The `path` field accepts absolute paths to binaries or bare commands like `npx` if the binary is in your `$PATH`. For Python-based servers, replace `npx` with `uv` or `python`.
+
+## Which MCP Servers Work Best With Zed?
+
+We analyzed the devtools category on MCPFind, where the 2,824 servers average 38.29 stars per repo. The highest-value servers for a Zed workflow fall into three groups. First, file and code tools: the filesystem server from Anthropic's reference implementations gives Zed the ability to read, write, and list files outside the current project. Second, version control: GitHub and GitLab servers let the AI assistant query pull requests, issues, and commit history without leaving the editor. Third, documentation: the [Microsoft Learn MCP](/servers/com-microsoft-microsoft-learn-mcp) server (1,492 stars) lets you query technical docs inline. Browse the full [devtools category](/categories/devtools) to find servers that match your stack. Stick to servers with 50+ GitHub stars for stability, since lower-star projects frequently break between MCP spec updates.
+
+## Troubleshooting MCP in Zed
+
+Three failure modes account for most setup problems. The first is a missing binary: Zed resolves the command path using your login shell's `$PATH`, which differs from your interactive shell on macOS. If `npx` works in your terminal but not in Zed, add the full path, typically `/usr/local/bin/npx` or wherever `which npx` resolves. The second is an incorrect args format: each argument must be a separate string in the array. Passing `"-y @modelcontextprotocol/server-github"` as one string fails silently. The third is environment variable scope: variables set with `export` in `.bashrc` are not automatically available to Zed on macOS. Use the `env` block in the config instead of relying on shell exports. When in doubt, test the server manually in a terminal first with the exact command and args from your Zed config before debugging the editor integration.
+
+## Frequently Asked Questions
+
+### Does Zed support all MCP transports?
+
+Zed supports stdio transport for local processes. HTTP and Streamable HTTP transports are not yet supported in Zed's native context_servers integration as of early 2026.
+
+### Can I use the same MCP servers in Zed as in Cursor or Claude Desktop?
+
+Yes, if the server uses stdio transport. Most developer-focused MCP servers support stdio, so the same servers you run in Cursor will work in Zed with a minimal config change.
+
+### How do I add environment variables to a Zed MCP server config?
+
+Add an env block inside the context_servers entry for that server. Zed passes these as environment variables to the spawned process, which is the standard way to supply API keys.
+
+### Where is the Zed settings.json file located?
+
+On macOS, Zed settings live at `~/.config/zed/settings.json`. Open it directly with `cmd+,` or via the Zed menu. Changes take effect when you save the file.
+
+---
+
+New to MCP? Start with [what MCP is and how it works](/blog/what-is-mcp), then check the [devtools category on MCPFind](/categories/devtools) to find servers that match your stack. If you use other editors, the [Cursor MCP setup guide](/blog/how-to-use-mcp-with-cursor) covers a similar workflow.

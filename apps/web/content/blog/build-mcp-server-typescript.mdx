@@ -1,0 +1,160 @@
+---
+title: "How to Build an MCP Server With TypeScript: Step-by-Step"
+description: "Build a working MCP server in TypeScript using the official SDK. Covers tool definition, argument validation, error handling, and local testing in under 30 minutes."
+excerpt: "TypeScript dominates the MCP ecosystem with 315 indexed servers on MCPFind. This step-by-step guide shows you how to scaffold, implement, and test a production-ready MCP server using the official @modelcontextprotocol/sdk, with patterns drawn from the highest-starred TypeScript servers in the directory."
+date: "2026-04-14"
+updatedAt: "2026-04-14"
+author: "Gus Marquez"
+authorUrl: "https://mcpfind.org/authors/gus-marquez"
+authorSameAs:
+  - "https://linkedin.com/in/PLACEHOLDER"
+  - "https://github.com/PLACEHOLDER"
+tags:
+  - "mcp"
+  - "developer"
+  - "typescript"
+  - "build-mcp-server"
+  - "devtools"
+category: "devtools"
+focusKeyword: "build MCP server TypeScript"
+draft: false
+cornerstone: false
+faqItems:
+  - question: "What TypeScript version do I need to build an MCP server?"
+    answer: "TypeScript 5.0 or later is recommended. The official MCP SDK uses modern TypeScript features including satisfies expressions and stricter generics. Most examples target Node 18+."
+  - question: "Can I publish my TypeScript MCP server to MCPFind?"
+    answer: "Yes. Once your server is on GitHub with a valid package.json, you can submit it to MCPFind for indexing. The directory currently indexes 315 TypeScript MCP servers."
+  - question: "Should I use stdio or HTTP transport for my MCP server?"
+    answer: "Start with stdio. It requires no port management, works in Claude Desktop and Cursor out of the box, and covers 90%+ of use cases. Switch to HTTP only if you need multi-client or remote deployment."
+  - question: "How do I handle errors in an MCP tool handler?"
+    answer: "Return an isError: true response with a text content block describing the error. Do not throw unhandled exceptions from tool handlers, as the MCP SDK may not surface them cleanly to the client."
+---
+
+TypeScript powers 315 of the servers MCPFind indexes, more than any other language in the directory. The official `@modelcontextprotocol/sdk` makes the baseline straightforward: define tools with a Zod schema, connect a stdio transport, and your server is ready to use in any MCP client. The complexity shows up in argument validation, error handling, and making tools genuinely useful rather than just callable. We analyzed the top-starred TypeScript servers in the [devtools category](/categories/devtools) to extract the patterns that separate high-quality servers from basic stubs.
+
+## What You Need Before You Start
+
+Before writing code, confirm your environment. You need Node.js 18 or later and TypeScript 5.0+. Create a new directory and initialize it:
+
+```bash
+mkdir my-mcp-server && cd my-mcp-server
+npm init -y
+npm install @modelcontextprotocol/sdk zod
+npm install -D typescript @types/node tsx
+npx tsc --init --target ES2022 --module Node16 --moduleResolution Node16 --outDir dist
+```
+
+The `zod` dependency is not technically required by the SDK, but every production TypeScript MCP server uses it for runtime argument validation. The SDK's `zodToJsonSchema` helper converts your Zod schemas directly into the JSON Schema format the MCP protocol expects. Using `tsx` for development gives you fast iteration without a compile step. The `Node16` module resolution is important because the MCP SDK ships as ESM. Getting this wrong produces "named export not found" errors that are difficult to trace.
+
+## Defining Your First MCP Tool
+
+Create `src/index.ts`. The core pattern for a tool-based server is a `Server` instance with `ListToolsRequestSchema` and `CallToolRequestSchema` handlers:
+
+```typescript
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import {
+  ListToolsRequestSchema,
+  CallToolRequestSchema,
+} from "@modelcontextprotocol/sdk/types.js";
+import { z } from "zod";
+
+const server = new Server(
+  { name: "my-mcp-server", version: "0.1.0" },
+  { capabilities: { tools: {} } }
+);
+
+const FetchWeatherArgs = z.object({
+  city: z.string().describe("City name to look up"),
+});
+
+server.setRequestHandler(ListToolsRequestSchema, async () => ({
+  tools: [
+    {
+      name: "fetch_weather",
+      description: "Get current weather for a city",
+      inputSchema: {
+        type: "object",
+        properties: { city: { type: "string", description: "City name" } },
+        required: ["city"],
+      },
+    },
+  ],
+}));
+```
+
+The `inputSchema` object is what the MCP client shows to the LLM. Write descriptions that explain what the argument controls, not just its type.
+
+## Handling Arguments and Validation
+
+The `CallToolRequestSchema` handler receives raw input. Always parse it with your Zod schema before using any values:
+
+```typescript
+server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  if (request.params.name === "fetch_weather") {
+    const parsed = FetchWeatherArgs.safeParse(request.params.arguments);
+    if (!parsed.success) {
+      return {
+        isError: true,
+        content: [{ type: "text", text: `Invalid args: ${parsed.error.message}` }],
+      };
+    }
+    const { city } = parsed.data;
+    // your actual logic here
+    return {
+      content: [{ type: "text", text: `Weather for ${city}: sunny, 22°C` }],
+    };
+  }
+  return { isError: true, content: [{ type: "text", text: "Unknown tool" }] };
+});
+
+const transport = new StdioServerTransport();
+await server.connect(transport);
+```
+
+Three rules apply to every tool handler. First, never throw uncaught exceptions; the SDK transport may not surface them to the client. Second, always return an array under `content`, even for single responses. Third, use `isError: true` for expected failures like bad input or external service errors, so the LLM can reason about the failure and retry with corrected arguments.
+
+## Testing and Submitting Your Server
+
+Test locally with the MCP Inspector before connecting to a client:
+
+```bash
+npx @modelcontextprotocol/inspector tsx src/index.ts
+```
+
+The Inspector opens a browser UI where you can call tools directly and inspect request/response payloads. This is faster than wiring the server into Claude Desktop for every iteration. Once the server passes manual inspection, add it to Claude Desktop's config at `~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "my-mcp-server": {
+      "command": "tsx",
+      "args": ["/absolute/path/to/src/index.ts"]
+    }
+  }
+}
+```
+
+When the server is stable and on GitHub, submit it to MCPFind for indexing. The [devtools category](/categories/devtools) currently has 2,824 servers, making it the largest category. High-quality TypeScript servers with clear README documentation and consistent tool naming tend to accumulate stars faster than those with minimal docs. See [what MCP is](/blog/what-is-mcp) for the protocol background before writing your first real server.
+
+## Frequently Asked Questions
+
+### What TypeScript version do I need to build an MCP server?
+
+TypeScript 5.0 or later is recommended. The official MCP SDK uses modern TypeScript features including satisfies expressions and stricter generics. Most examples target Node 18+.
+
+### Can I publish my TypeScript MCP server to MCPFind?
+
+Yes. Once your server is on GitHub with a valid package.json, you can submit it to MCPFind for indexing. The directory currently indexes 315 TypeScript MCP servers.
+
+### Should I use stdio or HTTP transport for my MCP server?
+
+Start with stdio. It requires no port management, works in Claude Desktop and Cursor out of the box, and covers 90%+ of use cases. Switch to HTTP only if you need multi-client or remote deployment.
+
+### How do I handle errors in an MCP tool handler?
+
+Return an isError: true response with a text content block describing the error. Do not throw unhandled exceptions from tool handlers, as the MCP SDK may not surface them cleanly to the client.
+
+---
+
+If you prefer Python, the [Python MCP tools tutorial](/blog/build-mcp-tools-python-tutorial) covers the same patterns using the Python SDK. For a deeper look at the protocol before you build, start with [what MCP is](/blog/what-is-mcp).
