@@ -64,6 +64,8 @@ export function generateBlogPostJsonLd(post: BlogPost): object {
       logo: {
         '@type': 'ImageObject',
         url: `${SITE_URL}/og-image-mcp.png`,
+        width: 1200,
+        height: 630,
       },
       sameAs: ['https://github.com/mcp-find'],
     },
@@ -75,6 +77,7 @@ export function generateBlogPostJsonLd(post: BlogPost): object {
       '@type': 'FAQPage',
       '@id': `${SITE_URL}/blog/${post.slug}#faqpage`,
       url: `${SITE_URL}/blog/${post.slug}`,
+      isPartOf: { '@id': `${SITE_URL}/blog/${post.slug}#webpage` },
       mainEntity: post.frontmatter.faqItems.map(item => ({
         '@type': 'Question',
         name: item.question,
@@ -105,6 +108,19 @@ export function generateBlogIndexJsonLd(): object {
           { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
           { '@type': 'ListItem', position: 2, name: 'Blog', item: `${SITE_URL}/blog` },
         ],
+      },
+      {
+        '@type': 'Organization',
+        '@id': `${SITE_URL}/#organization`,
+        name: 'MCP Find',
+        url: SITE_URL,
+        logo: {
+          '@type': 'ImageObject',
+          url: `${SITE_URL}/og-image-mcp.png`,
+          width: 1200,
+          height: 630,
+        },
+        sameAs: ['https://github.com/mcp-find'],
       },
     ],
   };
