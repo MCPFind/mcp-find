@@ -32,7 +32,7 @@ faqItems:
 
 TypeScript powers 315 of the servers MCPFind indexes, more than any other language in the directory. The official `@modelcontextprotocol/sdk` makes the baseline straightforward: define tools with a Zod schema, connect a stdio transport, and your server is ready to use in any MCP client. The complexity shows up in argument validation, error handling, and making tools genuinely useful rather than just callable. We analyzed the top-starred TypeScript servers in the [devtools category](/categories/devtools) to extract the patterns that separate high-quality servers from basic stubs.
 
-## What You Need Before You Start
+## What Do You Need to Build an MCP Server in TypeScript?
 
 Before writing code, confirm your environment. You need Node.js 18 or later and TypeScript 5.0+. Create a new directory and initialize it:
 
@@ -85,7 +85,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
 
 The `inputSchema` object is what the MCP client shows to the LLM. Write descriptions that explain what the argument controls, not just its type.
 
-## Handling Arguments and Validation
+## How Do You Handle Arguments and Validation in MCP Tools?
 
 The `CallToolRequestSchema` handler receives raw input. Always parse it with your Zod schema before using any values:
 

@@ -56,6 +56,17 @@ export function generateBlogPostJsonLd(post: BlogPost): object {
       url: SITE_URL,
       name: 'MCP Find',
     },
+    {
+      '@type': 'Organization',
+      '@id': `${SITE_URL}/#organization`,
+      name: 'MCP Find',
+      url: SITE_URL,
+      logo: {
+        '@type': 'ImageObject',
+        url: `${SITE_URL}/og-image-mcp.png`,
+      },
+      sameAs: ['https://github.com/mcp-find'],
+    },
   ];
 
   // Add FAQPage when faqItems present
@@ -63,6 +74,7 @@ export function generateBlogPostJsonLd(post: BlogPost): object {
     graph.push({
       '@type': 'FAQPage',
       '@id': `${SITE_URL}/blog/${post.slug}#faqpage`,
+      url: `${SITE_URL}/blog/${post.slug}`,
       mainEntity: post.frontmatter.faqItems.map(item => ({
         '@type': 'Question',
         name: item.question,
