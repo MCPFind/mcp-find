@@ -54,6 +54,7 @@ export function TableOfContents({ headings }: TableOfContentsProps) {
                 if (el) {
                   el.scrollIntoView({ behavior: "smooth" });
                   setActiveId(heading.id);
+                  window.history.pushState(null, '', `#${heading.id}`);
                 }
               }}
               className={cn(
