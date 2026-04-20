@@ -2,6 +2,22 @@ import { SITE_URL } from '@mcpfind/shared';
 import type { BlogPost } from '@/types/blog';
 import { stripMdx } from './blog';
 
+function buildOrganizationNode() {
+  return {
+    '@type': 'Organization' as const,
+    '@id': `${SITE_URL}/#organization`,
+    name: 'MCP Find',
+    url: SITE_URL,
+    logo: {
+      '@type': 'ImageObject' as const,
+      url: `${SITE_URL}/og-image-mcp.png`,
+      width: 1200,
+      height: 630,
+    },
+    sameAs: ['https://github.com/mcp-find'],
+  };
+}
+
 export function generateBlogPostJsonLd(post: BlogPost): object {
   const wordCount = stripMdx(post.content).split(/\s+/).filter(Boolean).length;
 
@@ -56,19 +72,7 @@ export function generateBlogPostJsonLd(post: BlogPost): object {
       url: SITE_URL,
       name: 'MCP Find',
     },
-    {
-      '@type': 'Organization',
-      '@id': `${SITE_URL}/#organization`,
-      name: 'MCP Find',
-      url: SITE_URL,
-      logo: {
-        '@type': 'ImageObject',
-        url: `${SITE_URL}/og-image-mcp.png`,
-        width: 1200,
-        height: 630,
-      },
-      sameAs: ['https://github.com/mcp-find'],
-    },
+    buildOrganizationNode(),
   ];
 
   // Add FAQPage when faqItems present
@@ -109,19 +113,7 @@ export function generateBlogIndexJsonLd(): object {
           { '@type': 'ListItem', position: 2, name: 'Blog', item: `${SITE_URL}/blog` },
         ],
       },
-      {
-        '@type': 'Organization',
-        '@id': `${SITE_URL}/#organization`,
-        name: 'MCP Find',
-        url: SITE_URL,
-        logo: {
-          '@type': 'ImageObject',
-          url: `${SITE_URL}/og-image-mcp.png`,
-          width: 1200,
-          height: 630,
-        },
-        sameAs: ['https://github.com/mcp-find'],
-      },
+      buildOrganizationNode(),
     ],
   };
 }
