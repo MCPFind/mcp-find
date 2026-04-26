@@ -1,0 +1,101 @@
+---
+title: "Best Database MCP Servers: PostgreSQL, MySQL, SQLite, Supabase"
+description: "MCPFind indexes 267 database MCP servers. Compare top options for PostgreSQL, MySQL, SQLite, and Supabase by star count, transport type, and read-write access."
+excerpt: "If you want to connect Claude or another AI agent to a relational database, you need a database MCP server. MCPFind indexes 267 of them across PostgreSQL, MySQL, SQLite, and Supabase. This guide compares the top options by star count, access model, and transport type so you can pick the right one for your stack."
+date: "2026-04-20"
+updatedAt: "2026-04-20"
+author: "Gus Marquez"
+authorUrl: "https://www.linkedin.com/in/gustavoamarquez"
+authorSameAs:
+  - "https://www.linkedin.com/in/gustavoamarquez"
+tags:
+  - "mcp"
+  - "developer"
+  - "databases"
+  - "postgresql"
+  - "supabase"
+category: "databases"
+focusKeyword: "best database MCP servers"
+draft: false
+cornerstone: false
+faqItems:
+  - question: "Can database MCP servers modify data, or are they read-only?"
+    answer: "Most database MCP servers support both read and write operations. You control the access boundary through the database user you connect with. Create a role scoped to SELECT-only privileges and the server cannot make writes regardless of what the agent requests."
+  - question: "Do database MCP servers expose my entire schema to the AI model?"
+    answer: "Only the schemas and tables visible to the database user in the connection string are accessible. Create a dedicated role with access only to the tables the agent needs. The MCP server does not grant permissions beyond what the underlying database user already has."
+  - question: "How does the Supabase MCP server differ from a raw PostgreSQL connector?"
+    answer: "The Supabase MCP server connects to the Supabase Management API and your project database simultaneously, giving it access to edge functions, storage buckets, and project configuration alongside SQL queries. A raw PostgreSQL connector only sees the database layer."
+  - question: "What transport type do database MCP servers typically use?"
+    answer: "Most database MCP servers in the MCPFind directory use stdio transport, meaning they run as a subprocess on your local machine. This avoids exposing database credentials over a network. HTTP-transport database servers exist but require additional authentication setup."
+---
+
+Connecting an AI agent to a relational database used to mean writing a custom API layer or pasting query results manually into a chat window. With database MCP servers, you add a JSON config block, and Claude can query your PostgreSQL, MySQL, SQLite, or Supabase database directly in conversation. We analyzed the 267 servers in MCPFind's [databases category](/categories/databases), which averages 16.59 GitHub stars per server. This guide covers the top options by adoption and helps you choose based on your stack. If you are new to MCP, read [what MCP is](/blog/what-is-mcp) first.
+
+## How Do Database MCP Servers Compare by Adoption?
+
+Supabase leads the MCPFind database category by a wide margin, with 2,556 GitHub stars on the [Supabase MCP server](/servers/com-supabase-mcp). No other database server in the directory comes close. The next tier includes purpose-built PostgreSQL connectors and MySQL adapters that cluster in the 50-500 star range. A 267-server category means there is real variety to evaluate.
+
+The gap between Supabase and everything else reflects production usage patterns. Supabase's server wins by combining managed PostgreSQL infrastructure with a well-maintained SDK and clear documentation. Developers already on Supabase skip raw Postgres configuration entirely because the server handles auth, row-level security context, and connection pooling automatically.
+
+Pure PostgreSQL connectors sit in the 50-250 star range. MySQL and SQLite servers average lower counts, which reflects smaller deployment surfaces rather than lower quality. SQLite tools frequently solve specific personal-project problems well but do not accumulate stars at scale.
+
+When evaluating database MCP servers beyond star count, check three things: transport type (stdio is easier to start with), whether the server supports a read-only mode flag, and whether it documents behavior under concurrent tool calls.
+
+## Which Database MCP Server Should You Use for PostgreSQL?
+
+The most-used option for raw PostgreSQL is `@modelcontextprotocol/server-postgres`, maintained under the official MCP SDK. It runs via `npx -y`, requires no global install, and connects through a standard PostgreSQL connection string.
+
+```json
+{
+  "mcpServers": {
+    "postgres": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres",
+        "postgresql://user:password@localhost:5432/dbname"
+      ]
+    }
+  }
+}
+```
+
+Add this block to `~/Library/Application Support/Claude/claude_desktop_config.json` for Claude Desktop, or `.cursor/mcp.json` for Cursor. Restart the client after saving.
+
+For read-only access, create a dedicated database role and connect with those credentials. The MCP server respects database-level permissions, so the permission boundary sits at the Postgres role, not the server config. We consistently see teams with production database connections using a separate read-only role rather than application credentials. That is the right approach regardless of which server you choose. The [connect-postgresql-claude-mcp guide](/blog/connect-postgresql-claude-mcp) covers full setup and common connection errors in detail.
+
+## What Are the Best Options for Supabase, MySQL, and SQLite?
+
+Supabase is the clear choice for teams already on the platform. The official Supabase MCP server goes beyond SQL access, exposing project configuration, storage, edge functions, and realtime subscriptions through dedicated tools. Setup requires a Supabase personal access token rather than a raw database password, which simplifies credential management and rotation.
+
+For MySQL, community-built servers cover the most common use cases. Check the [databases category on MCPFind](/categories/databases) filtered by keyword for current MySQL options. Quality varies more than PostgreSQL, so prioritize servers with active maintenance (recent commits, open issues with responses) over pure star count.
+
+SQLite removes infrastructure friction entirely for development and prototyping. Several SQLite MCP servers accept a file path and have no other required configuration. If you are experimenting with agent workflows before committing to a production database, SQLite is the fastest path to a working setup.
+
+MongoDB and Redis have dedicated servers in the category for document and key-value use cases. Their star counts are lower than relational database servers, but they cover the actual tool surface those systems need for agent workflows.
+
+## How Do You Evaluate Read-Write Access in Database MCP Servers?
+
+Read-write access is a configuration decision made at the database user level, not the MCP server level. Most servers expose both query tools (for SELECT) and execute tools (for INSERT, UPDATE, DELETE, DDL). The agent uses whichever tools the database user's permissions allow.
+
+For production databases, the right default is a read-only database user. Grant Claude SELECT access to the tables needed for analytics, debugging, or data exploration. If a workflow requires write access, create a second configuration with scoped permissions for those specific tables. Mixing broad write access with an agent generating queries from natural language is a risk profile that requires explicit approval in most engineering environments.
+
+Some MCP servers support a read-only flag in the config itself, adding a second protection layer beyond database user permissions. Check the server's documentation for this option before connecting to any database with production data. A server that enforces read-only at the protocol level is safer than one that relies entirely on database role configuration, particularly in shared team setups where connection strings get reused.
+
+## Frequently Asked Questions
+
+### Can database MCP servers modify data, or are they read-only?
+
+Most database MCP servers support both read and write operations. You control the access boundary through the database user you connect with. Create a role scoped to SELECT-only privileges and the server cannot make writes regardless of what the agent requests.
+
+### Do database MCP servers expose my entire schema to the AI model?
+
+Only the schemas and tables visible to the database user in the connection string are accessible. Create a dedicated role with access only to the tables the agent needs. The MCP server does not grant permissions beyond what the underlying database user already has.
+
+### How does the Supabase MCP server differ from a raw PostgreSQL connector?
+
+The Supabase MCP server connects to the Supabase Management API and your project database simultaneously, giving it access to edge functions, storage buckets, and project configuration alongside SQL queries. A raw PostgreSQL connector only sees the database layer.
+
+### What transport type do database MCP servers typically use?
+
+Most database MCP servers in the MCPFind directory use stdio transport, meaning they run as a subprocess on your local machine. This avoids exposing database credentials over a network. HTTP-transport database servers exist but require additional authentication setup.

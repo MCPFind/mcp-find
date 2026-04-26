@@ -1,0 +1,110 @@
+---
+title: "How to Set Up MCP Servers in JetBrains IDEs (2026 Guide)"
+description: "JetBrains AI Assistant supports MCP servers in IntelliJ IDEA, WebStorm, PyCharm, and GoLand. Configure MCP with the 2,971 devtools servers in MCPFind's directory."
+excerpt: "JetBrains IDEs added MCP support through their AI Assistant plugin, giving IntelliJ IDEA, WebStorm, PyCharm, and GoLand users access to the same MCP server ecosystem as Cursor and VS Code. This guide covers how to configure MCP in JetBrains, which devtools servers work well, and how the experience compares to other MCP-enabled IDEs."
+date: "2026-04-24"
+updatedAt: "2026-04-24"
+author: "Gus Marquez"
+authorUrl: "https://www.linkedin.com/in/gustavoamarquez"
+authorSameAs:
+  - "https://www.linkedin.com/in/gustavoamarquez"
+tags:
+  - "mcp"
+  - "developer"
+  - "jetbrains"
+  - "ide"
+  - "devtools"
+category: "devtools"
+focusKeyword: "MCP servers JetBrains IDE"
+draft: false
+cornerstone: false
+faqItems:
+  - question: "Does JetBrains MCP support work with all IDEs in the suite?"
+    answer: "MCP support in JetBrains is provided through the AI Assistant plugin, which is available across IntelliJ IDEA, WebStorm, PyCharm, GoLand, Rider, CLion, and other JetBrains IDEs. The MCP configuration file is shared across all IDEs on the same machine, so you configure servers once and they are available everywhere."
+  - question: "Can I use the same MCP servers in JetBrains that I use in Cursor or Claude Desktop?"
+    answer: "Yes. MCP is a protocol standard, not a vendor-specific implementation. Any server that uses stdio transport and follows the MCP specification works with JetBrains AI Assistant. The JSON config format is slightly different from Claude Desktop but the servers themselves are identical."
+  - question: "Does JetBrains MCP support remote servers over HTTP?"
+    answer: "JetBrains AI Assistant supports both stdio and Streamable HTTP transport for MCP servers. Stdio servers run locally on your machine. HTTP servers can be remote and accessed over the network, which is useful for team-shared MCP configurations in enterprise environments."
+  - question: "Are there JetBrains-specific MCP servers, or do I use the same directory as other IDEs?"
+    answer: "MCPFind's devtools category indexes 2,971 servers, none of which are JetBrains-exclusive. JetBrains MCP works with the same server ecosystem used by Cursor, Windsurf, and VS Code. There is no separate JetBrains-only server catalog."
+---
+
+JetBrains added MCP support to its AI Assistant plugin, bringing the protocol's tool-calling capability into IntelliJ IDEA, WebStorm, PyCharm, GoLand, and the rest of the suite. If you have been using Cursor or VS Code with MCP servers and wanted the same functionality in your JetBrains IDE, it is now available with a JSON config file.
+
+MCPFind's [devtools category](/categories/devtools) indexes 2,971 servers with an average of 36.4 GitHub stars per server, the largest category in the directory. Most of these servers work in JetBrains without modification. This guide covers the setup process, which servers pair well with JetBrains workflows, and how the experience compares to Cursor and VS Code. If you are new to MCP, read [what MCP is](/blog/what-is-mcp) first.
+
+## Does JetBrains Support MCP Natively in 2026?
+
+JetBrains AI Assistant supports MCP servers as of 2025. The implementation is part of the AI Assistant plugin rather than built into the IDE core, which means you need the plugin active to use MCP. The plugin ships with most JetBrains IDE installations and activates with a JetBrains AI subscription or a free trial.
+
+MCP configuration in JetBrains uses a JSON file similar in structure to Claude Desktop's config. Server definitions follow the same `command`, `args`, and `env` pattern, so you can transfer working server configs from other clients without rewriting them. The key difference is where the file lives and how JetBrains discovers it.
+
+Both stdio and Streamable HTTP transport are supported. Stdio servers run as subprocesses on your local machine, which is the pattern used by most servers in the MCPFind directory. HTTP transport is available for remote team-shared configurations. Check the JetBrains AI Assistant documentation for your specific IDE version to confirm the current config file path, as it can vary across platform and plugin versions.
+
+## How to Configure MCP Servers in JetBrains AI Assistant
+
+To add MCP servers in JetBrains, open Settings (or Preferences on macOS), navigate to **Tools > AI Assistant**, and look for the MCP servers section. You can add servers through the UI or by editing the config file directly.
+
+The MCP config file format used by JetBrains follows this structure:
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "your-token-here"
+      }
+    },
+    "postgres": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres",
+        "postgresql://user:password@localhost:5432/mydb"
+      ]
+    }
+  }
+}
+```
+
+After saving the config, restart the AI Assistant or trigger a plugin refresh. JetBrains loads MCP servers at session start and they appear as available tools in the AI chat panel. You can verify which servers are active by opening the AI Assistant chat and checking the tool list.
+
+Use the same principle as any MCP setup: apply least-privilege to every server. Do not paste production credentials into an IDE config file that gets synced by Settings Sync or committed to a repository accidentally.
+
+## Which MCP Servers Work Best With JetBrains for Development Workflows?
+
+The servers that deliver the most value in a JetBrains context follow the same pattern as Cursor: database access, version control, filesystem tools, and external service integrations. JetBrains IDEs already handle code navigation and refactoring well. MCP adds the external context layer that the IDE itself cannot provide.
+
+The GitHub MCP server is the strongest starting point for most JetBrains users. It gives the AI Assistant access to issues, pull requests, repository structure, and code search across your GitHub account. Combined with JetBrains' native Git integration, this creates a workflow where Claude can pull an issue, understand the codebase, and help you write the implementation without leaving the IDE.
+
+The [databases category](/categories/databases) servers pair well with JetBrains for backend development. If you are in IntelliJ IDEA or DataGrip working on database-heavy code, a PostgreSQL or Supabase MCP server lets the AI Assistant query your actual schema rather than guessing column names and types.
+
+Web search servers from the [search category](/categories/search) (524 servers indexed, averaging 54.47 stars) are useful for keeping research in-context when working through unfamiliar APIs or debugging dependency issues.
+
+## How Does JetBrains MCP Compare to Cursor and VS Code?
+
+The core MCP protocol is identical across clients. A server that works in Cursor works in JetBrains without changes. The differences are in how each client exposes MCP tools and how the AI integrates with the IDE's native features.
+
+Cursor was the earliest IDE with deep MCP integration and has the most refined tool-calling UI. You can see which tools the agent is considering before it calls them, and interrupt at specific points. VS Code's MCP support through GitHub Copilot follows a similar model but is newer. JetBrains' implementation is more recent and focuses on the AI chat panel rather than agentic inline editing.
+
+For teams standardized on JetBrains IDEs (common in Java, Kotlin, Python, and Go shops), the choice is not Cursor vs JetBrains. It is whether MCP servers add enough value in the JetBrains workflow to configure. Based on our analysis of the 2,971-server devtools category, the answer for most backend developers is yes. Database connections, GitHub integration, and external API access are the three server types that make AI assistance genuinely faster for production development work. The [how-to-use-mcp-with-cursor guide](/blog/how-to-use-mcp-with-cursor) covers the Cursor-specific configuration if you use both editors and want a comparison baseline.
+
+## Frequently Asked Questions
+
+### Does JetBrains MCP support work with all IDEs in the suite?
+
+MCP support in JetBrains is provided through the AI Assistant plugin, which is available across IntelliJ IDEA, WebStorm, PyCharm, GoLand, Rider, CLion, and other JetBrains IDEs. The MCP configuration file is shared across all IDEs on the same machine, so you configure servers once and they are available everywhere.
+
+### Can I use the same MCP servers in JetBrains that I use in Cursor or Claude Desktop?
+
+Yes. MCP is a protocol standard, not a vendor-specific implementation. Any server that uses stdio transport and follows the MCP specification works with JetBrains AI Assistant. The JSON config format is slightly different from Claude Desktop but the servers themselves are identical.
+
+### Does JetBrains MCP support remote servers over HTTP?
+
+JetBrains AI Assistant supports both stdio and Streamable HTTP transport for MCP servers. Stdio servers run locally on your machine. HTTP servers can be remote and accessed over the network, which is useful for team-shared MCP configurations in enterprise environments.
+
+### Are there JetBrains-specific MCP servers, or do I use the same directory as other IDEs?
+
+MCPFind's devtools category indexes 2,971 servers, none of which are JetBrains-exclusive. JetBrains MCP works with the same server ecosystem used by Cursor, Windsurf, and VS Code. There is no separate JetBrains-only server catalog.
