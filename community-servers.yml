@@ -3,4 +3,10 @@
 #
 # Required fields: name, github_url, package_name, description
 # Optional fields: package_type (npm|pypi|docker), category
-servers: []
+servers:
+  - name: "BuyWhere MCP Server"
+    github_url: "https://github.com/BuyWhere/buywhere-mcp"
+    package_name: "@buywhere/mcp-server"
+    description: "Search and compare products from Singapore, SEA, and US markets via Model Context Protocol. Cross-border e-commerce product catalog for AI agents."
+    package_type: "npm"
+    category: "other"
