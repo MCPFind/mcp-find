@@ -4,6 +4,12 @@
 # Required fields: name, github_url, package_name, description
 # Optional fields: package_type (npm|pypi|docker), category
 servers:
+  - name: "Contextful"
+    github_url: "https://github.com/Inferensys/contextful"
+    package_name: "@inferensys/contextful"
+    description: "Highly efficient context management for agentic AI: local-first code search, evidence packs, graph context, and memory for large coding projects."
+    package_type: "npm"
+    category: "developer-tools"
   - name: "BuyWhere MCP Server"
     github_url: "https://github.com/BuyWhere/buywhere-mcp"
     package_name: "@buywhere/mcp-server"
