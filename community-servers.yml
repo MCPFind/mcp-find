@@ -18,7 +18,7 @@ servers:
     category: "communication"
   - name: "Bilig WorkPaper"
     github_url: "https://github.com/proompteng/bilig"
-    package_name: "@bilig/headless"
+    package_name: "@bilig/workpaper"
     description: "Formula-backed WorkPaper MCP server for editing workbook cells, recalculating formulas, validating formulas, and exporting JSON state."
     package_type: "npm"
     category: "devtools"
