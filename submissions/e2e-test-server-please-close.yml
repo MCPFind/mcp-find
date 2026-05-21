@@ -1,0 +1,7 @@
+servers:
+  - name: "E2E Test Server Please Close"
+    github_url: "https://github.com/anthropic/example-mcp-test"
+    package_name: "@example/mcp-e2e-test"
+    description: "Automated end-to-end verification of the mcpfind submission flow. Please close this PR."
+    package_type: "npm"
+    category: "databases"
