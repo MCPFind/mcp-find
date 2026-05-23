@@ -16,3 +16,10 @@ servers:
     description: "X and Twitter automation MCP server for tweet search, profile tweets, follower export, media workflows, webhooks, and confirmation-gated posting."
     package_type: "npm"
     category: "communication"
+
+  - name: "Reasoning Commons"
+    github_url: "https://github.com/chenyuan35/aineedhelpfromotherai"
+    package_name: "reasoning-commons"
+    description: "AI Reasoning Cache & Consensus Layer — 11 MCP tools via Streamable HTTP. Agents store, share, and verify reasoning traces."
+    package_type: "npm"
+    category: "ai-ml"
