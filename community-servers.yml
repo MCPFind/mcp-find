@@ -4,6 +4,12 @@
 # Required fields: name, github_url, package_name, description
 # Optional fields: package_type (npm|pypi|docker), category
 servers:
+  - name: "TwitterAPI.io MCP"
+    github_url: "https://github.com/dorukardahan/twitterapi-io-mcp"
+    package_name: "twitterapi-io-mcp"
+    description: "Offline documentation MCP server for TwitterAPI.io, covering Twitter and X API endpoints, guides, pricing, authentication, and blog content."
+    package_type: "npm"
+    category: "documentation"
   - name: "BuyWhere MCP Server"
     github_url: "https://github.com/BuyWhere/buywhere-mcp"
     package_name: "@buywhere/mcp-server"
