@@ -1,0 +1,7 @@
+servers:
+  - name: "AsterStream AIoT Energy & ESG MCP Server"
+    github_url: "https://github.com/asterstreamtech-arch/AsterStreamTech-AIoT-mcp"
+    package_name: "AsterStreamTech-AIoT-mcp"
+    description: "servers for real-time Energy Management, ESG Carbon Reporting, and Smart Building control. Connects AI agents to live kWh, CO₂, HVAC, and IoT data across Singapore, Taiwan, Malaysia, India"
+    package_type: "pypi"
+    category: "ai-ml"
