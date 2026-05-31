@@ -7,7 +7,7 @@ servers:
   - name: "Forge Cascade MCP Memory Server"
     github_url: "https://github.com/SunFlash12/forge-cascade-mcp"
     package_name: "ghcr.io/sunflash12/forge-cascade-mcp"
-    description: "Public MCP connector for Forge Cascade enterprise AI memory, RAG buyer routes, direct enterprise checkout paths, docs, OpenAPI, pricing, and intake."
+    description: "Public MCP connector for Forge Cascade enterprise AI memory, RAG buyer routes, paid checkout recommendations, direct enterprise checkout paths, docs, OpenAPI, pricing, and intake."
     package_type: "docker"
     category: "search"
   - name: "BuyWhere MCP Server"
