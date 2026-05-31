@@ -4,6 +4,12 @@
 # Required fields: name, github_url, package_name, description
 # Optional fields: package_type (npm|pypi|docker), category
 servers:
+  - name: "Forge Cascade MCP Memory Server"
+    github_url: "https://github.com/SunFlash12/forge-cascade-mcp"
+    package_name: "ghcr.io/sunflash12/forge-cascade-mcp"
+    description: "Public MCP connector for Forge Cascade enterprise AI memory, RAG buyer routes, docs, OpenAPI, pricing, and intake."
+    package_type: "docker"
+    category: "search"
   - name: "BuyWhere MCP Server"
     github_url: "https://github.com/BuyWhere/buywhere-mcp"
     package_name: "@buywhere/mcp-server"
