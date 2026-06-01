@@ -1,0 +1,7 @@
+servers:
+  - name: "BinSearchLookup"
+    github_url: "https://github.com/Bin-Search-Lookup/mcp-binsearchlookup"
+    package_name: "Docker image"
+    description: "BIN Search Lookup MCP Server: Give AI agents access to real-time BIN/IIN intelligence, card issuer data, prepaid detection, country verification, and fraud signals."
+    package_type: "docker"
+    category: "security"
