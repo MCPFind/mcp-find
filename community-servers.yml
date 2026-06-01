@@ -4,6 +4,12 @@
 # Required fields: name, github_url, package_name, description
 # Optional fields: package_type (npm|pypi|docker), category
 servers:
+  - name: "Hive Intelligence"
+    github_url: "https://github.com/hive-intel/hive-sdk"
+    package_name: "hive-intelligence"
+    description: "Crypto intelligence MCP server and CLI for AI agents, covering market data, wallets, DeFi, DEX flows, NFTs, token risk, Solana, prediction markets, and stateful monitoring."
+    package_type: "npm"
+    category: "finance"
   - name: "BuyWhere MCP Server"
     github_url: "https://github.com/BuyWhere/buywhere-mcp"
     package_name: "@buywhere/mcp-server"
