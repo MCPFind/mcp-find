@@ -1,0 +1,8 @@
+---
+name: Dark Search Protocol
+github_url: https://github.com/parnasheps-eng/dsp-mcp-server
+package: "@parnasheps-eng/dark-search-mcp-server"
+description: Searches deep and dark data sources not indexed by mainstream search engines, with confidence-scored and cross-verified results via 6-step pipeline
+category: search
+type: npm
+
