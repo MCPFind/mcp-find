@@ -4,6 +4,12 @@
 # Required fields: name, github_url, package_name, description
 # Optional fields: package_type (npm|pypi|docker), category
 servers:
+  - name: "Pyrimid Protocol"
+    github_url: "https://github.com/pyrimid-ai/pyrimid"
+    package_name: "@pyrimid/sdk"
+    description: "Discover paid MCP tools and x402 AI/API products, purchase them with Base USDC, and route affiliate commissions through Pyrimid."
+    package_type: "npm"
+    category: "finance"
   - name: "BuyWhere MCP Server"
     github_url: "https://github.com/BuyWhere/buywhere-mcp"
     package_name: "@buywhere/mcp-server"
