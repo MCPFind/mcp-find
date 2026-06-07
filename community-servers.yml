@@ -4,6 +4,12 @@
 # Required fields: name, github_url, package_name, description
 # Optional fields: package_type (npm|pypi|docker), category
 servers:
+  - name: "Dedicated Mac Mini AI Bot Setup"
+    github_url: "https://github.com/eibrahim/dedicated-mac-mini-ai-bot-setup-mcp"
+    package_name: "ghcr.io/eibrahim/dedicated-mac-mini-ai-bot-setup-mcp:1.0.3"
+    description: "Read-only MCP server that returns Emad Ibrahim's dedicated Mac mini AI operator setup offer, queue status, pricing, and buyer routes."
+    package_type: "docker"
+    category: "other"
   - name: "BuyWhere MCP Server"
     github_url: "https://github.com/BuyWhere/buywhere-mcp"
     package_name: "@buywhere/mcp-server"
