@@ -1,0 +1,6 @@
+servers:
+  - name: "RunCabin"
+    github_url: "https://github.com/RYAN-RC/runcabin-mcp"
+    package_name: "https://runcabin.com/mcp"
+    description: "Your AI assistant deploys real websites: instant free HTTPS subdomain in one tool call, plus custom domains with human-approved checkout."
+    category: "cloud"
