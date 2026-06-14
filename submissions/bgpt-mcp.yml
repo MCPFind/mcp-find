@@ -1,0 +1,7 @@
+servers:
+  - name: "BGPT MCP"
+    github_url: "https://github.com/connerlambden/bgpt-mcp"
+    package_name: "bgpt-mcp"
+    description: "Search scientific papers with structured evidence fields from full-text studies, including limitations, conflicts, and falsifiability."
+    package_type: "npm"
+    category: "search"
