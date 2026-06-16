@@ -4,6 +4,12 @@
 # Required fields: name, github_url, package_name, description
 # Optional fields: package_type (npm|pypi|docker), category
 servers:
+  - name: "LatLng"
+    github_url: "https://github.com/latlng-work/latlng-mcp"
+    package_name: "@latlng/mcp-server"
+    description: "Geocoding, reverse geocoding, places search, nearby places, and place category tools for the LatLng location API."
+    package_type: "npm"
+    category: "devtools"
   - name: "BuyWhere MCP Server"
     github_url: "https://github.com/BuyWhere/buywhere-mcp"
     package_name: "@buywhere/mcp-server"
