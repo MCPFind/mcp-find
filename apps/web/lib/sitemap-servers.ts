@@ -14,7 +14,7 @@ export async function getServersSitemapBatch(batchIndex: number): Promise<Respon
   const offset = batchIndex * BATCH_SIZE;
   const servers = await getServersSitemapPage(offset, BATCH_SIZE);
 
-  if (servers.length === 0 && batchIndex > 0) {
+  if (servers.length === 0) {
     notFound();
   }
 
