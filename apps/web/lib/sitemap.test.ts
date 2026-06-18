@@ -7,6 +7,7 @@
  * 1. The index route lists exactly min(ceil(total/BATCH_SIZE), MAX_BATCHES) server shards.
  * 2. Shard handler returns non-empty XML for in-range indices (0, 1, 2).
  * 3. Shard handler calls notFound() for out-of-range indices.
+ * 4. Zero-server edge case: index lists 0 shards; shard-0 calls notFound().
  *
  * All DB/query calls are mocked — no real Supabase connection required.
  */
@@ -102,6 +103,19 @@ describe('sitemap index — shard count', () => {
     expect(shardMatches).toHaveLength(1);
     expect(shardMatches).toContain('sitemap-servers-0.xml');
   });
+
+  it('lists 0 server shards when total=0', async () => {
+    const { getServerCount } = await import('@/lib/queries');
+    vi.mocked(getServerCount).mockResolvedValue(0);
+
+    const { GET } = await import('@/app/sitemap.xml/route');
+    const response = await GET();
+    const body = await response.text();
+
+    const shardMatches = body.match(/sitemap-servers-\d+\.xml/g) ?? [];
+    expect(shardMatches).toHaveLength(0);
+    expect(shardMatches).not.toContain('sitemap-servers-0.xml');
+  });
 });
 
 describe('getServersSitemapBatch — shard handler', () => {
@@ -170,6 +184,16 @@ describe('getServersSitemapBatch — shard handler', () => {
     const { getServersSitemapBatch } = await import('@/lib/sitemap-servers');
 
     await expect(getServersSitemapBatch(3)).rejects.toThrow('NEXT_NOT_FOUND');
+    expect(notFound).toHaveBeenCalled();
+  });
+
+  it('calls notFound() for batch index 0 when DB returns empty servers (zero-server DB)', async () => {
+    const { getServersSitemapPage } = await import('@/lib/queries');
+    vi.mocked(getServersSitemapPage).mockResolvedValue([]);
+
+    const { getServersSitemapBatch } = await import('@/lib/sitemap-servers');
+
+    await expect(getServersSitemapBatch(0)).rejects.toThrow('NEXT_NOT_FOUND');
     expect(notFound).toHaveBeenCalled();
   });
 });
