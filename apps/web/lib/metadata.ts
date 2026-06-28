@@ -211,7 +211,7 @@ export function generateCategoryJsonLd(
         name: `${categoryLabel} MCP Servers`,
         description: `Browse ${totalCount}+ ${categoryLabel.toLowerCase()} MCP servers with instant install configs.`,
         url: `${SITE_URL}/categories/${category}`,
-        dateModified: dateModified || undefined,
+        dateModified: dateModified,
         breadcrumb: { '@id': `${SITE_URL}/categories/${category}#breadcrumb` },
         mainEntity: {
           '@type': 'ItemList',

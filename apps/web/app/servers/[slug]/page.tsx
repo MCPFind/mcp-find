@@ -71,6 +71,25 @@ import { ServerOutboundLink } from "@/components/ServerOutboundLink";
 
 export const revalidate = 86400;
 
+// Hoisted to module scope — derived only from compile-time CLIENT_CONFIGS,
+// so there's no need to rebuild this array on every render.
+const CLIENT_DISPLAY_NAMES: Record<ClientType, string> = {
+  "claude-desktop": "Claude Desktop",
+  cursor: "Cursor",
+  vscode: "VS Code",
+  windsurf: "Windsurf",
+  "claude-code": "Claude Code",
+};
+
+const compatibilityClients = (Object.keys(CLIENT_CONFIGS) as ClientType[]).map(
+  (key) => ({
+    key,
+    displayName: CLIENT_DISPLAY_NAMES[key],
+    configPath: CLIENT_CONFIGS[key].filePath.macos,
+    postInstall: CLIENT_CONFIGS[key].postInstall,
+  })
+);
+
 export async function generateStaticParams() {
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
     return [];
@@ -176,24 +195,6 @@ export default async function ServerDetailPage({
       // Config generation failed — skip
     }
   }
-
-  // Build compatibility client list — all standard MCP clients share the same config format.
-  const CLIENT_DISPLAY_NAMES: Record<ClientType, string> = {
-    "claude-desktop": "Claude Desktop",
-    cursor: "Cursor",
-    vscode: "VS Code",
-    windsurf: "Windsurf",
-    "claude-code": "Claude Code",
-  };
-
-  const compatibilityClients = (Object.keys(CLIENT_CONFIGS) as ClientType[]).map(
-    (key) => ({
-      key,
-      displayName: CLIENT_DISPLAY_NAMES[key],
-      configPath: CLIENT_CONFIGS[key].filePath.macos,
-      postInstall: CLIENT_CONFIGS[key].postInstall,
-    })
-  );
 
   const categoryLabel = server.category
     ? (CATEGORY_LABELS[server.category] ?? server.category)
@@ -329,7 +330,7 @@ export default async function ServerDetailPage({
               </section>
             )}
 
-            {/* Capabilities */}
+            {/* Capabilities — intentionally excludes tool-only servers (covered by Exposed Tools above) */}
             {(server.has_resources || server.has_prompts) && (
               <section aria-labelledby="capabilities-heading">
                 <h2
@@ -340,8 +341,7 @@ export default async function ServerDetailPage({
                   Server Capabilities
                 </h2>
                 <p className="text-neutral-400 text-sm mb-4">
-                  In addition to tools, {server.name} exposes the following MCP
-                  primitives:
+                  {server.name} exposes the following MCP primitives:
                 </p>
                 <ul className="space-y-2" role="list">
                   {server.has_tools && (

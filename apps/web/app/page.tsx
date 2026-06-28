@@ -199,7 +199,7 @@ async function FeaturedServersSection() {
 
         <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 list-none p-0 m-0">
           {featuredServers.map((server) => (
-            <li key={server.id} className="contents">
+            <li key={server.id} className="contents" role="listitem">
               <ServerCard server={server} qualityStatus={getQualityStatus(server.slug)} />
             </li>
           ))}
@@ -469,7 +469,7 @@ export default async function HomePage() {
 
           <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 list-none p-0 m-0">
             {CATEGORIES.map((cat: string) => (
-              <li key={cat} className="contents">
+              <li key={cat} className="contents" role="listitem">
                 <Link
                   href={`/servers?category=${encodeURIComponent(cat)}`}
                   className="group flex flex-col items-center gap-3 p-5 rounded-xl bg-neutral-900 border border-neutral-800 hover:border-neutral-700 hover:bg-neutral-800/80 transition-all duration-200"
@@ -540,7 +540,7 @@ export default async function HomePage() {
 
             <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 list-none p-0 m-0">
               {latestPosts.map((post) => (
-                <li key={post.slug} className="contents">
+                <li key={post.slug} className="contents" role="listitem">
                   <PostCard post={post} />
                 </li>
               ))}
