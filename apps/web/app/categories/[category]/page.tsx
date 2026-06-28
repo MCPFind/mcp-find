@@ -60,7 +60,10 @@ export default async function CategoryPage({
     return best;
   }, null);
   const dateModified = mostRecentDate ?? new Date().toISOString().slice(0, 10);
-  const dateModifiedDisplay = new Date(dateModified).toLocaleDateString("en-US", {
+  // Normalize to the date part first so a full ISO timestamp (e.g. "2025-03-15T18:22:00.000Z")
+  // doesn't produce "...ZT12:00:00Z" → Invalid Date.  Then pin to noon UTC so a bare
+  // YYYY-MM-DD string never rolls back a day under negative UTC offsets (e.g. US/Pacific).
+  const dateModifiedDisplay = new Date(dateModified.slice(0, 10) + "T12:00:00Z").toLocaleDateString("en-US", {
     month: "long",
     day: "numeric",
     year: "numeric",
@@ -101,7 +104,8 @@ export default async function CategoryPage({
 
         <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 list-none p-0 m-0">
           {servers.map((server) => (
-            <li key={server.id} className="contents">
+            // explicit role: display:contents can strip implicit listitem in some ATs
+            <li key={server.id} className="contents" role="listitem">
               <ServerCard server={server} qualityStatus={getQualityStatus(server.slug)} />
             </li>
           ))}

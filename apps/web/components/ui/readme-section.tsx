@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { MarkdownContent } from "./markdown-content";
 import { TracingBeam } from "./tracing-beam";
 import { IconExternalLink } from "@tabler/icons-react";
+import { isSafeHttpUrl } from "@/lib/url";
 
 interface ReadmeSectionProps {
   readmeContent: string | null;
@@ -151,7 +152,8 @@ export function ReadmeSection({ readmeContent, githubUrl }: ReadmeSectionProps) 
         <div className="rounded-xl bg-neutral-900/50 border border-neutral-800 p-6 text-center">
           <p className="text-neutral-500 text-sm">
             This MCP has no overview available.
-            {githubUrl && (
+            {/* Guard against javascript:, data:, or other unsafe schemes in the untrusted github_url field. */}
+            {githubUrl && isSafeHttpUrl(githubUrl) && (
               <>
                 {" "}
                 <a

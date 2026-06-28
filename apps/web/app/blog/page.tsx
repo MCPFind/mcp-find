@@ -139,7 +139,7 @@ export default async function BlogIndexPage({
             {posts.length > 0 ? (
               <ul className="grid grid-cols-1 md:grid-cols-2 gap-4 list-none p-0 m-0">
                 {posts.map((post) => (
-                  <li key={post.slug} className="contents">
+                  <li key={post.slug} className="contents" role="listitem">
                     <PostCard post={post} />
                   </li>
                 ))}

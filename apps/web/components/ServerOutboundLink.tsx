@@ -6,9 +6,13 @@
  * Wraps any outbound anchor on the server detail page.
  * Fires server_outbound_click with only server_slug and destination_host —
  * never the full URL with query strings.
+ *
+ * Only renders as an <a> when the URL scheme is http or https.
+ * Non-http(s) URLs (e.g. javascript:, data:) silently render children without a link.
  */
 
 import { trackServerOutboundClick } from "@/lib/analytics";
+import { isSafeHttpUrl } from "@/lib/url";
 import type { ReactNode } from "react";
 
 interface ServerOutboundLinkProps {
@@ -28,14 +32,17 @@ export function ServerOutboundLink({
   target = "_blank",
   children,
 }: ServerOutboundLinkProps) {
+  // Reject non-http(s) URLs before rendering an anchor to prevent
+  // javascript:, data:, or other unsafe scheme injection.
+  const parsedUrl = isSafeHttpUrl(href);
+  if (!parsedUrl) {
+    return <>{children}</>;
+  }
+
   function handleClick() {
-    try {
-      // Extract only the hostname — never log full URL with query strings
-      const destinationHost = new URL(href).hostname;
-      trackServerOutboundClick({ server_slug: serverSlug, destination_host: destinationHost });
-    } catch {
-      // Malformed URL — skip tracking, don't block navigation
-    }
+    // Use the already-parsed URL object — no second parse needed.
+    // parsedUrl is non-null here: the early-return guard above ensures it.
+    trackServerOutboundClick({ server_slug: serverSlug, destination_host: parsedUrl!.hostname });
   }
 
   return (
