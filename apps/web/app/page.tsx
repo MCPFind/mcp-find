@@ -197,11 +197,13 @@ async function FeaturedServersSection() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 list-none p-0 m-0">
           {featuredServers.map((server) => (
-            <ServerCard key={server.id} server={server} qualityStatus={getQualityStatus(server.slug)} />
+            <li key={server.id} className="contents">
+              <ServerCard server={server} qualityStatus={getQualityStatus(server.slug)} />
+            </li>
           ))}
-        </div>
+        </ul>
       </div>
     </section>
   );
@@ -238,12 +240,12 @@ async function RecentServersSection() {
         </div>
 
         {/* Horizontal scroll strip */}
-        <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide">
+        <ul className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide list-none p-0 m-0">
           {recentServers.map((server) => (
+            <li key={server.id} className="snap-start shrink-0 w-72">
             <Link
-              key={server.id}
               href={`/servers/${server.slug}`}
-              className="snap-start shrink-0 w-72 bg-neutral-900 border border-neutral-800 hover:border-neutral-700 rounded-xl p-4 transition-all duration-200 hover:bg-neutral-900/80 group"
+              className="block bg-neutral-900 border border-neutral-800 hover:border-neutral-700 rounded-xl p-4 transition-all duration-200 hover:bg-neutral-900/80 group"
             >
               <div className="mb-3">
                 {server.github_last_push && (
@@ -284,8 +286,9 @@ async function RecentServersSection() {
                 )}
               </div>
             </Link>
+            </li>
           ))}
-        </div>
+        </ul>
       </div>
     </section>
   );
@@ -369,6 +372,7 @@ export default async function HomePage() {
                 {serverCount > 0 ? `${serverCount.toLocaleString()}+` : FALLBACK_SERVER_COUNT_DISPLAY}
               </span>
               <span className="text-neutral-500 mt-1">MCP Servers</span>
+              <span className="text-neutral-600 text-xs mt-0.5">Updated daily</span>
             </div>
             <div className="w-px h-12 bg-neutral-800 hidden sm:block self-center" />
             <div className="flex flex-col items-center">
@@ -463,26 +467,27 @@ export default async function HomePage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 list-none p-0 m-0">
             {CATEGORIES.map((cat: string) => (
-              <Link
-                key={cat}
-                href={`/servers?category=${encodeURIComponent(cat)}`}
-                className="group flex flex-col items-center gap-3 p-5 rounded-xl bg-neutral-900 border border-neutral-800 hover:border-neutral-700 hover:bg-neutral-800/80 transition-all duration-200"
-              >
-                <div className="w-10 h-10 rounded-lg bg-neutral-800 group-hover:bg-neutral-700 flex items-center justify-center transition-colors duration-200">
-                  {categoryIconMap[cat] ?? (
-                    <IconServer size={20} className="text-neutral-400" />
-                  )}
-                </div>
-                <div className="text-center">
-                  <p className="text-sm font-medium text-neutral-200 group-hover:text-white transition-colors duration-200">
-                    {CATEGORY_LABELS[cat as Category]}
-                  </p>
-                </div>
-              </Link>
+              <li key={cat} className="contents">
+                <Link
+                  href={`/servers?category=${encodeURIComponent(cat)}`}
+                  className="group flex flex-col items-center gap-3 p-5 rounded-xl bg-neutral-900 border border-neutral-800 hover:border-neutral-700 hover:bg-neutral-800/80 transition-all duration-200"
+                >
+                  <div className="w-10 h-10 rounded-lg bg-neutral-800 group-hover:bg-neutral-700 flex items-center justify-center transition-colors duration-200">
+                    {categoryIconMap[cat] ?? (
+                      <IconServer size={20} className="text-neutral-400" />
+                    )}
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-medium text-neutral-200 group-hover:text-white transition-colors duration-200">
+                      {CATEGORY_LABELS[cat as Category]}
+                    </p>
+                  </div>
+                </Link>
+              </li>
             ))}
-          </div>
+          </ul>
         </div>
       </section>
 
@@ -533,11 +538,13 @@ export default async function HomePage() {
               </Link>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 list-none p-0 m-0">
               {latestPosts.map((post) => (
-                <PostCard key={post.slug} post={post} />
+                <li key={post.slug} className="contents">
+                  <PostCard post={post} />
+                </li>
               ))}
-            </div>
+            </ul>
 
             {/* Mobile "View all" link */}
             <div className="flex sm:hidden justify-center mt-8">

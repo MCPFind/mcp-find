@@ -52,6 +52,20 @@ export default async function CategoryPage({
     getCategoryCount(category),
   ]);
 
+  // Most recent server update date — used for the visible freshness line and JSON-LD dateModified.
+  const mostRecentDate = servers.reduce<string | null>((best, s) => {
+    const d = s.github_last_push ?? s.registry_updated_at ?? s.updated_at;
+    if (!d) return best;
+    if (!best || new Date(d) > new Date(best)) return d;
+    return best;
+  }, null);
+  const dateModified = mostRecentDate ?? new Date().toISOString().slice(0, 10);
+  const dateModifiedDisplay = new Date(dateModified).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+
   return (
     <div className="min-h-screen bg-black text-white">
       <Navbar variant="sticky" />
@@ -60,7 +74,7 @@ export default async function CategoryPage({
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: safeJsonLd(generateCategoryJsonLd(category, label, servers, categoryCount)),
+            __html: safeJsonLd(generateCategoryJsonLd(category, label, servers, categoryCount, dateModified)),
           }}
         />
 
@@ -71,16 +85,27 @@ export default async function CategoryPage({
           <p className="text-neutral-400 text-base max-w-2xl mb-2">
             {CATEGORY_DESCRIPTIONS[category as Category]}
           </p>
-          <p className="text-neutral-500 text-lg">
-            {categoryCount} servers in this category
-          </p>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <p className="text-neutral-500 text-lg">
+              {categoryCount} servers in this category
+            </p>
+            <time
+              dateTime={dateModified}
+              className="text-neutral-600 text-sm"
+              title="Most recent server update in this category"
+            >
+              Updated {dateModifiedDisplay}
+            </time>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 list-none p-0 m-0">
           {servers.map((server) => (
-            <ServerCard key={server.id} server={server} qualityStatus={getQualityStatus(server.slug)} />
+            <li key={server.id} className="contents">
+              <ServerCard server={server} qualityStatus={getQualityStatus(server.slug)} />
+            </li>
           ))}
-        </div>
+        </ul>
 
         <CategoryFaq
           categoryLabel={label}

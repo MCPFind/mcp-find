@@ -196,6 +196,8 @@ export function generateCategoryJsonLd(
   /** True total count for the category (may exceed the display limit of 200).
    *  Defaults to servers.length for backward compatibility. */
   trueCount?: number,
+  /** ISO date string for dateModified on the CollectionPage (most recent server update). */
+  dateModified?: string,
 ): object {
   const faqs = CATEGORY_FAQS[category as Category] || [];
   // Use the true DB count if provided; fall back to the length of the fetched slice.
@@ -209,6 +211,7 @@ export function generateCategoryJsonLd(
         name: `${categoryLabel} MCP Servers`,
         description: `Browse ${totalCount}+ ${categoryLabel.toLowerCase()} MCP servers with instant install configs.`,
         url: `${SITE_URL}/categories/${category}`,
+        dateModified: dateModified || undefined,
         breadcrumb: { '@id': `${SITE_URL}/categories/${category}#breadcrumb` },
         mainEntity: {
           '@type': 'ItemList',

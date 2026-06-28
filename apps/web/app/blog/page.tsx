@@ -137,11 +137,13 @@ export default async function BlogIndexPage({
           {/* Posts grid */}
           <main className="flex-1 min-w-0">
             {posts.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <ul className="grid grid-cols-1 md:grid-cols-2 gap-4 list-none p-0 m-0">
                 {posts.map((post) => (
-                  <PostCard key={post.slug} post={post} />
+                  <li key={post.slug} className="contents">
+                    <PostCard post={post} />
+                  </li>
                 ))}
-              </div>
+              </ul>
             ) : (
               <div className="text-center py-20">
                 <p className="text-neutral-500 text-lg">
