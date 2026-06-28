@@ -1,5 +1,9 @@
 export interface BlogFrontmatter {
   title: string;
+  /** Short title for <title> tag (≤60 chars). Overrides `title` in metadata only;
+   *  the full `title` is still used for the H1 and Open Graph heading.
+   *  Use this on posts whose display title exceeds 60 chars. */
+  seoTitle?: string;
   description: string;
   excerpt?: string;
   date: string;

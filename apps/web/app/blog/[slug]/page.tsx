@@ -32,8 +32,14 @@ export async function generateMetadata({
   const post = getPostBySlug(slug);
   if (!post) return { title: "Post Not Found" };
 
+  // Use `seoTitle` (frontmatter override) when provided; otherwise use the display
+  // title as-is.  Both use `absolute` to bypass the root layout's title template
+  // ("%s | MCP Find"), avoiding a double-brand suffix that pushes every blog title
+  // over 60 chars.  The full `title` is preserved for the H1 and Open Graph heading.
+  const metaTitle = post.frontmatter.seoTitle ?? post.frontmatter.title;
+
   return {
-    title: `${post.frontmatter.title} | MCP Find Blog`,
+    title: { absolute: metaTitle },
     description: post.frontmatter.description,
     ...(post.frontmatter.noindex && {
       robots: { index: false, follow: false },
