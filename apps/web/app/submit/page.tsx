@@ -22,6 +22,15 @@ export const metadata: Metadata = {
     title: PAGE_TITLE,
     description: PAGE_DESCRIPTION,
     url: `${SITE_URL}/submit`,
+    type: "website",
+    images: [
+      {
+        url: `${SITE_URL}/og-image-mcp.png`,
+        width: 1200,
+        height: 630,
+        alt: "MCP Find — The open-source way to find MCP servers",
+      },
+    ],
   },
 };
 

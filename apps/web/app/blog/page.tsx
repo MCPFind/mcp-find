@@ -26,7 +26,15 @@ export const metadata: Metadata = {
     description:
       "Guides, tutorials, and analysis on MCP servers and the Model Context Protocol.",
     type: "website",
-    url: "/blog",
+    url: `${SITE_URL}/blog`,
+    images: [
+      {
+        url: `${SITE_URL}/og-image-mcp.png`,
+        width: 1200,
+        height: 630,
+        alt: "MCP Find — The open-source way to find MCP servers",
+      },
+    ],
   },
 };
 
