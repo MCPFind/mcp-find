@@ -49,6 +49,56 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
+          // Shift heading scale down by one level so README markdown h1 never
+          // emits a page-level <h1> (the page already has one in page.tsx).
+          // Visual sizing is preserved via explicit Tailwind classes.
+          h1({ children }) {
+            return (
+              <h2 className="text-2xl font-bold tracking-tight text-white border-b border-neutral-800 pb-2 mb-4">
+                {children}
+              </h2>
+            );
+          },
+          h2({ children }) {
+            return (
+              <h3 className="text-xl font-bold tracking-tight text-white border-b border-neutral-800 pb-2 mb-4">
+                {children}
+              </h3>
+            );
+          },
+          h3({ children }) {
+            return (
+              <h4 className="text-lg font-bold tracking-tight text-white border-b border-neutral-800 pb-2 mb-4">
+                {children}
+              </h4>
+            );
+          },
+          h4({ children }) {
+            return (
+              <h5 className="text-base font-bold tracking-tight text-white border-b border-neutral-800 pb-2 mb-4">
+                {children}
+              </h5>
+            );
+          },
+          // h5 shifts to <h6> but keeps text-base to stay visually distinct from h6 (text-sm).
+          h5({ children }) {
+            return (
+              <h6 className="text-base font-semibold tracking-tight text-white border-b border-neutral-800 pb-2 mb-4">
+                {children}
+              </h6>
+            );
+          },
+          // h6 collapses to a styled <p> — HTML has no sub-h6 heading level so
+          // a second <h6> in the DOM would duplicate the heading role for screen
+          // readers. We keep the visual treatment (text-sm font-bold text-neutral-300)
+          // while avoiding a semantic duplicate.
+          h6({ children }) {
+            return (
+              <p className="text-sm font-bold text-neutral-300">
+                {children}
+              </p>
+            );
+          },
           // Block code: delegate to the project's styled CodeBlock
           pre({ children }) {
             // Let the code renderer handle everything; unwrap the <pre> wrapper

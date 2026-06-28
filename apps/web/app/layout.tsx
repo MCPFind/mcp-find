@@ -25,6 +25,7 @@ export const metadata: Metadata = {
     siteName: "MCP Find",
     type: "website",
     locale: "en_US",
+    url: SITE_URL,
     images: [
       {
         url: `${SITE_URL}/og-image-mcp.png`,
@@ -65,6 +66,15 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
+      <head>
+        {/* Preconnect + DNS prefetch for third-party analytics origins (LCP support) */}
+        <link rel="preconnect" href="https://www.googletagmanager.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
+        <link rel="preconnect" href="https://www.google-analytics.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://www.google-analytics.com" />
+        <link rel="preconnect" href="https://www.clarity.ms" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://www.clarity.ms" />
+      </head>
       <body className={`${inter.variable} font-sans antialiased bg-black text-white`}>
         {children}
         {/* Google Analytics 4 */}
@@ -80,8 +90,8 @@ export default function RootLayout({
             gtag('config', 'G-LLD1VR2K5Z');
           `}
         </Script>
-        {/* Microsoft Clarity */}
-        <Script id="clarity-init" strategy="afterInteractive">
+        {/* Microsoft Clarity — lazyOnload reduces TBT vs afterInteractive */}
+        <Script id="clarity-init" strategy="lazyOnload">
           {`
             (function(c,l,a,r,i,t,y){
                 c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};

@@ -1,6 +1,7 @@
 import { SITE_URL } from '@mcpfind/shared';
 import type { BlogPost } from '@/types/blog';
 import { stripMdx } from './blog';
+import { ORGANIZATION_SAMEAS } from '@/lib/org';
 
 // Fix 1 + Fix 3: strict ISO 8601 duration — (?=\d) after T rejects bare "PT"
 const ISO_8601_DURATION =
@@ -33,11 +34,19 @@ function buildOrganizationNode() {
       width: 1200,
       height: 630,
     },
-    sameAs: ['https://github.com/mcp-find'],
+    sameAs: ORGANIZATION_SAMEAS,
   };
 }
 
 export function generateBlogPostJsonLd(post: BlogPost): object {
+  // P1-5 date guard: datePublished is required — fail loudly at build time
+  if (!post.frontmatter.date) {
+    throw new Error(
+      `[blog-jsonld] Post "${post.slug}" is missing required frontmatter field: date. ` +
+      `datePublished cannot be empty. Add a date to the post's frontmatter before publishing.`
+    );
+  }
+
   const wordCount = stripMdx(post.content).split(/\s+/).filter(Boolean).length;
 
   const graph: object[] = [
@@ -64,7 +73,7 @@ export function generateBlogPostJsonLd(post: BlogPost): object {
         width: 1200,
         height: 630,
       },
-      inLanguage: 'en-US',
+      inLanguage: 'en',
       wordCount,
       keywords: post.frontmatter.tags,
     },
@@ -90,6 +99,7 @@ export function generateBlogPostJsonLd(post: BlogPost): object {
       '@id': `${SITE_URL}/#website`,
       url: SITE_URL,
       name: 'MCP Find',
+      inLanguage: 'en',
     },
     buildOrganizationNode(),
   ];

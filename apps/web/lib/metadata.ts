@@ -3,6 +3,69 @@ import { SITE_NAME, SITE_URL, CATEGORY_LABELS, CATEGORY_DESCRIPTIONS, CATEGORY_F
 import type { Category } from '@mcpfind/shared';
 import type { Metadata } from 'next';
 
+/** Pad sentences appended when a generated description is below the 120-char floor. */
+const PAD_PHRASES = [
+  ' Discover and compare MCP servers on MCPFind.',
+  ' Browse open-source integrations for Claude Desktop, Cursor, and VS Code.',
+] as const;
+
+/**
+ * Ensure description is in [120, 160] characters.
+ * - Already >=120: return as-is (trimmed to 160 at a word boundary if over the ceiling).
+ * - Below 120: append pad phrases in order. If a full phrase would exceed 160 but the
+ *   running length is still <120, append a word-boundary-truncated slice so the result
+ *   lands as close to 160 as possible without exceeding it.
+ * Note: targets [120,160] given current PAD_PHRASES — not a hard guarantee if the input
+ * is very short and truncation clips below 120 (a console.warn is emitted in that case).
+ */
+function applyDescriptionFloor(description: string): string {
+  /** Trim a string to `max` chars at the last word boundary, stripping trailing punctuation/space. */
+  function trimToWordBoundary(s: string, max: number): string {
+    if (s.length <= max) return s;
+    const slice = s.slice(0, max);
+    const lastSpace = slice.lastIndexOf(' ');
+    const cut = lastSpace > 0 ? slice.slice(0, lastSpace) : slice;
+    return cut.replace(/[\s,;:.]+$/, '');
+  }
+
+  if (description.length > 160) return trimToWordBoundary(description, 160);
+  if (description.length >= 120) return description;
+
+  let result = description;
+  for (const phrase of PAD_PHRASES) {
+    if (result.length >= 120) break;
+    if (result.length + phrase.length <= 160) {
+      result += phrase;
+    } else {
+      // Full phrase exceeds ceiling but we are still below the 120-char floor.
+      // Append a word-boundary-truncated slice to reach [120, 160].
+      const available = 160 - result.length;
+      const slice = phrase.slice(0, available);
+      const lastSpace = slice.lastIndexOf(' ');
+      const truncated = lastSpace > 0 ? slice.slice(0, lastSpace) : slice;
+      let trimmedPhrase = truncated.replace(/[\s,;:.]+$/, '');
+      // Strip a dangling short preposition/conjunction left by the word-boundary cut
+      // (e.g. "… for" or "… and" reads poorly as a sentence tail).
+      const DANGLING = new Set(['on','in','for','at','of','by','to','and','or','the','a','with']);
+      const lastWord = trimmedPhrase.match(/\b(\w+)$/)?.[1];
+      if (lastWord && DANGLING.has(lastWord.toLowerCase())) {
+        trimmedPhrase = trimmedPhrase.slice(0, trimmedPhrase.length - lastWord.length).replace(/[\s,;:.]+$/, '');
+      }
+      result += trimmedPhrase;
+      break;
+    }
+  }
+
+  // Safety net: warn if padding still couldn't reach 120 chars (e.g. very short input).
+  if (result.length < 120) {
+    console.warn(
+      `[applyDescriptionFloor] Description still below 120 chars after padding (${result.length}). Input: "${description}"`
+    );
+  }
+
+  return result;
+}
+
 export function generateServerJsonLd(server: ServerWithTools): object {
   // Extract author/org name from GitHub URL (e.g. "https://github.com/org/repo" -> "org")
   const githubAuthor = server.github_url
@@ -17,6 +80,64 @@ export function generateServerJsonLd(server: ServerWithTools): object {
     server.github_last_push ||
     server.registry_updated_at ||
     server.updated_at;
+
+  // Build FAQ items from available server data; emit FAQPage only if >= 2 pairs
+  const faqItems: Array<{
+    '@type': 'Question';
+    name: string;
+    acceptedAnswer: { '@type': 'Answer'; text: string };
+  }> = [];
+
+  // Q1: What is {name}?
+  if (server.description && server.description.trim().length >= 20) {
+    faqItems.push({
+      '@type': 'Question',
+      name: `What is ${server.name}?`,
+      acceptedAnswer: { '@type': 'Answer', text: server.description.trim() },
+    });
+  }
+
+  // Q2: How do I install {name}?
+  if (server.package_url || server.github_url) {
+    const clientList = 'Claude Desktop, Cursor, or VS Code';
+    const installText = server.package_url
+      ? `Install ${server.name} via ${server.package_type === 'npm' ? 'npm' : 'the package manager'} from ${server.package_url}, then add the server config to your MCP client (${clientList}).`
+      : `Clone ${server.name} from ${server.github_url} and configure it as an MCP server in your client (${clientList}).`;
+    faqItems.push({
+      '@type': 'Question',
+      name: `How do I install ${server.name}?`,
+      acceptedAnswer: { '@type': 'Answer', text: installText },
+    });
+  }
+
+  // Q3: Is {name} open source?
+  // Gated on github_license being present so this doesn't overlap with Q2 for
+  // servers that have a GitHub URL but no declared license.
+  if (server.github_url && server.github_license) {
+    const licenseText = `Yes, ${server.name} is open source under the ${server.github_license} license. Source code is available at ${server.github_url}.`;
+    faqItems.push({
+      '@type': 'Question',
+      name: `Is ${server.name} open source?`,
+      acceptedAnswer: { '@type': 'Answer', text: licenseText },
+    });
+  }
+
+  // Q4: What category?
+  if (server.category) {
+    const catLabel = CATEGORY_LABELS[server.category as keyof typeof CATEGORY_LABELS] || server.category;
+    faqItems.push({
+      '@type': 'Question',
+      name: `What category does ${server.name} belong to?`,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: `${server.name} is listed under ${catLabel} MCP servers on MCPFind.`,
+      },
+    });
+  }
+
+  const faqPage = faqItems.length >= 2
+    ? [{ '@type': 'FAQPage', mainEntity: faqItems }]
+    : [];
 
   return {
     '@context': 'https://schema.org',
@@ -34,6 +155,7 @@ export function generateServerJsonLd(server: ServerWithTools): object {
         license: server.github_license
           ? `https://spdx.org/licenses/${server.github_license}`
           : undefined,
+        datePublished: dateCreated || undefined,
         dateCreated: dateCreated || undefined,
         dateModified: dateModified || undefined,
         keywords:
@@ -62,6 +184,7 @@ export function generateServerJsonLd(server: ServerWithTools): object {
           { '@type': 'ListItem', position: 3, name: server.name, item: `${SITE_URL}/servers/${server.slug}` },
         ],
       },
+      ...faqPage,
     ],
   };
 }
@@ -133,6 +256,7 @@ export function generateServerMetadata(server: ServerWithTools): Metadata {
     description = description ? description + ' ' + sentence : sentence;
   }
   if (!description) description = fullDesc.slice(0, 157) + '...';
+  description = applyDescriptionFloor(description);
   return {
     title,
     description,
@@ -166,10 +290,11 @@ export function generateCategoryMetadata(
   const sentences = fullDesc.split(/(?<=[.!?])\s+/);
   let description = '';
   for (const sentence of sentences) {
-    if ((description ? description + ' ' : '') .length + sentence.length > 160) break;
+    if ((description ? description + ' ' : '').length + sentence.length > 160) break;
     description = description ? description + ' ' + sentence : sentence;
   }
   if (!description) description = fullDesc.slice(0, 157) + '...';
+  description = applyDescriptionFloor(description);
   return {
     title,
     description,

@@ -48,6 +48,16 @@ const nextConfig = {
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
           { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
+          // Reporting API endpoint name (modern browsers)
+          { key: 'Reporting-Endpoints', value: 'csp-endpoint="/api/csp-report"' },
+          // Report-Only CSP — NOT enforcing. Review violation reports before switching to
+          // Content-Security-Policy. Built from audited third parties (GTM, GA4, Clarity).
+          // report-to  → Reporting API (modern browsers, uses Reporting-Endpoints above)
+          // report-uri → legacy fallback for older browsers
+          {
+            key: 'Content-Security-Policy-Report-Only',
+            value: "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://*.clarity.ms; connect-src 'self' https://www.google-analytics.com https://www.googletagmanager.com https://*.clarity.ms; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; base-uri 'self'; frame-ancestors 'none'; report-to csp-endpoint; report-uri /api/csp-report",
+          },
         ],
       },
     ];
