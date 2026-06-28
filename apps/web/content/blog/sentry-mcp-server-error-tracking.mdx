@@ -1,0 +1,103 @@
+---
+title: "Sentry MCP Server: Error Tracking in AI Agent Workflows"
+description: "Connect Sentry to Claude, Cursor, and AI coding tools using the Sentry MCP server. Query errors, stack traces, releases, and issue status from your editor."
+excerpt: "The Sentry MCP server gives AI coding agents read access to your error tracking data, including unresolved issues, full event details with breadcrumbs, release history, and team assignments. MCPFind indexes 171 monitoring MCP servers. This guide covers Sentry MCP setup, what tools it exposes, how to filter by environment, and the security risks you should know before connecting it."
+date: "2026-06-26"
+updatedAt: "2026-06-26"
+author: "Adam Bush"
+authorUrl: "https://www.linkedin.com/in/adam-bush/"
+authorSameAs:
+  - "https://www.linkedin.com/in/adam-bush/"
+tags:
+  - "mcp"
+  - "developer"
+  - "monitoring"
+  - "sentry"
+  - "error-tracking"
+category: "monitoring"
+focusKeyword: "sentry mcp server"
+draft: false
+cornerstone: false
+topic_source: new_topic
+faqItems:
+  - question: "Is the Sentry MCP server read-only or can it modify issues?"
+    answer: "The Sentry MCP server exposes both read and write tools. Read tools let you list issues, fetch event details, and pull release history. Write tools let you update issue status (resolve, ignore, assign) and add comments. You can limit scope by connecting with an auth token that has restricted permissions."
+  - question: "Does the Sentry MCP server support self-hosted Sentry?"
+    answer: "The cloud-hosted Sentry MCP at mcp.sentry.dev works with Sentry Cloud accounts. For self-hosted Sentry, use the open-source getsentry/sentry-mcp-stdio server configured with your instance URL and an auth token from your self-hosted installation."
+  - question: "What Sentry plan do I need to use the MCP server?"
+    answer: "The Sentry MCP server is available on all Sentry plans including free developer accounts. Authentication requires a Sentry auth token with the appropriate organization and project scopes enabled."
+  - question: "Can I use the Sentry MCP server with multiple Sentry organizations?"
+    answer: "Each Sentry MCP server instance connects to one organization at a time via its auth token. To access multiple organizations, configure separate MCP server entries in your client config, each with a distinct auth token scoped to the respective organization."
+  - question: "How does the Sentry MCP server authenticate with my Sentry account?"
+    answer: "The cloud-hosted server at mcp.sentry.dev uses OAuth. You authenticate once in the browser and the token is stored by your MCP client. The stdio version (getsentry/sentry-mcp-stdio) uses a Sentry auth token passed as an environment variable."
+---
+
+Production bugs move faster than browser tabs. By the time you navigate from your editor to Sentry, find the right project, filter to the correct environment, and open the failing event, the context switch has already broken your concentration. The Sentry MCP server eliminates that loop by bringing error tracking directly into Claude, Cursor, and any other MCP-compatible AI client. MCPFind indexes 171 servers in the monitoring category, making it a smaller but high-value segment of the directory. Sentry stands out as one of the few monitoring tools with an officially maintained MCP server backed by the Sentry team. If you are new to the MCP protocol and how these integrations work, start with the [MCP overview](/blog/what-is-mcp). This guide covers what Sentry MCP exposes, how to connect it, and what to watch out for before giving your AI agent access to production error data.
+
+## What Does the Sentry MCP Server Give Your AI Agent Access To?
+
+The Sentry MCP server gives your AI coding agent direct access to your error tracking data without requiring you to leave your editor. With it connected, you can ask Claude or Cursor to show unresolved errors in production, pull the full stack trace for a specific event, summarize open issues by severity, or check whether a recent release introduced new errors.
+
+The server exposes data across organizations, projects, issues, events, releases, teams, and members. That is a wide surface: you are not just getting error messages, but also breadcrumbs (the sequence of actions leading to the error), performance metrics, source maps for minified stack traces, and release-level context like which commits shipped with each deploy. The [devtools category on MCPFind](/categories/devtools) has 4,450 servers across code, infrastructure, and monitoring tools. Pairing Sentry MCP with the [Kubernetes MCP server](/blog/kubernetes-mcp-server-cluster-management) or the [GitHub MCP server](/blog/github-mcp-server-claude-code-tutorial) creates a full incident response loop where your AI agent can correlate a production error with the commit that introduced it and the pod that is crashing.
+
+## How Do You Add the Sentry MCP Server to Claude or Cursor?
+
+Sentry offers two installation paths: a cloud-hosted server at mcp.sentry.dev and an open-source stdio server you run locally.
+
+For the cloud-hosted version, add this to your Claude Desktop config at `~/Library/Application Support/Claude/claude_desktop_config.json` or your Cursor MCP settings:
+
+```json
+{
+  "mcpServers": {
+    "sentry": {
+      "command": "npx",
+      "args": ["sentry-mcp-server"],
+      "env": {
+        "SENTRY_AUTH_TOKEN": "your-token-here"
+      }
+    }
+  }
+}
+```
+
+Alternatively, Sentry hosts the server at `https://mcp.sentry.dev/mcp` as an OAuth-based remote connector. If your client supports remote MCP servers, add that URL and authenticate once in the browser. For self-hosted Sentry instances, use the open-source getsentry/sentry-mcp-stdio repository and point it at your instance URL with an internal integration auth token. After connecting, ask Claude to list your Sentry projects. This is a safe first call that confirms the token has the right scopes and the server can reach your Sentry account.
+
+## What Tools Does the Sentry MCP Server Expose?
+
+The Sentry MCP server exposes 12 tools covering the full lifecycle of error investigation. Understanding what each group does helps you get the most out of the integration without giving Claude more access than it needs.
+
+The issue and event tools are the most frequently used: they let you list unresolved issues filtered by project, environment, and severity, fetch individual events with full breadcrumbs and exception details, and search across issues using Sentry's query syntax. The release tools pull deploy history, commit associations, and error rate comparisons between releases. Organization and project tools let Claude report on team structure and project health without requiring you to navigate Sentry's sidebar. The write-side tools, available with appropriate auth token scopes, let you update issue status (resolve, archive, assign) and add comments directly from your coding session. You can disable write access by using a Sentry auth token scoped to read-only permissions. Create the token in Sentry under Settings, then set `project:read` and `event:read` scopes only. The [devtools category on MCPFind](/categories/devtools) includes other developer observability tools you can combine with Sentry MCP in a broader incident workflow.
+
+## How Do You Filter Sentry Issues by Environment and Severity?
+
+Sentry MCP supports the same issue search query syntax Sentry uses natively, which means you can filter precisely without returning noise.
+
+When asking Claude to find errors, include environment and severity filters in your request. For example: "Show me unresolved errors in the production environment with level:error and more than 10 occurrences in the last 24 hours." Claude translates this to a Sentry issue query and passes it to the MCP server. Useful filter combinations include `environment:production level:error` for critical production bugs, `release:1.2.3 is:unresolved` for post-deploy issue triage, and `assigned:me` for issues already in your queue. You can also filter by tag values specific to your Sentry configuration, such as `browser:Chrome` or `user.email:specific-user@example.com`, which is useful for reproducing customer-reported issues. The breadcrumb data returned for individual events includes the full request context, user agent, and any custom tags your application sends, giving Claude enough detail to suggest a root cause without you opening the Sentry web UI. For teams that also use the [Jira MCP server](/blog/jira-mcp-server-setup-claude-cursor), you can ask Claude to pull a Sentry error and create a Jira ticket for it in a single conversation turn.
+
+## What Security Risks Should You Know Before Connecting Sentry MCP?
+
+The Sentry MCP server gives your AI agent access to production error data, which often includes user identifiers, session tokens, request payloads, and other sensitive information that ends up in breadcrumbs and stack traces.
+
+A security firm documented an attack called agentjacking where malicious content in a Sentry error message can instruct an AI agent to take unintended actions. If your application surfaces user-supplied input in error messages (for example, a validation error that includes the submitted form value), an attacker could craft a payload that the MCP-connected Claude treats as an instruction. Mitigate this by reviewing what your application logs in Sentry before connecting it to an AI agent, and by connecting with a read-only auth token so the agent cannot take actions like resolving issues or adding comments based on injected instructions. A second risk is credential exposure in breadcrumbs. Applications sometimes accidentally log API keys, passwords, or tokens in request headers or body fields. Claude will read these through the MCP server and may include them in its responses. Audit your Sentry data scrubbing rules before connecting MCP. The [MCP server security deep dive](/blog/mcp-server-security-deep-dive-permissions) covers these patterns across the MCP ecosystem, and the [DevOps MCP roundup](/blog/best-mcp-servers-devops-cicd) includes other tools where similar access controls apply.
+
+## Frequently Asked Questions
+
+### Is the Sentry MCP server read-only or can it modify issues?
+
+The Sentry MCP server exposes both read and write tools. Read tools let you list issues, fetch event details, and pull release history. Write tools let you update issue status (resolve, ignore, assign) and add comments. You can limit scope by connecting with an auth token that has restricted permissions.
+
+### Does the Sentry MCP server support self-hosted Sentry?
+
+The cloud-hosted Sentry MCP at mcp.sentry.dev works with Sentry Cloud accounts. For self-hosted Sentry, use the open-source getsentry/sentry-mcp-stdio server configured with your instance URL and an auth token from your self-hosted installation.
+
+### What Sentry plan do I need to use the MCP server?
+
+The Sentry MCP server is available on all Sentry plans including free developer accounts. Authentication requires a Sentry auth token with the appropriate organization and project scopes enabled.
+
+### Can I use the Sentry MCP server with multiple Sentry organizations?
+
+Each Sentry MCP server instance connects to one organization at a time via its auth token. To access multiple organizations, configure separate MCP server entries in your client config, each with a distinct auth token scoped to the respective organization.
+
+### How does the Sentry MCP server authenticate with my Sentry account?
+
+The cloud-hosted server at mcp.sentry.dev uses OAuth. You authenticate once in the browser and the token is stored by your MCP client. The stdio version (getsentry/sentry-mcp-stdio) uses a Sentry auth token passed as an environment variable.
