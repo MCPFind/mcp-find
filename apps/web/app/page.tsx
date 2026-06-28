@@ -76,6 +76,15 @@ export async function generateMetadata(): Promise<Metadata> {
       url: SITE_URL,
       title: pageTitle,
       description: pageDescription,
+      type: "website",
+      images: [
+        {
+          url: `${SITE_URL}/og-image-mcp.png`,
+          width: 1200,
+          height: 630,
+          alt: "MCP Find — The open-source way to find MCP servers",
+        },
+      ],
     },
   };
 }

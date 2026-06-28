@@ -15,13 +15,22 @@ const PAGE_TITLE = `Submit Your MCP Server | ${SITE_NAME}`;
 const PAGE_DESCRIPTION = "Add your MCP server to the open-source directory used by thousands of AI developers. Submit via GitHub PR — no account required, reviewed within 48 hours.";
 
 export const metadata: Metadata = {
-  title: PAGE_TITLE,
+  title: "Submit Your MCP Server",
   description: PAGE_DESCRIPTION,
   alternates: { canonical: `${SITE_URL}/submit` },
   openGraph: {
     title: PAGE_TITLE,
     description: PAGE_DESCRIPTION,
     url: `${SITE_URL}/submit`,
+    type: "website",
+    images: [
+      {
+        url: `${SITE_URL}/og-image-mcp.png`,
+        width: 1200,
+        height: 630,
+        alt: "MCP Find — The open-source way to find MCP servers",
+      },
+    ],
   },
 };
 
