@@ -6,10 +6,39 @@ import { generateConfig } from "@mcpfind/shared";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { CategoryBadge } from "@/components/ui/category-badge";
 import { LanguageBadge } from "@/components/ui/language-badge";
-import { CodeBlock } from "@/components/ui/code-block";
-import { ReadmeSection } from "@/components/ui/readme-section";
+
+// Lazy-load CodeBlock: code-splits the copy-button JS while keeping install
+// snippets in SSR HTML for SEO and direct readability.
+const CodeBlock = dynamic(
+  () => import("@/components/ui/code-block").then((m) => ({ default: m.CodeBlock })),
+  {
+    ssr: true,
+    loading: () => (
+      <pre className="rounded-xl bg-neutral-950 border border-neutral-800 p-4 text-sm font-mono text-neutral-200 overflow-x-auto min-h-[3rem]" />
+    ),
+  }
+);
+
+// Lazy-load ReadmeSection: defers react-markdown + remark-gfm bundle (~40 kB)
+// until after FCP so the font-swap LCP repaint isn't blocked by parser work.
+// ssr:true keeps readme content in the initial HTML for SEO crawlers.
+const ReadmeSection = dynamic(
+  () => import("@/components/ui/readme-section").then((m) => ({ default: m.ReadmeSection })),
+  {
+    ssr: true,
+    loading: () => (
+      <div className="animate-pulse space-y-4">
+        <div className="h-6 w-48 bg-neutral-800 rounded" />
+        <div className="h-4 w-full bg-neutral-900 rounded" />
+        <div className="h-4 w-5/6 bg-neutral-900 rounded" />
+        <div className="h-4 w-4/6 bg-neutral-900 rounded" />
+      </div>
+    ),
+  }
+);
 import { ServerCard } from "@/components/ui/server-card";
 import { formatNumber } from "@/components/ui/stat-badge";
 import { RelatedArticles } from "@/components/related-articles";

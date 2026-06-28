@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { AuroraBackground } from "@/components/aceternity/aurora-background";
@@ -51,6 +52,11 @@ const HomeFaq = dynamic(
   () => import("@/components/ui/home-faq").then((m) => ({ default: m.HomeFaq })),
   { ssr: true }
 );
+
+// ISR: cache the homepage for 1 hour. Eliminates cold-start TTFB spikes by
+// serving stale HTML from Vercel's edge instantly while Next.js revalidates in
+// the background. Warm LCP is already 2.2s; cold TTFB (6.2s) was the blocker.
+export const revalidate = 3600;
 
 // Static metadata — description uses a conservative number to avoid drift.
 // The live serverCount from Supabase is shown dynamically in the hero section.
@@ -111,28 +117,194 @@ const categoryIconMap: Record<string, React.ReactNode> = {
   other: <IconBriefcase size={20} className="text-neutral-400" />,
 };
 
-export default async function HomePage() {
-  let featuredServers: ServerListItem[] = [];
-  let recentServers: ServerListItem[] = [];
-  let serverCount = 0;
-  let totalDownloads = 0;
+// ── Skeleton fallbacks ──────────────────────────────────────────────────────
 
+function FeaturedServersSkeleton() {
+  return (
+    <section className="py-24 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto">
+        <div className="h-8 w-48 bg-neutral-800 rounded mb-3 animate-pulse" />
+        <div className="h-4 w-64 bg-neutral-900 rounded mb-12 animate-pulse" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              className="rounded-xl border border-neutral-800 bg-neutral-900 p-6 animate-pulse"
+            >
+              <div className="h-4 w-3/4 bg-neutral-800 rounded mb-3" />
+              <div className="h-3 w-full bg-neutral-800 rounded mb-2" />
+              <div className="h-3 w-5/6 bg-neutral-800 rounded" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function RecentServersSkeleton() {
+  return (
+    <section className="py-24 px-4 sm:px-6 lg:px-8 bg-neutral-950/50">
+      <div className="max-w-7xl mx-auto">
+        <div className="h-8 w-48 bg-neutral-800 rounded mb-3 animate-pulse" />
+        <div className="h-4 w-56 bg-neutral-900 rounded mb-8 animate-pulse" />
+        <div className="flex gap-4 overflow-x-hidden pb-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="shrink-0 w-72 bg-neutral-900 border border-neutral-800 rounded-xl p-4 animate-pulse"
+            >
+              <div className="h-3 w-20 bg-neutral-800 rounded mb-3" />
+              <div className="h-4 w-full bg-neutral-800 rounded mb-2" />
+              <div className="h-3 w-full bg-neutral-800 rounded mb-1" />
+              <div className="h-3 w-4/5 bg-neutral-800 rounded" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ── Async server components (data-heavy, streamed below-the-fold) ───────────
+
+async function FeaturedServersSection() {
+  let featuredServers: ServerListItem[] = [];
   try {
-    const [featured, recent, count] = await Promise.all([
-      getTopServers(6),
-      listServers({ sort: "updated", limit: 8 }),
-      getServerCount(),
-    ]);
-    featuredServers = featured;
-    recentServers = recent.servers;
-    serverCount = count;
-    totalDownloads = featured.reduce(
-      (sum, s) => sum + (s.npm_weekly_downloads ?? 0),
-      0
-    );
+    featuredServers = await getTopServers(6);
+  } catch {
+    // Supabase not available
+  }
+  if (featuredServers.length === 0) return null;
+  return (
+    <section className="py-24 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex items-center justify-between mb-12">
+          <div>
+            <h2 className="text-3xl sm:text-4xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-white to-neutral-400">
+              Featured Servers
+            </h2>
+            <p className="text-neutral-500">
+              Hand-picked, production-ready integrations
+            </p>
+          </div>
+          <Link
+            href="/servers"
+            className="hidden sm:flex items-center gap-2 text-blue-400 hover:text-blue-300 font-medium transition-colors duration-200"
+          >
+            View all
+            <IconArrowRight size={16} />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {featuredServers.map((server) => (
+            <ServerCard key={server.id} server={server} qualityStatus={getQualityStatus(server.slug)} />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+async function RecentServersSection() {
+  let recentServers: ServerListItem[] = [];
+  try {
+    const result = await listServers({ sort: "updated", limit: 8 });
+    recentServers = result.servers;
+  } catch {
+    // Supabase not available
+  }
+  if (recentServers.length === 0) return null;
+  return (
+    <section className="py-24 px-4 sm:px-6 lg:px-8 bg-neutral-950/50">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h2 className="text-3xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-white to-neutral-400">
+              Recently Updated
+            </h2>
+            <p className="text-neutral-500">
+              Fresh releases and recent updates
+            </p>
+          </div>
+          <Link
+            href="/servers?sort=updated"
+            className="hidden sm:flex items-center gap-2 text-blue-400 hover:text-blue-300 font-medium transition-colors duration-200"
+          >
+            View all
+            <IconArrowRight size={16} />
+          </Link>
+        </div>
+
+        {/* Horizontal scroll strip */}
+        <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide">
+          {recentServers.map((server) => (
+            <Link
+              key={server.id}
+              href={`/servers/${server.slug}`}
+              className="snap-start shrink-0 w-72 bg-neutral-900 border border-neutral-800 hover:border-neutral-700 rounded-xl p-4 transition-all duration-200 hover:bg-neutral-900/80 group"
+            >
+              <div className="mb-3">
+                {server.github_last_push && (
+                  <p className="text-xs text-neutral-600 mb-1.5">
+                    {new Date(server.github_last_push).toLocaleDateString(
+                      "en-US",
+                      { month: "short", day: "numeric" }
+                    )}
+                  </p>
+                )}
+                <h3 className="font-semibold text-white text-sm group-hover:text-blue-300 transition-colors duration-200">
+                  {server.name}
+                </h3>
+                {server.github_url && (
+                  <p className="text-neutral-500 text-xs mt-0.5">
+                    {server.github_url.replace("https://github.com/", "")}
+                  </p>
+                )}
+              </div>
+              <p className="text-neutral-400 text-xs leading-relaxed mb-3 line-clamp-2">
+                {server.description}
+              </p>
+              <div className="flex items-center gap-3 text-xs text-neutral-500">
+                <span className="flex items-center gap-1">
+                  <IconStar size={11} className="text-amber-400" />
+                  {server.github_stars.toLocaleString()}
+                </span>
+                {server.npm_weekly_downloads > 0 && (
+                  <span className="flex items-center gap-1">
+                    <IconDownload size={11} className="text-green-400" />
+                    {(server.npm_weekly_downloads / 1000).toFixed(1)}k
+                  </span>
+                )}
+                {server.github_language && (
+                  <span className="ml-auto px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-400">
+                    {server.github_language}
+                  </span>
+                )}
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ── Main page ───────────────────────────────────────────────────────────────
+
+export default async function HomePage() {
+  // Only await the lightweight count query here so the hero streams immediately.
+  // Featured and Recently Updated sections fetch their data in child components
+  // wrapped in <Suspense>, so they don't block the above-the-fold render.
+  let serverCount = 0;
+  try {
+    serverCount = await getServerCount();
   } catch {
     // Supabase not available (e.g., during build without credentials)
   }
+
+  const latestPosts = getAllPosts({ limit: 3 });
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -208,9 +380,7 @@ export default async function HomePage() {
             <div className="w-px h-12 bg-neutral-800 hidden sm:block self-center" />
             <div className="flex flex-col items-center">
               <span className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">
-                {totalDownloads > 0
-                  ? `${Math.round(totalDownloads / 1000)}k+`
-                  : "1M+"}
+                1M+
               </span>
               <span className="text-neutral-500 mt-1">Weekly Downloads</span>
             </div>
@@ -316,111 +486,15 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ── 4. Featured Servers ── */}
-      {featuredServers.length > 0 && (
-        <section className="py-24 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-7xl mx-auto">
-            <div className="flex items-center justify-between mb-12">
-              <div>
-                <h2 className="text-3xl sm:text-4xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-white to-neutral-400">
-                  Featured Servers
-                </h2>
-                <p className="text-neutral-500">
-                  Hand-picked, production-ready integrations
-                </p>
-              </div>
-              <Link
-                href="/servers"
-                className="hidden sm:flex items-center gap-2 text-blue-400 hover:text-blue-300 font-medium transition-colors duration-200"
-              >
-                View all
-                <IconArrowRight size={16} />
-              </Link>
-            </div>
+      {/* ── 4. Featured Servers — streamed ── */}
+      <Suspense fallback={<FeaturedServersSkeleton />}>
+        <FeaturedServersSection />
+      </Suspense>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {featuredServers.map((server) => (
-                <ServerCard key={server.id} server={server} qualityStatus={getQualityStatus(server.slug)} />
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* ── 5. Recently Updated ── */}
-      {recentServers.length > 0 && (
-        <section className="py-24 px-4 sm:px-6 lg:px-8 bg-neutral-950/50">
-          <div className="max-w-7xl mx-auto">
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <h2 className="text-3xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-white to-neutral-400">
-                  Recently Updated
-                </h2>
-                <p className="text-neutral-500">
-                  Fresh releases and recent updates
-                </p>
-              </div>
-              <Link
-                href="/servers?sort=updated"
-                className="hidden sm:flex items-center gap-2 text-blue-400 hover:text-blue-300 font-medium transition-colors duration-200"
-              >
-                View all
-                <IconArrowRight size={16} />
-              </Link>
-            </div>
-
-            {/* Horizontal scroll strip */}
-            <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide">
-              {recentServers.map((server) => (
-                <Link
-                  key={server.id}
-                  href={`/servers/${server.slug}`}
-                  className="snap-start shrink-0 w-72 bg-neutral-900 border border-neutral-800 hover:border-neutral-700 rounded-xl p-4 transition-all duration-200 hover:bg-neutral-900/80 group"
-                >
-                  <div className="mb-3">
-                    {server.github_last_push && (
-                      <p className="text-xs text-neutral-600 mb-1.5">
-                        {new Date(server.github_last_push).toLocaleDateString(
-                          "en-US",
-                          { month: "short", day: "numeric" }
-                        )}
-                      </p>
-                    )}
-                    <h3 className="font-semibold text-white text-sm group-hover:text-blue-300 transition-colors duration-200">
-                      {server.name}
-                    </h3>
-                    {server.github_url && (
-                      <p className="text-neutral-500 text-xs mt-0.5">
-                        {server.github_url.replace("https://github.com/", "")}
-                      </p>
-                    )}
-                  </div>
-                  <p className="text-neutral-400 text-xs leading-relaxed mb-3 line-clamp-2">
-                    {server.description}
-                  </p>
-                  <div className="flex items-center gap-3 text-xs text-neutral-500">
-                    <span className="flex items-center gap-1">
-                      <IconStar size={11} className="text-amber-400" />
-                      {server.github_stars.toLocaleString()}
-                    </span>
-                    {server.npm_weekly_downloads > 0 && (
-                      <span className="flex items-center gap-1">
-                        <IconDownload size={11} className="text-green-400" />
-                        {(server.npm_weekly_downloads / 1000).toFixed(1)}k
-                      </span>
-                    )}
-                    {server.github_language && (
-                      <span className="ml-auto px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-400">
-                        {server.github_language}
-                      </span>
-                    )}
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
+      {/* ── 5. Recently Updated — streamed ── */}
+      <Suspense fallback={<RecentServersSkeleton />}>
+        <RecentServersSection />
+      </Suspense>
 
       {/* ── 6. FAQ ── */}
       <section className="py-24 px-4 sm:px-6 lg:px-8">
@@ -438,50 +512,46 @@ export default async function HomePage() {
       </section>
 
       {/* ── 7. From the Blog ── */}
-      {(() => {
-        const latestPosts = getAllPosts({ limit: 3 });
-        if (latestPosts.length === 0) return null;
-        return (
-          <section className="py-24 px-4 sm:px-6 lg:px-8 bg-neutral-950/50">
-            <div className="max-w-7xl mx-auto">
-              <div className="flex items-center justify-between mb-12">
-                <div>
-                  <h2 className="text-3xl sm:text-4xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-white to-neutral-400">
-                    From the Blog
-                  </h2>
-                  <p className="text-neutral-500">
-                    Guides, tutorials, and insights on MCP
-                  </p>
-                </div>
-                <Link
-                  href="/blog"
-                  className="hidden sm:flex items-center gap-2 text-blue-400 hover:text-blue-300 font-medium transition-colors duration-200"
-                >
-                  View all
-                  <IconArrowRight size={16} />
-                </Link>
+      {latestPosts.length > 0 && (
+        <section className="py-24 px-4 sm:px-6 lg:px-8 bg-neutral-950/50">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex items-center justify-between mb-12">
+              <div>
+                <h2 className="text-3xl sm:text-4xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-white to-neutral-400">
+                  From the Blog
+                </h2>
+                <p className="text-neutral-500">
+                  Guides, tutorials, and insights on MCP
+                </p>
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {latestPosts.map((post) => (
-                  <PostCard key={post.slug} post={post} />
-                ))}
-              </div>
-
-              {/* Mobile "View all" link */}
-              <div className="flex sm:hidden justify-center mt-8">
-                <Link
-                  href="/blog"
-                  className="flex items-center gap-2 text-blue-400 hover:text-blue-300 font-medium transition-colors duration-200"
-                >
-                  View all articles
-                  <IconArrowRight size={16} />
-                </Link>
-              </div>
+              <Link
+                href="/blog"
+                className="hidden sm:flex items-center gap-2 text-blue-400 hover:text-blue-300 font-medium transition-colors duration-200"
+              >
+                View all
+                <IconArrowRight size={16} />
+              </Link>
             </div>
-          </section>
-        );
-      })()}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {latestPosts.map((post) => (
+                <PostCard key={post.slug} post={post} />
+              ))}
+            </div>
+
+            {/* Mobile "View all" link */}
+            <div className="flex sm:hidden justify-center mt-8">
+              <Link
+                href="/blog"
+                className="flex items-center gap-2 text-blue-400 hover:text-blue-300 font-medium transition-colors duration-200"
+              >
+                View all articles
+                <IconArrowRight size={16} />
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ── 8. CTA Banner ── */}
       <section className="py-24 px-4 sm:px-6 lg:px-8">
