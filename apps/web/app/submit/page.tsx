@@ -15,7 +15,7 @@ const PAGE_TITLE = `Submit Your MCP Server | ${SITE_NAME}`;
 const PAGE_DESCRIPTION = "Add your MCP server to the open-source directory used by thousands of AI developers. Submit via GitHub PR — no account required, reviewed within 48 hours.";
 
 export const metadata: Metadata = {
-  title: PAGE_TITLE,
+  title: "Submit Your MCP Server",
   description: PAGE_DESCRIPTION,
   alternates: { canonical: `${SITE_URL}/submit` },
   openGraph: {

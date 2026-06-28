@@ -12,7 +12,7 @@ import type { Metadata } from "next";
 export const revalidate = 3600;
 
 export const metadata: Metadata = {
-  title: "Blog | MCP Find",
+  title: "Blog",
   description:
     "Guides, tutorials, and analysis on MCP servers and the Model Context Protocol. Learn how to connect AI assistants to your tools and data.",
   alternates: {
