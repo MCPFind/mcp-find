@@ -2,7 +2,8 @@ import { getServerBySlug, getTopServers, getServersByCategory } from "@/lib/quer
 import { generateServerMetadata, generateServerJsonLd } from "@/lib/metadata";
 import { getQualityStatus } from "@/lib/quality-status";
 import { safeJsonLd } from "@/lib/json-ld";
-import { generateConfig } from "@mcpfind/shared";
+import { generateConfig, CLIENT_CONFIGS, CATEGORY_LABELS } from "@mcpfind/shared";
+import type { ClientType } from "@mcpfind/shared";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -61,6 +62,10 @@ import {
   IconGitFork,
   IconUsers,
   IconPackage,
+  IconDeviceDesktop,
+  IconInfoCircle,
+  IconLink,
+  IconAlertCircle,
 } from "@tabler/icons-react";
 import { ServerOutboundLink } from "@/components/ServerOutboundLink";
 
@@ -171,6 +176,30 @@ export default async function ServerDetailPage({
       // Config generation failed — skip
     }
   }
+
+  // Build compatibility client list — all standard MCP clients share the same config format.
+  const CLIENT_DISPLAY_NAMES: Record<ClientType, string> = {
+    "claude-desktop": "Claude Desktop",
+    cursor: "Cursor",
+    vscode: "VS Code",
+    windsurf: "Windsurf",
+    "claude-code": "Claude Code",
+  };
+
+  const compatibilityClients = (Object.keys(CLIENT_CONFIGS) as ClientType[]).map(
+    (key) => ({
+      key,
+      displayName: CLIENT_DISPLAY_NAMES[key],
+      configPath: CLIENT_CONFIGS[key].filePath.macos,
+      postInstall: CLIENT_CONFIGS[key].postInstall,
+    })
+  );
+
+  const categoryLabel = server.category
+    ? (CATEGORY_LABELS[server.category] ?? server.category)
+    : null;
+
+  const publishedDate = server.registry_published_at ?? server.created_at;
 
   return (
     <div className="min-h-screen bg-black text-white overflow-x-hidden">
@@ -300,6 +329,71 @@ export default async function ServerDetailPage({
               </section>
             )}
 
+            {/* Capabilities */}
+            {(server.has_resources || server.has_prompts) && (
+              <section aria-labelledby="capabilities-heading">
+                <h2
+                  id="capabilities-heading"
+                  className="text-xl font-bold text-white mb-4 flex items-center gap-2"
+                >
+                  <IconInfoCircle size={20} className="text-teal-400" />
+                  Server Capabilities
+                </h2>
+                <p className="text-neutral-400 text-sm mb-4">
+                  In addition to tools, {server.name} exposes the following MCP
+                  primitives:
+                </p>
+                <ul className="space-y-2" role="list">
+                  {server.has_tools && (
+                    <li className="flex items-center gap-3 p-3 rounded-lg bg-neutral-900 border border-neutral-800">
+                      <div className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
+                      <div>
+                        <span className="text-white text-sm font-medium">
+                          Tools
+                        </span>
+                        {server.tool_count > 0 && (
+                          <span className="ml-2 text-xs text-neutral-500">
+                            ({server.tool_count} registered)
+                          </span>
+                        )}
+                        <p className="text-xs text-neutral-500 mt-0.5">
+                          Callable functions the AI agent can invoke directly.
+                        </p>
+                      </div>
+                    </li>
+                  )}
+                  {server.has_resources && (
+                    <li className="flex items-center gap-3 p-3 rounded-lg bg-neutral-900 border border-neutral-800">
+                      <div className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                      <div>
+                        <span className="text-white text-sm font-medium">
+                          Resources
+                        </span>
+                        <p className="text-xs text-neutral-500 mt-0.5">
+                          Data sources the agent can read — files, URLs, or
+                          structured records.
+                        </p>
+                      </div>
+                    </li>
+                  )}
+                  {server.has_prompts && (
+                    <li className="flex items-center gap-3 p-3 rounded-lg bg-neutral-900 border border-neutral-800">
+                      <div className="w-2 h-2 rounded-full bg-purple-500 shrink-0" />
+                      <div>
+                        <span className="text-white text-sm font-medium">
+                          Prompts
+                        </span>
+                        <p className="text-xs text-neutral-500 mt-0.5">
+                          Reusable prompt templates the agent can expand and
+                          chain.
+                        </p>
+                      </div>
+                    </li>
+                  )}
+                </ul>
+              </section>
+            )}
+
             {/* Installation */}
             {installCommand && (
               <section>
@@ -364,6 +458,45 @@ export default async function ServerDetailPage({
                 </div>
               </section>
             )}
+            {/* Compatibility */}
+            {server.package_name && server.package_type && (
+              <section aria-labelledby="compatibility-heading">
+                <h2
+                  id="compatibility-heading"
+                  className="text-xl font-bold text-white mb-4 flex items-center gap-2"
+                >
+                  <IconDeviceDesktop size={20} className="text-blue-400" />
+                  Compatible MCP Clients
+                </h2>
+                <p className="text-neutral-400 text-sm mb-4">
+                  {server.name} works with any MCP-compatible client. Copy the
+                  config snippet from the Configuration section above and add it
+                  to the file shown for your client, then restart the
+                  application.
+                </p>
+                <ul className="space-y-2" role="list">
+                  {compatibilityClients.map(
+                    ({ key, displayName, configPath, postInstall }) => (
+                      <li
+                        key={key}
+                        className="flex flex-col gap-1 p-3 rounded-lg bg-neutral-900 border border-neutral-800"
+                      >
+                        <span className="text-white text-sm font-medium">
+                          {displayName}
+                        </span>
+                        <code className="text-xs text-neutral-500 font-mono break-all">
+                          {configPath}
+                        </code>
+                        <span className="text-xs text-neutral-600">
+                          {postInstall}
+                        </span>
+                      </li>
+                    )
+                  )}
+                </ul>
+              </section>
+            )}
+
             {/* Related Articles */}
             <RelatedArticles serverCategory={server.category} />
           </div>
@@ -372,78 +505,89 @@ export default async function ServerDetailPage({
           <aside className="space-y-6">
             {/* Stats */}
             <div className="rounded-xl bg-neutral-900 border border-neutral-800 p-5 space-y-4">
-              <h3 className="text-sm font-semibold text-neutral-300 uppercase tracking-wider">
+              <h2 className="text-sm font-semibold text-neutral-300 uppercase tracking-wider">
                 Stats
-              </h3>
-              <div className="space-y-3">
+              </h2>
+              <dl className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-2 text-neutral-500 text-sm">
+                  <dt className="flex items-center gap-2 text-neutral-500 text-sm">
                     <IconStar size={15} className="text-amber-400" />
                     Stars
-                  </span>
-                  <span className="text-white font-semibold text-sm">
+                  </dt>
+                  <dd className="text-white font-semibold text-sm">
                     {server.github_stars.toLocaleString()}
-                  </span>
+                  </dd>
                 </div>
                 {server.npm_weekly_downloads > 0 && (
                   <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-2 text-neutral-500 text-sm">
+                    <dt className="flex items-center gap-2 text-neutral-500 text-sm">
                       <IconDownload size={15} className="text-green-400" />
                       Weekly Downloads
-                    </span>
-                    <span className="text-white font-semibold text-sm">
+                    </dt>
+                    <dd className="text-white font-semibold text-sm">
                       {formatNumber(server.npm_weekly_downloads)}
-                    </span>
+                    </dd>
                   </div>
                 )}
                 {server.github_forks > 0 && (
                   <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-2 text-neutral-500 text-sm">
+                    <dt className="flex items-center gap-2 text-neutral-500 text-sm">
                       <IconGitFork size={15} className="text-blue-400" />
                       Forks
-                    </span>
-                    <span className="text-white font-semibold text-sm">
+                    </dt>
+                    <dd className="text-white font-semibold text-sm">
                       {server.github_forks.toLocaleString()}
-                    </span>
+                    </dd>
                   </div>
                 )}
                 {server.github_contributors > 0 && (
                   <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-2 text-neutral-500 text-sm">
+                    <dt className="flex items-center gap-2 text-neutral-500 text-sm">
                       <IconUsers size={15} className="text-purple-400" />
                       Contributors
-                    </span>
-                    <span className="text-white font-semibold text-sm">
+                    </dt>
+                    <dd className="text-white font-semibold text-sm">
                       {server.github_contributors}
-                    </span>
+                    </dd>
                   </div>
                 )}
                 {server.github_last_push && (
                   <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-2 text-neutral-500 text-sm">
+                    <dt className="flex items-center gap-2 text-neutral-500 text-sm">
                       <IconCalendar size={15} className="text-purple-400" />
                       Last Push
-                    </span>
-                    <span className="text-white font-semibold text-sm">
+                    </dt>
+                    <dd className="text-white font-semibold text-sm">
                       {new Date(server.github_last_push).toLocaleDateString(
                         "en-US",
                         { month: "short", day: "numeric", year: "numeric" }
                       )}
-                    </span>
+                    </dd>
                   </div>
                 )}
                 {server.github_license && (
                   <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-2 text-neutral-500 text-sm">
+                    <dt className="flex items-center gap-2 text-neutral-500 text-sm">
                       <IconCode size={15} className="text-indigo-400" />
                       License
-                    </span>
-                    <span className="text-white font-semibold text-sm">
+                    </dt>
+                    <dd className="text-white font-semibold text-sm">
                       {server.github_license}
-                    </span>
+                    </dd>
                   </div>
                 )}
-              </div>
+                {server.github_open_issues > 0 && (
+                  <div className="flex items-center justify-between">
+                    <dt className="flex items-center gap-2 text-neutral-500 text-sm">
+                      <IconAlertCircle size={15} className="text-yellow-400" />
+                      Open Issues
+                    </dt>
+                    <dd className="text-white font-semibold text-sm">
+                      {server.github_open_issues.toLocaleString()}
+                    </dd>
+                  </div>
+                )}
+              </dl>
             </div>
 
             {/* Author */}
@@ -453,9 +597,9 @@ export default async function ServerDetailPage({
               const firstLetter = authorOrg.charAt(0)?.toUpperCase() ?? "";
               return (
                 <div className="rounded-xl bg-neutral-900 border border-neutral-800 p-5 space-y-3">
-                  <h3 className="text-sm font-semibold text-neutral-300 uppercase tracking-wider">
+                  <h2 className="text-sm font-semibold text-neutral-300 uppercase tracking-wider">
                     Author
-                  </h3>
+                  </h2>
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-neutral-800 border border-neutral-700 flex items-center justify-center text-white font-semibold text-base shrink-0">
                       {firstLetter}
@@ -482,51 +626,141 @@ export default async function ServerDetailPage({
               );
             })()}
 
+            {/* Details */}
+            {(categoryLabel || publishedDate || server.source || server.github_language) && (
+              <div className="rounded-xl bg-neutral-900 border border-neutral-800 p-5 space-y-3">
+                <h2 className="text-sm font-semibold text-neutral-300 uppercase tracking-wider flex items-center gap-2">
+                  <IconInfoCircle size={14} />
+                  Details
+                </h2>
+                <dl className="space-y-2">
+                  {categoryLabel && (
+                    <div className="flex items-start justify-between gap-2">
+                      <dt className="text-neutral-500 text-xs shrink-0">Category</dt>
+                      <dd className="text-white text-xs font-medium text-right">{categoryLabel}</dd>
+                    </div>
+                  )}
+                  {server.github_language && (
+                    <div className="flex items-start justify-between gap-2">
+                      <dt className="text-neutral-500 text-xs shrink-0">Language</dt>
+                      <dd className="text-white text-xs font-medium text-right">{server.github_language}</dd>
+                    </div>
+                  )}
+                  {server.source && (
+                    <div className="flex items-start justify-between gap-2">
+                      <dt className="text-neutral-500 text-xs shrink-0">Source</dt>
+                      <dd className="text-white text-xs font-medium text-right capitalize">{server.source}</dd>
+                    </div>
+                  )}
+                  {publishedDate && (
+                    <div className="flex items-start justify-between gap-2">
+                      <dt className="text-neutral-500 text-xs shrink-0">Published</dt>
+                      <dd className="text-white text-xs font-medium text-right">
+                        {new Date(publishedDate).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+              </div>
+            )}
+
+            {/* Links */}
+            {(server.github_url || server.package_url) && (
+              <div className="rounded-xl bg-neutral-900 border border-neutral-800 p-5 space-y-3">
+                <h2 className="text-sm font-semibold text-neutral-300 uppercase tracking-wider flex items-center gap-2">
+                  <IconLink size={14} />
+                  Links
+                </h2>
+                <ul className="space-y-2" role="list">
+                  {server.github_url && (
+                    <li>
+                      <ServerOutboundLink
+                        href={server.github_url}
+                        serverSlug={slug}
+                        className="flex items-center gap-2 text-neutral-400 hover:text-white text-sm transition-colors duration-200"
+                      >
+                        <IconBrandGithub size={15} className="shrink-0" />
+                        <span className="truncate">GitHub Repository</span>
+                        <IconExternalLink size={12} className="text-neutral-600 ml-auto shrink-0" />
+                      </ServerOutboundLink>
+                    </li>
+                  )}
+                  {server.package_url && (
+                    <li>
+                      <ServerOutboundLink
+                        href={server.package_url}
+                        serverSlug={slug}
+                        className="flex items-center gap-2 text-neutral-400 hover:text-white text-sm transition-colors duration-200"
+                      >
+                        <IconPackage size={15} className="shrink-0" />
+                        <span className="truncate">
+                          {server.package_type === "npm"
+                            ? "npm Registry"
+                            : server.package_type === "pypi"
+                            ? "PyPI Package"
+                            : server.package_type === "docker"
+                            ? "Docker Hub"
+                            : "Package Registry"}
+                        </span>
+                        <IconExternalLink size={12} className="text-neutral-600 ml-auto shrink-0" />
+                      </ServerOutboundLink>
+                    </li>
+                  )}
+                </ul>
+              </div>
+            )}
+
             {/* Tags */}
             {server.registry_tags && server.registry_tags.length > 0 && (
               <div className="rounded-xl bg-neutral-900 border border-neutral-800 p-5 space-y-3">
-                <h3 className="text-sm font-semibold text-neutral-300 uppercase tracking-wider flex items-center gap-2">
+                <h2 className="text-sm font-semibold text-neutral-300 uppercase tracking-wider flex items-center gap-2">
                   <IconTag size={14} />
                   Tags
-                </h3>
-                <div className="flex flex-wrap gap-2">
+                </h2>
+                <ul className="flex flex-wrap gap-2" role="list">
                   {server.registry_tags.map((tag) => (
-                    <Link
-                      key={tag}
-                      href={`/servers?q=${encodeURIComponent(tag)}`}
-                      className="text-xs px-2.5 py-1 rounded-md bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white border border-neutral-700 hover:border-neutral-600 transition-all duration-200"
-                    >
-                      #{tag}
-                    </Link>
+                    <li key={tag}>
+                      <Link
+                        href={`/servers?q=${encodeURIComponent(tag)}`}
+                        className="text-xs px-2.5 py-1 rounded-md bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white border border-neutral-700 hover:border-neutral-600 transition-all duration-200"
+                      >
+                        #{tag}
+                      </Link>
+                    </li>
                   ))}
-                </div>
+                </ul>
               </div>
             )}
 
             {/* Related Servers */}
             {relatedServers.length > 0 && (
               <div className="rounded-xl bg-neutral-900 border border-neutral-800 p-5 space-y-3">
-                <h3 className="text-sm font-semibold text-neutral-300 uppercase tracking-wider">
+                <h2 className="text-sm font-semibold text-neutral-300 uppercase tracking-wider">
                   Related Servers
-                </h3>
-                <div className="space-y-2">
+                </h2>
+                <ul className="space-y-2" role="list">
                   {relatedServers.map((related) => (
-                    <Link
-                      key={related.id}
-                      href={`/servers/${related.slug}`}
-                      className="flex flex-col gap-0.5 p-3 rounded-lg bg-neutral-800/50 hover:bg-neutral-800 border border-neutral-700/50 hover:border-neutral-700 transition-all duration-200 group"
-                    >
-                      <span className="text-white text-sm font-medium group-hover:text-blue-300 transition-colors duration-200 line-clamp-1">
-                        {related.name}
-                      </span>
-                      {related.description && (
-                        <span className="text-neutral-500 text-xs line-clamp-1">
-                          {related.description}
+                    <li key={related.id}>
+                      <Link
+                        href={`/servers/${related.slug}`}
+                        className="flex flex-col gap-0.5 p-3 rounded-lg bg-neutral-800/50 hover:bg-neutral-800 border border-neutral-700/50 hover:border-neutral-700 transition-all duration-200 group"
+                      >
+                        <span className="text-white text-sm font-medium group-hover:text-blue-300 transition-colors duration-200 line-clamp-1">
+                          {related.name}
                         </span>
-                      )}
-                    </Link>
+                        {related.description && (
+                          <span className="text-neutral-500 text-xs line-clamp-1">
+                            {related.description}
+                          </span>
+                        )}
+                      </Link>
+                    </li>
                   ))}
-                </div>
+                </ul>
               </div>
             )}
           </aside>
