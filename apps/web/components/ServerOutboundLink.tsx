@@ -12,16 +12,8 @@
  */
 
 import { trackServerOutboundClick } from "@/lib/analytics";
+import { isSafeHttpUrl } from "@/lib/url";
 import type { ReactNode } from "react";
-
-/** Guard: only allow http and https URLs as outbound hrefs. */
-function isSafeHttpUrl(url: string): boolean {
-  try {
-    return ["http:", "https:"].includes(new URL(url).protocol);
-  } catch {
-    return false;
-  }
-}
 
 interface ServerOutboundLinkProps {
   href: string;
@@ -42,18 +34,15 @@ export function ServerOutboundLink({
 }: ServerOutboundLinkProps) {
   // Reject non-http(s) URLs before rendering an anchor to prevent
   // javascript:, data:, or other unsafe scheme injection.
-  if (!isSafeHttpUrl(href)) {
+  const parsedUrl = isSafeHttpUrl(href);
+  if (!parsedUrl) {
     return <>{children}</>;
   }
 
   function handleClick() {
-    try {
-      // Extract only the hostname — never log full URL with query strings
-      const destinationHost = new URL(href).hostname;
-      trackServerOutboundClick({ server_slug: serverSlug, destination_host: destinationHost });
-    } catch {
-      // Malformed URL — skip tracking, don't block navigation
-    }
+    // Use the already-parsed URL object — no second parse needed.
+    // parsedUrl is non-null here: the early-return guard above ensures it.
+    trackServerOutboundClick({ server_slug: serverSlug, destination_host: parsedUrl!.hostname });
   }
 
   return (
