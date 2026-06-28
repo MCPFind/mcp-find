@@ -1,0 +1,120 @@
+---
+title: "Kubernetes MCP Server: Manage Clusters with Claude"
+description: "Use the Kubernetes MCP server to query pod status, describe deployments, tail logs, and run Helm operations from Claude Code or Cursor without kubectl commands."
+excerpt: "The Kubernetes MCP server bridges AI coding agents and your k8s cluster. We cover the two main implementations, RBAC scoping for production safety, context pinning to prevent staging vs production mix-ups, and what Claude can actually do against a live cluster through MCP. MCPFind indexes 4,450 devtools MCP servers, and Kubernetes tooling is one of the fastest-growing segments."
+date: "2026-06-23"
+updatedAt: "2026-06-23"
+author: "Gus Marquez"
+authorUrl: "https://www.linkedin.com/in/gustavoamarquez"
+authorSameAs:
+  - "https://www.linkedin.com/in/gustavoamarquez"
+tags:
+  - "mcp"
+  - "developer"
+  - "devtools"
+  - "kubernetes"
+  - "devops"
+category: "devtools"
+focusKeyword: "kubernetes mcp server"
+draft: false
+cornerstone: false
+topic_source: new_topic
+faqItems:
+  - question: "What is the difference between containers/kubernetes-mcp-server and mcp-server-kubernetes?"
+    answer: "containers/kubernetes-mcp-server is a Go-based native Kubernetes API implementation with RBAC support, secrets masking, non-destructive mode, and OpenTelemetry tracing. mcp-server-kubernetes wraps kubectl and Helm CLI commands, which is simpler but requires those tools installed on your system."
+  - question: "Does the Kubernetes MCP server require cluster-admin permissions?"
+    answer: "No. The server uses your current kubeconfig context, which means its permissions match whatever the active context allows. For AI agent access, create a dedicated ServiceAccount with a scoped ClusterRole rather than using a high-privilege admin context."
+  - question: "Can the Kubernetes MCP server modify cluster resources?"
+    answer: "Yes, if your kubeconfig allows it. The containers/kubernetes-mcp-server includes a non-destructive mode that prevents delete, patch, and apply operations, making it safe to use against production clusters for read-only debugging workflows."
+  - question: "Does the Kubernetes MCP server work with OpenShift?"
+    answer: "Yes. containers/kubernetes-mcp-server explicitly supports OpenShift alongside standard Kubernetes. The server interacts directly with the Kubernetes API server rather than wrapping CLI tools, so OpenShift clusters work with the same configuration."
+  - question: "How do I prevent the Kubernetes MCP server from touching the wrong cluster?"
+    answer: "Pin the server to a specific kubeconfig context at startup using the context flag. This prevents Claude from operating against whichever context happens to be active in your shell and eliminates the risk of staging commands running against production."
+---
+
+Managing a Kubernetes cluster still means a lot of kubectl commands, context switching, and log tail-chasing across terminal windows. The Kubernetes MCP server changes this: it gives Claude, Claude Code, and Cursor a direct line to your cluster so you can query pods, describe deployments, tail logs, and run Helm operations through natural language. MCPFind indexes 4,450 servers in the [devtools category](/categories/devtools), making it the largest category in the directory. Kubernetes tooling is one of the fastest-growing segments within it. If you are new to MCP and how these integrations work, start with the [MCP overview](/blog/what-is-mcp). This post covers the two main Kubernetes MCP server implementations, how to install them, how to scope permissions safely, and what operations Claude can actually execute against a live cluster.
+
+## What Kubernetes MCP Server Implementations Are Available?
+
+Two main implementations handle the Kubernetes MCP use case, and they take meaningfully different approaches. Understanding the difference determines which fits your production setup.
+
+The first is containers/kubernetes-mcp-server, a Go-based native implementation that talks directly to the Kubernetes API server. You can find it and compare alternatives in the [devtools category on MCPFind](/categories/devtools). It does not wrap kubectl or Helm CLI commands, which means it does not require those tools installed on the machine running the server. It supports RBAC-aware access, a non-destructive mode that blocks mutating operations, automatic secrets masking to prevent credential exposure in MCP responses, and OpenTelemetry tracing for observability. It is distributed via npm and PyPI, so installation is straightforward. The second is Flux159/mcp-server-kubernetes, which wraps kubectl and Helm CLI commands and passes them through to whatever context is active. This approach is simpler to reason about for teams already comfortable with kubectl, but it requires kubectl and Helm installed locally and inherits whatever permissions the current context carries. We use containers/kubernetes-mcp-server in the examples below because the native API approach gives more granular safety controls for production clusters.
+
+## How Do You Install the Kubernetes MCP Server for Claude Code or Cursor?
+
+Installing containers/kubernetes-mcp-server takes one command and a config block. The server is distributed via npm and can be added to Claude Code or Cursor without any separate Go toolchain.
+
+Add this to your Claude Code config at `~/.claude/mcp.json` or your Cursor settings at `.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "kubernetes": {
+      "command": "npx",
+      "args": [
+        "kubernetes-mcp-server@latest",
+        "--kubeconfig", "/path/to/.kube/config",
+        "--context", "my-staging-context"
+      ]
+    }
+  }
+}
+```
+
+The `--context` flag pins the server to a specific kubeconfig context. Without it, the server uses whichever context is active in your shell, which is a production-risk if your terminal is pointed at a live cluster while Claude is answering questions. For read-only debugging workflows, add `--non-destructive` to block any mutating operation at the server level. Restart your client after saving the config. You can verify the connection by asking Claude to list namespaces or describe a running deployment. Both are fast read operations that confirm the server can reach the cluster.
+
+## How Do You Scope RBAC Permissions for AI Agent Access to Your Cluster?
+
+The real enforcement layer for Kubernetes MCP is RBAC, not the MCP server itself. We recommend creating a dedicated ServiceAccount with a scoped ClusterRole rather than pointing the server at your admin credentials.
+
+A minimal read-only RBAC setup for AI-assisted debugging looks like this:
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: mcp-reader
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services", "namespaces", "events", "configmaps"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "statefulsets"]
+    verbs: ["get", "list"]
+```
+
+Bind this role to a ServiceAccount, generate a kubeconfig for that account, and use it as your MCP server's kubeconfig. This means even if Claude sends an unexpected delete or patch command, the API server rejects it at the RBAC layer before the operation reaches any resource. For teams that want to allow Helm operations and rollouts, expand the role incrementally and audit what Claude actually uses before broadening permissions. The [devops MCP server roundup](/blog/best-mcp-servers-devops-cicd) covers how similar permission scoping works across GitHub, Terraform, and other infrastructure MCP servers.
+
+## What Can Claude Do With Your Kubernetes Cluster Through MCP?
+
+Once connected with an appropriate kubeconfig, Claude can handle a significant portion of day-to-day cluster observability tasks without you opening a terminal.
+
+Read operations work immediately with the minimal ClusterRole above: listing pods by namespace, describing deployment rollout status, reading pod logs, checking resource requests and limits, querying events for recent errors, and inspecting ConfigMaps. These cover most debugging workflows, including identifying CrashLoopBackOff causes, reading resource quotas, and checking whether a deployment has the right number of ready replicas. With write permissions added to the ClusterRole, Claude can also annotate resources, trigger rolling restarts, apply patches to deployments, and run Helm upgrade operations. The containers/kubernetes-mcp-server also includes a built-in `/k8s-diagnose` prompt that kicks off a structured troubleshooting workflow when you describe a problem in plain language, pulling relevant pod logs, events, and resource states automatically. We have found this particularly useful for debugging service connectivity issues that would otherwise require five or six separate kubectl commands. See the [GitHub MCP server guide](/blog/github-mcp-server-claude-code-tutorial) for a pattern on combining code repository and infrastructure MCP access in Claude Code.
+
+## How Do You Prevent Context Mix-ups Between Staging and Production?
+
+Context mix-ups are the most common production incident pattern for Kubernetes MCP setups. You ask Claude to delete stuck pods in staging, and the command runs against production because your shell context switched earlier in the session.
+
+The mitigation is to always pin the server to an explicit context at startup using the `--context` flag, as shown in the configuration above. This means the Kubernetes MCP server always operates against the same cluster regardless of what your terminal is doing. For teams with multiple environments, we recommend running separate MCP server instances per environment: one config entry for staging, one for production, each pinned to its own context and named clearly in the config. In Claude Code, you can then reference the server by name when asking questions. For production-only access, combine context pinning with the `--non-destructive` flag so the production instance is structurally read-only even if a broad ClusterRole is in use. Pair this with the same permission model used by your [Terraform MCP server setup](/blog/terraform-mcp-server-iac-guide): separate contexts and read-only defaults for prod, broader permissions gated behind a manual approval for staging changes. The [deploy-via-Docker guide](/blog/deploy-mcp-server-docker-guide) covers containerizing this setup if you want the MCP server running as a sidecar rather than a local process.
+
+## Frequently Asked Questions
+
+### What is the difference between containers/kubernetes-mcp-server and mcp-server-kubernetes?
+
+containers/kubernetes-mcp-server is a Go-based native Kubernetes API implementation with RBAC support, secrets masking, non-destructive mode, and OpenTelemetry tracing. mcp-server-kubernetes wraps kubectl and Helm CLI commands, which is simpler but requires those tools installed on your system.
+
+### Does the Kubernetes MCP server require cluster-admin permissions?
+
+No. The server uses your current kubeconfig context, which means its permissions match whatever the active context allows. For AI agent access, create a dedicated ServiceAccount with a scoped ClusterRole rather than using a high-privilege admin context.
+
+### Can the Kubernetes MCP server modify cluster resources?
+
+Yes, if your kubeconfig allows it. The containers/kubernetes-mcp-server includes a non-destructive mode that prevents delete, patch, and apply operations, making it safe to use against production clusters for read-only debugging workflows.
+
+### Does the Kubernetes MCP server work with OpenShift?
+
+Yes. containers/kubernetes-mcp-server explicitly supports OpenShift alongside standard Kubernetes. The server interacts directly with the Kubernetes API server rather than wrapping CLI tools, so OpenShift clusters work with the same configuration.
+
+### How do I prevent the Kubernetes MCP server from touching the wrong cluster?
+
+Pin the server to a specific kubeconfig context at startup using the context flag. This prevents Claude from operating against whichever context happens to be active in your shell and eliminates the risk of staging commands running against production.

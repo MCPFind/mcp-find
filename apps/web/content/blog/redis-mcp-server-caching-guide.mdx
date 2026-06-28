@@ -1,0 +1,103 @@
+---
+title: "Redis MCP Server: Caching and Real-Time Data for AI Agents"
+description: "Connect your Redis instance to Claude, Cursor, and other AI clients using the official Redis MCP server. Learn setup, data types, and permission scoping."
+excerpt: "The Redis MCP server gives AI agents natural-language access to your Redis data store. MCPFind indexes 414 database MCP servers, and Redis is one of the few backed by an official implementation from Redis, Inc. This guide covers setup, supported data types, read-only scoping, and how it differs from the Redis agent memory server."
+date: "2026-06-22"
+updatedAt: "2026-06-22"
+author: "Adam Bush"
+authorUrl: "https://www.linkedin.com/in/adam-bush/"
+authorSameAs:
+  - "https://www.linkedin.com/in/adam-bush/"
+tags:
+  - "mcp"
+  - "developer"
+  - "databases"
+  - "redis"
+  - "caching"
+category: "databases"
+focusKeyword: "redis mcp server"
+draft: false
+cornerstone: false
+topic_source: new_topic
+faqItems:
+  - question: "Does the Redis MCP server support Redis Cluster and Sentinel?"
+    answer: "The official redis/mcp-redis server connects through a single REDIS_URL. Sentinel and Cluster connection strings work if your underlying Redis client resolves them, but native multi-node topology management is not part of the current tool surface."
+  - question: "Is the Redis MCP server read-only by default?"
+    answer: "No. The server supports both reads and writes by default. To restrict write access, connect with a Redis ACL user that has read-only command permissions, or choose a server build that omits write tools from its tool surface."
+  - question: "Can I use the Redis MCP server with Redis Cloud?"
+    answer: "Yes. Redis publishes a separate redis-mcp-cloud package with additional tools for managing Redis Cloud databases, including creating and deleting instances and querying subscription details. It uses the same REDIS_URL environment variable pattern."
+  - question: "What data types does the Redis MCP server support?"
+    answer: "The server handles strings, hashes, lists, sets, sorted sets, streams, and pub/sub channels. It also supports key scanning with pattern matching, TTL inspection, and time-series data through compatible Redis modules installed on your instance."
+  - question: "What is the difference between redis/mcp-redis and redis/agent-memory-server?"
+    answer: "redis/mcp-redis gives AI agents access to your existing Redis data store. redis/agent-memory-server is a separate project purpose-built for AI agent memory, with long-term storage, sessions, and namespace isolation. They serve different use cases and can run side by side."
+---
+
+Redis powers session caches, rate limiters, leaderboards, task queues, and pub/sub messaging in millions of production stacks. If you use Claude, Cursor, or another MCP-compatible AI client, you can now query and write to Redis in plain English instead of raw commands. The official Redis MCP server, maintained by Redis, Inc., gives your agent a natural-language interface to your full data store. MCPFind indexes 414 database MCP servers in its [databases category](/categories/databases), and Redis is one of the few entries with an officially supported implementation. If you are new to how these integrations work, the [MCP overview](/blog/what-is-mcp) explains the protocol. This guide covers what the server connects, how to set it up, which data structures it supports, and how to keep production access safe.
+
+## What Does the Redis MCP Server Connect to Your AI Agent?
+
+The Redis MCP server connects a running Redis instance to any MCP-compatible AI client and exposes your key-value store through natural-language queries. Once configured, you can ask Claude to check a session key, scan keys that match a prefix, inspect a sorted set, or peek at a message queue without writing a single Redis command.
+
+Unlike SQL-focused database MCP servers, Redis does not have tables or schemas. The server maps natural-language requests to Redis commands and returns raw data. This makes it well-suited for reading application state, debugging cache behavior, checking rate-limit counters, and tracing message queue contents. The [databases category on MCPFind](/categories/databases) lists 414 servers across SQL, NoSQL, vector stores, and in-memory options. [Supabase](/servers/com-supabase-mcp) tops the category at 2,556 GitHub stars as a PostgreSQL-based option, while Redis fills a distinct niche for cache-layer and real-time data access. Knowing which category of server fits your workflow first saves time before you commit to a setup.
+
+## How Do You Install and Configure the Redis MCP Server in Claude Desktop?
+
+Installing the Redis MCP server requires `uvx` and a running Redis instance with its connection URL available. Redis, Inc. maintains the server at github.com/redis/mcp-redis and recommends uvx to avoid a global package install.
+
+Add this block to your Claude Desktop config at `~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "redis": {
+      "command": "uvx",
+      "args": ["mcp-redis"],
+      "env": {
+        "REDIS_URL": "redis://localhost:6379"
+      }
+    }
+  }
+}
+```
+
+For TLS connections, replace `redis://` with `rediss://` and include credentials in the URL. For Redis Cloud, swap in your cloud endpoint. For Cursor, place the same block in `.cursor/mcp.json`. After saving and restarting your client, the Redis tools appear in your AI agent's tool list. Verify the connection by asking Claude to list keys or run an INFO command. Both are non-destructive and confirm the server is reachable before you run any data queries.
+
+## What Redis Data Structures Can You Query Through MCP?
+
+The Redis MCP server exposes tools for all major Redis data structures, not just simple string gets and sets. You can read and write strings, hashes, lists, sets, sorted sets, and streams. Pub/sub channel access is included, so your agent can publish to or subscribe from active Redis Streams workflows.
+
+For caching use cases, the most practical operations are key scanning with pattern matching, TTL inspection, and hash field reads. If you are debugging a slow cache, ask Claude to scan for keys matching a prefix, check expiration times, and compare values against expected outputs. For task queue monitoring, list operations let your agent check queue depth and peek at the front without dequeuing. Sorted sets are useful for leaderboard queries and priority queues, and streams give read access to append-only event logs. Time-series data through compatible Redis modules is also queryable if your instance has those modules installed. This range of access makes Redis MCP a practical complement to SQL-oriented servers like the [MySQL MCP server](/blog/mysql-mcp-server-setup-guide) or the [PostgreSQL options covered in the databases roundup](/blog/best-database-mcp-servers).
+
+## How Do You Restrict Redis MCP to Read-Only Access in Production?
+
+The Redis MCP server allows both reads and writes by default, which is acceptable for development but risky in shared or production environments. You have two practical options for restricting access.
+
+The first option is Redis ACL users. Create a dedicated user with read-only command permissions and point the server's REDIS_URL at that user's credentials. A properly scoped ACL user can only run GET, HGET, LRANGE, SMEMBERS, SCAN, and similar read commands, blocking your agent from accidentally deleting keys, flushing databases, or publishing to production channels. Set this up with `ACL SETUSER mcp-reader on >password ~* &* +@read` in the Redis CLI. The second option is network-level isolation: run the Redis MCP server against a read-only replica rather than your primary instance. This prevents writes at the infrastructure level rather than relying on command filtering alone. For lower-risk workflows like debugging or monitoring a staging environment, neither restriction is strictly required. For any agent operating against shared production data, the ACL approach is the safer default.
+
+## What Is the Difference Between redis/mcp-redis and redis/agent-memory-server?
+
+Redis maintains two separate MCP-related projects that serve different purposes. The standard mcp-redis server provides direct access to your existing Redis data, useful for reading application state, debugging cache behavior, and managing message queues. The separate redis/agent-memory-server is purpose-built for AI agent memory, providing long-term storage, session management, and namespace isolation designed specifically for agents that need persistent state across conversations.
+
+If your goal is to give Claude read or write access to your application's Redis instance, use mcp-redis. If you are building an agent that needs its own memory separate from your application data, agent-memory-server is the right fit. The two can run at the same time, with agent-memory-server pointing to a dedicated Redis namespace while mcp-redis connects to your application database. For a broader view of database access options in the MCP ecosystem, the [Supabase MCP deep dive](/blog/supabase-mcp-server-deep-dive) and the [MongoDB MCP server guide](/blog/mongodb-mcp-server-guide) show how other data stores handle similar access patterns through MCP.
+
+## Frequently Asked Questions
+
+### Does the Redis MCP server support Redis Cluster and Sentinel?
+
+The official redis/mcp-redis server connects through a single REDIS_URL. Sentinel and Cluster connection strings work if your underlying Redis client resolves them, but native multi-node topology management is not part of the current tool surface.
+
+### Is the Redis MCP server read-only by default?
+
+No. The server supports both reads and writes by default. To restrict write access, connect with a Redis ACL user that has read-only command permissions, or choose a server build that omits write tools from its tool surface.
+
+### Can I use the Redis MCP server with Redis Cloud?
+
+Yes. Redis publishes a separate redis-mcp-cloud package with additional tools for managing Redis Cloud databases, including creating and deleting instances and querying subscription details. It uses the same REDIS_URL environment variable pattern.
+
+### What data types does the Redis MCP server support?
+
+The server handles strings, hashes, lists, sets, sorted sets, streams, and pub/sub channels. It also supports key scanning with pattern matching, TTL inspection, and time-series data through compatible Redis modules installed on your instance.
+
+### What is the difference between redis/mcp-redis and redis/agent-memory-server?
+
+redis/mcp-redis gives AI agents access to your existing Redis data store. redis/agent-memory-server is a separate project purpose-built for AI agent memory, with long-term storage, sessions, and namespace isolation. They serve different use cases and can run side by side.
