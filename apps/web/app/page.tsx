@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { AuroraBackground } from "@/components/aceternity/aurora-background";
 import { ServerCard } from "@/components/ui/server-card";
@@ -11,8 +12,8 @@ import { getTopServers, getServerCount, listServers } from "@/lib/queries";
 import { getQualityStatus } from "@/lib/quality-status";
 import { CATEGORIES, CATEGORY_LABELS, SITE_URL, FALLBACK_SERVER_COUNT_DISPLAY } from "@mcpfind/shared";
 import type { Category, ServerListItem } from "@mcpfind/shared";
-import { HomeFaq } from "@/components/ui/home-faq";
 import { HOME_FAQS } from "@/lib/home-faqs";
+import { ORGANIZATION_SAMEAS } from "@/lib/org";
 import { KNOWN_LANGUAGES } from "@/lib/filter-utils";
 import {
   IconDatabase,
@@ -44,6 +45,13 @@ import {
   IconShoppingCart,
 } from "@tabler/icons-react";
 
+// HomeFaq is code-split for bundle efficiency but SSR-enabled so FAQ text is
+// in the initial HTML — required for FAQPage JSON-LD rich-result eligibility.
+const HomeFaq = dynamic(
+  () => import("@/components/ui/home-faq").then((m) => ({ default: m.HomeFaq })),
+  { ssr: true }
+);
+
 // Static metadata — description uses a conservative number to avoid drift.
 // The live serverCount from Supabase is shown dynamically in the hero section.
 export async function generateMetadata(): Promise<Metadata> {
@@ -56,11 +64,18 @@ export async function generateMetadata(): Promise<Metadata> {
   const countStr = serverCount > 0
     ? `${serverCount.toLocaleString()}+`
     : FALLBACK_SERVER_COUNT_DISPLAY;
+  const pageTitle = "MCP Server Directory — Find, Compare & Install MCP Servers";
+  const pageDescription = `Browse, search, and install ${countStr} MCP servers across the ecosystem. One-click configs for Claude Desktop, Cursor, VS Code, Windsurf, and GitHub Copilot.`;
   return {
-    title: "MCPFind — Open-Source MCP Server Directory",
-    description: `Browse, search, and install ${countStr} MCP servers across the ecosystem. One-click configs for Claude Desktop, Cursor, VS Code, Windsurf, and GitHub Copilot.`,
+    title: { absolute: pageTitle },
+    description: pageDescription,
     alternates: {
-      canonical: "https://mcpfind.org",
+      canonical: SITE_URL,
+    },
+    openGraph: {
+      url: SITE_URL,
+      title: pageTitle,
+      description: pageDescription,
     },
   };
 }
@@ -250,7 +265,7 @@ export default async function HomePage() {
               </div>
               <h3 className="font-bold text-neutral-200 mb-2">Rich Tool Documentation</h3>
               <p className="text-neutral-400 text-sm leading-relaxed">
-                Each server entry lists every tool it exposes — from read_file to kubernetes_deploy — so you know exactly what capabilities you're adding to your AI. Complete with transport type, version history, and configuration examples.
+                Each server entry lists every tool it exposes &mdash; from read_file to kubernetes_deploy &mdash; so you know exactly what capabilities you&apos;re adding to your AI. Complete with transport type, version history, and configuration examples.
               </p>
             </div>
           </div>
@@ -624,13 +639,14 @@ export default async function HomePage() {
                 "@id": `${SITE_URL}/#organization`,
                 "name": "MCP Find",
                 "url": SITE_URL,
-                "sameAs": ["https://github.com/MCPFind/mcp-find", "https://x.com/mcpfind"],
+                "sameAs": ORGANIZATION_SAMEAS,
               },
               {
                 "@type": "WebSite",
                 "@id": `${SITE_URL}/#website`,
                 name: "MCP Find",
                 url: SITE_URL,
+                "inLanguage": "en",
                 description:
                   "Open-source directory of MCP servers. AI-agent optimized. Get instant install configs for Claude Desktop, Cursor, VS Code, Windsurf, and Claude Code.",
                 publisher: { "@id": `${SITE_URL}/#organization` },

@@ -9,11 +9,20 @@ import {
   IconRocket,
 } from "@tabler/icons-react";
 import { SubmitForm } from "@/components/SubmitForm";
+import { safeJsonLd } from "@/lib/json-ld";
+
+const PAGE_TITLE = `Submit Your MCP Server | ${SITE_NAME}`;
+const PAGE_DESCRIPTION = "Add your MCP server to the open-source directory used by thousands of AI developers. Submit via GitHub PR — no account required, reviewed within 48 hours.";
 
 export const metadata: Metadata = {
-  title: `Submit Your MCP Server | ${SITE_NAME}`,
-  description: "Add your MCP server to the open-source directory used by thousands of AI developers. Submit via GitHub PR — no account required, reviewed within 48 hours.",
+  title: PAGE_TITLE,
+  description: PAGE_DESCRIPTION,
   alternates: { canonical: `${SITE_URL}/submit` },
+  openGraph: {
+    title: PAGE_TITLE,
+    description: PAGE_DESCRIPTION,
+    url: `${SITE_URL}/submit`,
+  },
 };
 
 export default function SubmitPage() {
@@ -109,6 +118,21 @@ export default function SubmitPage() {
           </p>
         </div>
       </div>
+
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: safeJsonLd({
+            "@context": "https://schema.org",
+            "@type": "WebPage",
+            "@id": `${SITE_URL}/submit#webpage`,
+            "name": PAGE_TITLE,
+            "description": PAGE_DESCRIPTION,
+            "url": `${SITE_URL}/submit`,
+            "isPartOf": { "@id": `${SITE_URL}/#website` },
+          }),
+        }}
+      />
     </div>
   );
 }

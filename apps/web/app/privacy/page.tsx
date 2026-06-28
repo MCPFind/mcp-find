@@ -166,7 +166,7 @@ export default function PrivacyPage() {
                 <ul className="text-sm list-disc list-inside ml-2 space-y-0.5">
                   <li>
                     <code className="text-blue-300 text-xs">category</code> — category enum or
-                    empty string for "All Categories"
+                    empty string for &ldquo;All Categories&rdquo;
                   </li>
                   <li>
                     <code className="text-blue-300 text-xs">results_count</code> — bucketed integer:{" "}
