@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import Script from "next/script";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import { SITE_URL } from "@mcpfind/shared";
 
@@ -100,6 +101,8 @@ export default function RootLayout({
             })(window, document, "clarity", "script", "w4hafhct20");
           `}
         </Script>
+        {/* Vercel Speed Insights — real-user CWV/LCP RUM */}
+        <SpeedInsights />
       </body>
     </html>
   );
