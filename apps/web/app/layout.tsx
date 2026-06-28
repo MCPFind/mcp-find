@@ -77,12 +77,12 @@ export default function RootLayout({
       </head>
       <body className={`${inter.variable} font-sans antialiased bg-black text-white`}>
         {children}
-        {/* Google Analytics 4 */}
+        {/* Google Analytics 4 — lazyOnload defers GTM until after idle to reduce bandwidth contention before first paint (LCP) */}
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-LLD1VR2K5Z"
-          strategy="afterInteractive"
+          strategy="lazyOnload"
         />
-        <Script id="ga4-init" strategy="afterInteractive">
+        <Script id="ga4-init" strategy="lazyOnload">
           {`
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}
