@@ -1,0 +1,141 @@
+---
+title: "MCP Server Directories Compared: Glama, Smithery, mcp.so, MCPFind, and More"
+seoTitle: "MCP Server Directories Compared (2026)"
+description: "A fair, data-driven comparison of the major MCP server directories: Glama, Smithery, mcp.so, MCPFind, the official registry, and more. Covers server counts, quality signals, discovery vs deployment, and which fits your workflow."
+excerpt: "Six MCP directories have emerged since the protocol launched, and they are not interchangeable. Glama leads on scale and grading. Smithery adds hosting. The official registry is a machine API, not a browsable UI. MCPFind optimizes for fast client-specific installation. This comparison breaks down what each directory actually does well."
+date: "2026-06-28"
+updatedAt: "2026-06-28"
+author: "Gus Marquez"
+authorUrl: "https://www.linkedin.com/in/gustavoamarquez"
+authorSameAs:
+  - "https://www.linkedin.com/in/gustavoamarquez"
+tags:
+  - "mcp"
+  - "comparison"
+  - "directory"
+  - "developer"
+category: "other"
+focusKeyword: "mcp server directories compared"
+draft: true
+cornerstone: true
+topic_source: new_topic
+cluster: architecture
+faqItems:
+  - question: "Which MCP directory has the most servers?"
+    answer: "Glama leads with approximately 49,837 indexed servers as of mid-2026, followed by mcp.so at around 22,924. MCPFind indexes 13,941 servers with active dead-link pruning, which means a higher proportion of those listings are functional rather than pointing to abandoned repositories."
+  - question: "What is the official MCP registry and how is it different from directories?"
+    answer: "The official MCP registry at registry.modelcontextprotocol.io is a machine-readable API maintained by Anthropic, GitHub, and Microsoft. It is not a browsable directory. Developers query it programmatically to discover servers by namespace. It uses reverse-DNS naming and GitHub OIDC for namespace authentication, making it infrastructure for tooling rather than a place to browse."
+  - question: "Is Smithery safe to use for MCP server hosting?"
+    answer: "Smithery has strong reviews (4.79/5) and offers genuine value for teams that need managed hosting and do not want to maintain local processes. A March 2026 security scan of sampled servers found that 22% had security findings. Smithery is the hosting platform rather than the author of those servers, so evaluating the individual server's code before use matters regardless of which directory you find it in."
+  - question: "What makes MCPFind different from other MCP directories?"
+    answer: "MCPFind focuses on the step between finding a server and running it. Every listing includes ready-to-paste configuration blocks for five clients: Claude Desktop, Claude Code, Cursor, VS Code with GitHub Copilot, and Windsurf. The directory also publishes 95 setup guides, tool-level documentation, and automatically removes listings with dead GitHub repository links."
+---
+
+Six MCP server directories now compete for the same developers, and they are not interchangeable. Glama catalogs nearly 50,000 servers with quality grades and an in-browser inspector. The official registry from Anthropic, GitHub, and Microsoft is an API that most developers have never visited. Smithery hosts servers directly and ships a CLI. MCPFind produces five-client install configs and 95 setup guides. mcp.so runs on community contributions. Each solves a different problem, and picking the wrong one adds friction to a workflow that should be fast. This comparison uses data from each directory to map who does what well and where each one falls short.
+
+## Why Server Count Is a Misleading Benchmark
+
+The most commonly cited stat across MCP directories is total server count. Glama lists approximately 49,837 servers. mcp.so shows around 22,924. MCPFind indexes 13,941. MCP Surge has around 12,698 across 42-plus categories. The official registry sits at roughly 9,652. mcpservers.org counts about 9,445. Smithery hosts around 6,000-plus. The awesome-mcp-servers GitHub list, maintained by punkpeye and carrying 89.9K stars, holds roughly 700 to 1,000 curated entries.
+
+These numbers measure different things. A large directory built from automated GitHub scraping catches abandoned repos, one-commit experiments, and servers whose underlying APIs no longer exist. Glama syncs from the awesome-mcp-servers list as one upstream source alongside its own crawls, so its high count reflects breadth of discovery rather than independently verified quality for every entry. A pruned directory trades headline count for accuracy. MCPFind runs automated checks to remove listings with dead GitHub links, meaning a smaller index where a higher percentage of listings actually install today.
+
+The practical question is not which directory lists the most servers but how many of those servers would run if you tried to install them this afternoon.
+
+## The Discovery-to-Deployment Gap
+
+Finding a server is step one. Running it in your specific AI client is step two. Most directories stop at step one.
+
+A typical directory page shows a server name, description, GitHub link, and star count. That is enough to confirm the server exists. Getting it running in Claude Desktop requires a JSON config block with the right command, args, and env keys. Getting it into Cursor requires a slightly different format. VS Code with GitHub Copilot has its own syntax. Windsurf differs again. Developers copy-paste examples from documentation, GitHub readmes, and forum posts, often getting the format wrong on the first attempt.
+
+MCPFind addresses this directly at the listing level. Every server page includes ready-to-paste configuration blocks for Claude Desktop, Claude Code, Cursor, VS Code with GitHub Copilot, and Windsurf. The correct format appears without requiring the developer to read spec documentation first. The [guides section](/guides) extends this with 95 step-by-step setup articles covering individual server types and client-specific edge cases.
+
+Smithery takes a different approach at the deployment layer. The `smithery install` CLI handles installation programmatically, and for servers that Smithery hosts directly, you receive a managed endpoint rather than a local process to configure. The Toolbox meta-MCP lets you access multiple Smithery-hosted servers through a single connection.
+
+Glama solves the deployment gap at the other end with a hosted gateway. For supported clients, Claude Desktop, Cursor, and Claude Code, you connect to Glama's endpoint rather than running the server yourself. That eliminates local configuration entirely for servers inside Glama's network.
+
+## What the Official MCP Registry Actually Is
+
+The official MCP registry at registry.modelcontextprotocol.io generates confusion because its name sounds like a browsable directory. It is not. The registry is a machine-readable API backed by Anthropic, GitHub, and Microsoft.
+
+Developers query the registry programmatically to discover servers by namespace. Authentication uses reverse-DNS naming conventions and GitHub OIDC, which lets namespace owners prove they control a domain or GitHub organization before claiming a namespace. This prevents anyone from registering `com.stripe.mcp` or `io.github.anthropic` without proving that affiliation.
+
+For AI clients and tooling that need to auto-discover servers in code, the registry provides the canonical source of truth. For a developer browsing to find a Notion integration to try this afternoon, it provides nothing without a client that surfaces its data. Think of it as the DNS layer for MCP servers: essential infrastructure, invisible in day-to-day use.
+
+## Quality and Trust Signals Across Directories
+
+Every directory answers the question "how do I know this server is worth using?" differently.
+
+Glama uses A through F quality grades based on criteria including documentation completeness, repository health, and tool schema quality. That grading layer, combined with an in-browser inspector that lets you test a server's tools before installing, gives Glama the strongest pre-install evaluation flow of any public directory.
+
+The awesome-mcp-servers GitHub list earns trust differently: through star counts and the reputation of the list maintainer. With 89.9K stars on the list itself, inclusion carries social proof that a repository with 12 stars on its own cannot replicate. The tradeoff is that curation moves at human speed, so new quality servers lag before appearing.
+
+The official registry's namespace authentication provides a different kind of trust signal. A server claiming the `com.stripe.mcp` namespace has had that claim verified against Stripe's actual domain ownership. That does not guarantee code quality, but it eliminates impersonation.
+
+Smithery carries a 4.79 out of 5 star rating from user reviews, which reflects hosting quality and developer experience. A separate concern sits below that rating: a March 2026 security scan of sampled servers in Smithery's directory found that 22% had security findings. Smithery is the hosting platform rather than the author of the server code, but the stat points to a gap that no directory has fully closed. Community-sourced server code requires independent review regardless of the platform hosting it.
+
+MCPFind's quality signal is operational rather than evaluative: live link pruning removes servers with dead repositories automatically. That confirms what currently exists rather than whether the code is good, but it reduces the time a developer spends clicking dead links in search results.
+
+## How Each Directory Compares
+
+| Directory | Servers | Browsable UI | Install Help | Quality Signal | Hosting | Open Source |
+|---|---|---|---|---|---|---|
+| Glama | ~49,837 | Yes, A-F grades + inspector | Hosted gateway for 3 clients | A-F grading | Yes (gateway) | No |
+| mcp.so | ~22,924 | Yes | GitHub link only | Star count | No | No |
+| MCPFind | ~13,941 | Yes, 95 guides | 5-client copy-paste configs | Live link pruning | No | Yes |
+| MCP Surge | ~12,698 | Yes, 42+ categories | GitHub link only | Category tags | No | No |
+| Official Registry | ~9,652 | No (API only) | Machine-readable metadata | Namespace auth | No | Spec is open |
+| mcpservers.org | ~9,445 | Yes | GitHub link only | Curated (some sponsored) | No | No |
+| Smithery | ~6,000+ | Yes | CLI + hosted endpoints | 4.79/5 user reviews | Yes | No |
+| awesome-mcp-servers | ~700-1,000 | GitHub list | GitHub link only | 89.9K list stars | No | Yes |
+
+## Curation vs Comprehensiveness
+
+The tradeoff between broad indexing and careful curation runs through every directory decision.
+
+Comprehensive indexes like Glama and mcp.so catch new servers faster and give developers a better chance of finding something niche. The cost is signal-to-noise: a search for a Snowflake integration returns results alongside unmaintained forks and servers with broken dependencies unless the directory has a grading or pruning layer on top.
+
+Curated indexes like awesome-mcp-servers and mcpservers.org invert this. Their smaller counts reflect deliberate inclusion decisions. A server that clears the bar for the awesome-mcp-servers list has been looked at by a human. The tradeoff is coverage: specialized servers from smaller teams may never appear, and the review queue creates lag between a server shipping and being discoverable.
+
+Live pruning sits between these approaches. Removing dead links reduces noise without requiring manual review for every entry, but it does not catch low-quality servers with functional repositories.
+
+Neither model is objectively correct. A developer evaluating ten candidate servers before picking one benefits from a grading system like Glama's. A developer who already knows the server name and needs the install config benefits from a directory that serves that immediately.
+
+## AI Discoverability and Structured Data
+
+An emerging concern for MCP directories is whether AI agents can discover them programmatically. Traditional search optimization targets crawlers. Generative Engine Optimization, GEO for short, targets the retrieval systems that AI tools use when answering questions or routing tool discovery.
+
+Directories that expose structured data, `llms.txt` files, and machine-readable server metadata make themselves queryable by AI agents that want to find tools programmatically. The official registry is the most explicit example: it exists specifically to serve machine queries, not human browsers. For directories targeting developers who already use AI assistants as part of their research workflow, this layer is increasingly relevant to long-term discoverability.
+
+## Which Directory Fits Your Workflow
+
+No single directory wins across all dimensions, and most developers end up using more than one.
+
+Glama wins on scale, grading depth, and the in-browser inspector. Use it when you want to evaluate a server's tool quality before committing to an installation, or when you want a hosted endpoint for Claude Desktop, Cursor, or Claude Code without running a local process. It is the best choice for surveying an unfamiliar category before committing.
+
+The official registry wins on authority and machine readability. Use it if you are building tooling that needs to discover servers programmatically or if namespace verification matters for your security requirements. It is not the right place to browse casually.
+
+Smithery wins on managed hosting. If you want a server running in the cloud without provisioning infrastructure yourself, the `smithery install` path and Toolbox meta-MCP reduce setup time meaningfully. Review the specific server's code independently given the security scan data.
+
+awesome-mcp-servers wins on community trust. An 89.9K-star list carries social proof that no automated index replicates. Use it as a signal layer on top of a larger directory when you want to know which servers the community has genuinely endorsed.
+
+MCPFind wins on the installation step for developers working across multiple AI clients. The [categories section](/categories) organizes 13,941 servers across domains including [devtools](/categories/devtools), [databases](/categories/databases), and [productivity](/categories/productivity). Every listing includes the exact JSON config block for each of five clients. The [guides](/guides) cover server-specific setup with client-by-client instructions. For developers moving between Claude Desktop, Cursor, VS Code with Copilot, and Windsurf, having the correct per-client format in one place removes a lookup step from every new server install.
+
+The directories that serve you best depend on where you spend your time in the workflow. For evaluation and scale, start at Glama. For installation into a specific client, use MCPFind. For programmatic tooling, query the official registry. For community validation, check awesome-mcp-servers. For managed hosting, evaluate Smithery alongside the server's own code.
+
+## Frequently Asked Questions
+
+### Which MCP directory has the most servers?
+
+Glama leads with approximately 49,837 indexed servers as of mid-2026, followed by mcp.so at around 22,924. MCPFind indexes 13,941 servers with active dead-link pruning, meaning a higher proportion of those listings are functional rather than pointing to abandoned repositories.
+
+### What is the official MCP registry and how is it different from directories?
+
+The official MCP registry at registry.modelcontextprotocol.io is a machine-readable API maintained by Anthropic, GitHub, and Microsoft. It is not a browsable directory. Developers query it programmatically to discover servers by namespace, using reverse-DNS naming and GitHub OIDC for namespace authentication.
+
+### Is Smithery safe to use for MCP server hosting?
+
+Smithery has strong reviews (4.79/5) and offers genuine value for teams that need managed hosting. A March 2026 security scan found that 22% of sampled servers had security findings. Smithery is the hosting platform rather than the server code author, so evaluating the individual server's code before use matters regardless of which directory you find it in.
+
+### What makes MCPFind different from other MCP directories?
+
+MCPFind focuses on the step between finding a server and running it. Every listing includes copy-paste configuration for five clients: Claude Desktop, Claude Code, Cursor, VS Code with GitHub Copilot, and Windsurf. The directory also includes 95 guides, tool-level documentation, and automated removal of servers with dead repository links.
