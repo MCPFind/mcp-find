@@ -16,3 +16,10 @@ servers:
     description: "X and Twitter automation MCP server for tweet search, profile tweets, follower export, media workflows, webhooks, and confirmation-gated posting."
     package_type: "npm"
     category: "communication"
+  - name: "x402 Crypto Price Tracker"
+    github_url: "https://github.com/AmitabhainArunachala/x402-revenue-dojo-api"
+    package_name: "x402-crypto-price-tracker"
+    description: "Agent-payable crypto market data and revenue intelligence over HTTP 402/x402. 9 paid endpoints ($0.01-$1.00 USDC on Base), 4 MCP tools (revenue scanner, x402 auditor, bounty finder, dealwork scout). No API keys — agents pay per call via EIP-3009."
+    package_type: "pypi"
+    category: "finance"
+
