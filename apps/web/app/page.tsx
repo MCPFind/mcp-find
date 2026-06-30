@@ -614,6 +614,8 @@ export default async function HomePage() {
             </div>
 
             {/* Browse — first 5 categories */}
+            {/* Links point to /categories/<slug> so crawlers index the canonical */}
+            {/* category pages. The interactive filter cards above are unchanged. */}
             <div>
               <h4 className="text-sm font-semibold text-neutral-300 mb-4">
                 Browse
@@ -622,7 +624,7 @@ export default async function HomePage() {
                 {CATEGORIES.slice(0, 5).map((cat: string) => (
                   <li key={cat}>
                     <Link
-                      href={`/servers?category=${encodeURIComponent(cat)}`}
+                      href={`/categories/${cat}`}
                       className="text-neutral-500 hover:text-neutral-300 text-sm transition-colors duration-200"
                     >
                       {CATEGORY_LABELS[cat as Category]}
@@ -641,7 +643,7 @@ export default async function HomePage() {
                 {CATEGORIES.slice(5).map((cat: string) => (
                   <li key={cat}>
                     <Link
-                      href={`/servers?category=${encodeURIComponent(cat)}`}
+                      href={`/categories/${cat}`}
                       className="text-neutral-500 hover:text-neutral-300 text-sm transition-colors duration-200"
                     >
                       {CATEGORY_LABELS[cat as Category]}
