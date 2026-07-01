@@ -1,0 +1,119 @@
+---
+title: "AWS MCP Server: Manage Cloud Resources from Claude"
+description: "The AWS MCP server lets Claude query EC2 instances, manage S3 buckets, read CloudWatch logs, and more. Set up AWS CLI credentials and start your first session in minutes."
+excerpt: "AWS Labs maintains a suite of official MCP servers covering Bedrock, CDK, Lambda, S3, and more. This guide explains which server to choose for your use case, how to scope IAM permissions safely, and what Claude can actually do once connected to your AWS account."
+date: "2026-06-24"
+updatedAt: "2026-06-24"
+author: "Adam Bush"
+authorUrl: "https://www.linkedin.com/in/adam-bush/"
+authorSameAs:
+  - "https://www.linkedin.com/in/adam-bush/"
+tags:
+  - "mcp"
+  - "developer"
+  - "cloud"
+  - "aws"
+  - "infrastructure"
+category: "cloud"
+focusKeyword: "aws mcp server"
+draft: false
+cornerstone: false
+topic_source: new_topic
+faqItems:
+  - question: "Does AWS have an official MCP server?"
+    answer: "Yes. AWS Labs maintains a collection of official MCP servers on GitHub under the awslabs organization. These cover services including Amazon Bedrock, AWS CDK, Lambda, S3, and CloudWatch. Each server is a standalone package you install via npm or Python pip."
+  - question: "What IAM permissions does the AWS MCP server need?"
+    answer: "It depends on which AWS MCP server you are running. The CDK server needs CloudFormation and IAM permissions. The S3 server needs s3:GetObject, s3:ListBucket, and related actions. Always use an IAM role or user with the minimum permissions required for the tools you plan to use, and avoid using root credentials."
+  - question: "Can the AWS MCP server create or modify infrastructure?"
+    answer: "Yes, if you grant write permissions. The CDK MCP server can deploy stacks and the Lambda server can update function code. For exploratory or read-only workflows, attach a read-only policy to the IAM identity so Claude cannot make unintended changes."
+  - question: "How is the AWS MCP server different from using the AWS CLI directly in Claude Code?"
+    answer: "The MCP server is a structured interface: Claude calls named tools (listBuckets, describeLambda) rather than constructing raw CLI commands. This reduces hallucinated flags and makes operations easier to audit. The downside is that not every AWS API is exposed - the CLI still covers the full surface."
+---
+
+If you want to ask Claude why a Lambda function is timing out, list which S3 buckets hold your production data, or deploy a CDK stack without leaving your IDE, the AWS MCP server is how you connect those two things. MCPFind's [cloud category](/categories/cloud) indexes 296 servers with an average of 33 stars each - AWS Labs' official suite sits near the top because it covers the real production use cases developers care about.
+
+This guide explains which AWS MCP server to choose, how to set it up safely, how to scope IAM permissions, and what you can realistically accomplish in a Claude session once everything is connected. If you want background on the protocol before diving in, the [what is MCP primer](/blog/what-is-mcp) covers the fundamentals.
+
+## What Is the AWS MCP Server Suite?
+
+AWS Labs publishes a set of separate MCP servers under a single repository, each targeting a different AWS service. Rather than one catch-all server, you pick the specific tool you need. The core options include a Bedrock Knowledge Bases server for RAG workflows, an AWS CDK server for infrastructure-as-code, an Amazon S3 server for file and object management, a CloudWatch server for logs and metrics, and a Lambda server for function management.
+
+This modular design is intentional. A CDK deployment server needs different permissions than a read-only CloudWatch log reader. Keeping them separate means you can give Claude access to logs without also giving it the ability to deploy infrastructure changes. If you only need CloudWatch access, install only that package - no need to expose CDK tooling at the same time. Each server communicates via stdio transport, which means it runs as a local process on your machine and never exposes credentials over a network connection.
+
+## How to Set Up AWS MCP Servers
+
+Setting up the AWS MCP server starts with your AWS credentials. The servers use the standard AWS credential chain: environment variables, shared credentials file (`~/.aws/credentials`), or an IAM role if you are running from an EC2 instance or container. If you already have the AWS CLI working on your machine, the MCP servers will pick up the same profile.
+
+Install the specific server you need. For the CDK server:
+
+```bash
+npm install -g @aws/aws-cdk-mcp-server
+```
+
+For the S3 and Core AWS server:
+
+```bash
+npm install -g @aws/core-mcp-server
+```
+
+Add it to your MCP configuration file. For Claude Desktop on macOS (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "aws-cdk": {
+      "command": "aws-cdk-mcp-server",
+      "env": {
+        "AWS_PROFILE": "your-profile-name",
+        "AWS_REGION": "us-east-1"
+      }
+    }
+  }
+}
+```
+
+Setting `AWS_PROFILE` explicitly tells the server which profile to use instead of falling back to the default credential chain. This prevents accidental cross-account operations when you have multiple profiles configured. Set `AWS_REGION` to your primary region so list operations return results without requiring a region flag every time.
+
+## How Should You Scope IAM Permissions for Claude?
+
+IAM scoping is the most important step when connecting any AI assistant to your AWS account. The goal is to give Claude exactly what it needs for your workflow - nothing more. For exploratory use (reading logs, listing resources, querying infrastructure state), attach an AWS-managed read-only policy like `ReadOnlyAccess` or build a custom policy limited to Describe, Get, and List actions on the services you care about.
+
+For write-enabled workflows (deploying CDK stacks, updating Lambda code), create a dedicated IAM user or role for Claude sessions. Name it something recognizable like `claude-mcp-agent` so its actions are identifiable in CloudTrail. Attach only the service-level permissions the server's documented tools require. For CDK, that typically means CloudFormation, IAM (limited to role creation for stack resources), and whatever services your stacks deploy.
+
+Never use root credentials or an admin-level access key for MCP server connections. If the session is ever compromised or Claude makes an unintended API call, the damage radius is determined entirely by what the credential can do. A scoped IAM identity limits the worst case.
+
+The concept of minimal IAM permissions for AI agent access is also covered in the [Cloudflare MCP Server guide](/blog/cloudflare-mcp-server-workers-guide) for the cloud deployment side, and in [Kubernetes MCP server setup](/blog/kubernetes-mcp-server-cluster-management) for container infrastructure. The scoping approach is consistent across all of them.
+
+## What Can Claude Do With the AWS MCP Server?
+
+Once the server is connected, the most useful immediate workflows are around observability and investigation. You can ask Claude to pull CloudWatch logs for a specific Lambda function from the last hour, describe the configuration of an ECS service, list the objects in an S3 bucket filtered by prefix, or show which CDK stacks are deployed and their status. These queries replace the cycle of opening the AWS console, navigating to the right service, applying filters, and reading output.
+
+For infrastructure management, the CDK server lets Claude synthesize CloudFormation templates from your CDK code and deploy them. This is particularly useful when you have a complex CDK app and want to ask Claude to compare the synthesized template against the deployed stack and identify what would change in the next deployment. The ability to ask "what is different between my code and what is running?" is not easy to get from the CLI alone. MCPFind's [devtools category](/categories/devtools) indexes 4,524 developer tooling servers; AWS's CDK server is one of the few that covers the full infrastructure deployment loop rather than code editing or testing.
+
+The Bedrock server connects Claude to your Knowledge Bases for RAG workflows. If your organization has indexed internal documentation into a Bedrock Knowledge Base, you can query it through Claude's MCP session rather than building a separate retrieval layer. MCPFind's cloud category shows 296 servers in this space; AWS's official offerings stand out because they are maintained by the service teams and track API changes directly.
+
+## What Are the Limits of the AWS MCP Server?
+
+The AWS MCP servers cover a meaningful but incomplete surface of AWS APIs. Not every service has a dedicated MCP server, and not every API operation within a supported service is exposed as a tool. When you need an operation that is not in the server's tool manifest, you will need to fall back to the AWS CLI, the SDK, or the console.
+
+The servers also do not handle multi-region operations automatically. A list operation returns results for the configured region. If you manage resources across us-east-1 and eu-west-1, you need to either run separate server instances for each region or set up region-switching in your session. This is a known limitation of the current implementation.
+
+For teams running in AWS Organizations, the MCP servers use single-account credentials. Cross-account operations require separate credential configurations for each account, which adds setup overhead but also provides a natural safety boundary. You can read more about MCP architecture trade-offs in the [remote vs local MCP server comparison](/blog/remote-vs-local-mcp-server) if you want to understand how these credential boundaries work across different server models. The [cloud infrastructure overview](/blog/best-mcp-servers-cloud-infrastructure) also covers where AWS fits alongside other cloud provider MCP tools.
+
+## Frequently Asked Questions
+
+### Does AWS have an official MCP server?
+
+Yes. AWS Labs maintains a collection of official MCP servers on GitHub under the awslabs organization. These cover services including Amazon Bedrock, AWS CDK, Lambda, S3, and CloudWatch. Each server is a standalone package you install via npm or Python pip.
+
+### What IAM permissions does the AWS MCP server need?
+
+It depends on which AWS MCP server you are running. The CDK server needs CloudFormation and IAM permissions. The S3 server needs s3:GetObject, s3:ListBucket, and related actions. Always use an IAM role or user with the minimum permissions required for the tools you plan to use, and avoid using root credentials.
+
+### Can the AWS MCP server create or modify infrastructure?
+
+Yes, if you grant write permissions. The CDK MCP server can deploy stacks and the Lambda server can update function code. For exploratory or read-only workflows, attach a read-only policy to the IAM identity so Claude cannot make unintended changes.
+
+### How is the AWS MCP server different from using the AWS CLI directly in Claude Code?
+
+The MCP server is a structured interface: Claude calls named tools (listBuckets, describeLambda) rather than constructing raw CLI commands. This reduces hallucinated flags and makes operations easier to audit. The downside is that not every AWS API is exposed - the CLI still covers the full surface.
