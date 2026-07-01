@@ -1,0 +1,105 @@
+---
+title: "Vercel MCP Server: Deploy Next.js Apps from Claude"
+description: "Learn how the Vercel MCP server lets Claude manage deployments, environment variables, and logs. Step-by-step setup for developers using Claude Code or Cursor."
+excerpt: "The Vercel MCP server gives Claude access to your deployment pipeline. From listing deployments to promoting builds and reading runtime logs, this guide covers the full tool surface and how to wire it up alongside the GitHub MCP server."
+date: "2026-06-22"
+updatedAt: "2026-06-22"
+author: "Gus Marquez"
+authorUrl: "https://www.linkedin.com/in/gustavoamarquez"
+authorSameAs:
+  - "https://www.linkedin.com/in/gustavoamarquez"
+tags:
+  - "mcp"
+  - "developer"
+  - "devops"
+  - "vercel"
+  - "deployment"
+category: "devtools"
+focusKeyword: "vercel mcp server"
+draft: false
+cornerstone: false
+topic_source: new_topic
+faqItems:
+  - question: "Does the Vercel MCP server require a paid plan?"
+    answer: "No. The Vercel MCP server works with any Vercel account, including the free Hobby tier. You just need a personal access token scoped to your projects. Enterprise accounts get additional deployment targets and team permissions."
+  - question: "Can the Vercel MCP server push new code deployments?"
+    answer: "No. It manages existing deployments - promote, rollback, list, inspect - but it does not push code. Use the GitHub MCP server alongside Vercel MCP to create pull requests, which trigger Vercel's CI pipeline automatically."
+  - question: "What tools does the Vercel MCP server expose?"
+    answer: "The core tools cover deployments (list, get, promote, cancel), environment variables (list, add, remove), project info, domains, and log streaming. The exact tool count depends on the server version; check the Vercel docs for the current manifest."
+  - question: "How do I scope the Vercel token to minimize blast radius?"
+    answer: "When generating a token in Vercel's dashboard, choose 'Specific Projects' rather than 'All Projects'. For Claude Code usage, also enable only the permission scopes your workflow needs. Read-only scopes (list, get, logs) are safe for exploratory use; write scopes (promote, env write) should be narrowed to your target project."
+---
+
+The Vercel MCP server connects Claude to your deployment pipeline. Instead of opening the Vercel dashboard to check build status, promote a preview, or read runtime logs, you describe what you want in plain language and Claude handles the API calls. MCPFind's [devtools category](/categories/devtools) indexes 4,524 servers across the deployment and developer tooling space - Vercel's official server is one of the few cloud-provider tools with a complete deployment management surface.
+
+This guide covers the Vercel MCP server's tool surface, setup, token scoping, and how it pairs with the GitHub MCP server for a full CI/CD workflow from Claude Code. If you are new to the protocol, the [what is MCP guide](/blog/what-is-mcp) is the right starting point.
+
+## What Does the Vercel MCP Server Actually Do?
+
+The Vercel MCP server gives Claude access to your deployment API. You can query deployment status, read build logs, manage environment variables, promote preview builds to production, and roll back a broken deploy without leaving your editor. It connects over HTTP using a Vercel personal access token. No local daemon is needed - the server calls Vercel's REST API on your behalf.
+
+The tool surface covers five main areas: deployment lifecycle management (list, inspect, promote, cancel, rollback), environment variable CRUD across preview and production environments, project metadata, custom domain management, and log streaming for runtime error diagnosis. We find the log streaming tool particularly useful in Claude Code: when a deployment behaves unexpectedly in production, asking Claude to pull the last 100 log lines surfaces the root cause faster than navigating the Vercel dashboard.
+
+One thing the server does not do is push code. That job belongs to Git and your CI pipeline. The Vercel MCP server manages what is already deployed, not what gets built. It has no ability to trigger new builds directly; those originate from Git push events or manual re-deploys in the dashboard. It sits in the [devtools category](/categories/devtools) alongside over 4,500 other developer tooling servers - though few cover the full deployment management cycle that Vercel's official server offers. Think of it as a read-write interface to your deployment pipeline rather than a code execution tool.
+
+## How to Set Up the Vercel MCP Server
+
+Setting up the Vercel MCP server takes about five minutes. First, generate a personal access token in your [Vercel dashboard](https://vercel.com/account/settings/tokens) under Account Settings. Scope it to specific projects rather than all projects - this limits the blast radius if the token is ever exposed in a config file.
+
+Add the server to your Claude Desktop or Claude Code configuration:
+
+```json
+{
+  "mcpServers": {
+    "vercel": {
+      "command": "npx",
+      "args": ["-y", "@vercel/mcp-adapter"],
+      "env": {
+        "VERCEL_TOKEN": "your_token_here"
+      }
+    }
+  }
+}
+```
+
+For Claude Code users, the token can also be set as an environment variable in your shell profile. Running `VERCEL_TOKEN=xxx claude` or adding it to `.env` in your project root both work. Restart Claude after adding the config and confirm the server appears in the connected tools list.
+
+If your team uses multiple Vercel orgs, set `VERCEL_TEAM_ID` alongside the token. Without a team ID, the server defaults to your personal account scope.
+
+Vercel does not publish the server as a standalone CLI package yet. The `@vercel/mcp-adapter` approach above goes through npx each time, which means it downloads fresh on first use. For production environments where you need offline reliability, pin the package version in your project's devDependencies and reference it with a relative path in the config instead of using `npx -y`.
+
+## How Does the Vercel MCP Server Pair with the GitHub MCP Server?
+
+The Vercel MCP server handles deployments; the [GitHub MCP server](/blog/github-mcp-server-claude-code-tutorial) handles the code. Together they cover the full CI/CD loop from a single Claude session. A typical workflow: ask Claude to create a pull request for a fix, wait for Vercel's preview deployment to appear, then ask Claude to check the preview URL's deployment logs and promote it once the checks pass.
+
+This pairing works because Vercel's deployments are triggered by Git events. Claude can create the branch and PR through the GitHub MCP server, which kicks off Vercel's CI pipeline. Then the Vercel MCP server gives Claude visibility into that pipeline - build status, log output, and deployment health - without switching tools.
+
+We recommend enabling both servers in the same config block. Keep the GitHub token scoped to the repositories that have Vercel integrations to avoid accidentally triggering builds in unrelated repos. The two-server setup is covered in the [DevOps MCP guide](/blog/best-mcp-servers-devops-cicd) if you want the full stack perspective. For teams using Kubernetes alongside Vercel for non-frontend workloads, the [Kubernetes MCP server guide](/blog/kubernetes-mcp-server-cluster-management) covers how to layer cluster management into the same Claude session.
+
+## What Are the Token Permission Best Practices?
+
+Token scoping is the most important security decision for the Vercel MCP server. Vercel personal access tokens do not support fine-grained permission scopes at the tool level - a token either has access to a project or it does not. This means the scope boundary is at the project level, not the operation level.
+
+Set `scope: specific-projects` when generating the token and select only the projects where Claude should have access. For staging and development environments, a read-only workflow (list, get, logs) is safer than enabling promote and rollback. Only add write permissions when your workflow actively needs them - for example, if Claude is handling automated promotion of QA-approved preview builds.
+
+Rotate the token every 90 days. Vercel's dashboard shows the last-used timestamp for each token, making it easy to identify stale tokens that can be revoked. Never commit the token to a repository; always load it from an environment variable or a secrets manager. For teams with strict secrets management policies, integrate the token retrieval into your workflow using a tool like 1Password CLI or Doppler, both of which expose CLI commands that can populate environment variables at MCP startup time without touching the filesystem.
+
+The [Sentry MCP server](/blog/sentry-mcp-server-error-tracking) pairs well here for post-deployment observability - once a promotion is complete, Claude can check Sentry for any error rate spikes tied to the new build.
+
+## Frequently Asked Questions
+
+### Does the Vercel MCP server require a paid plan?
+
+No. The Vercel MCP server works with any Vercel account, including the free Hobby tier. You just need a personal access token scoped to your projects. Enterprise accounts get additional deployment targets and team permissions.
+
+### Can the Vercel MCP server push new code deployments?
+
+No. It manages existing deployments - promote, rollback, list, inspect - but it does not push code. Use the GitHub MCP server alongside Vercel MCP to create pull requests, which trigger Vercel's CI pipeline automatically.
+
+### What tools does the Vercel MCP server expose?
+
+The core tools cover deployments (list, get, promote, cancel), environment variables (list, add, remove), project info, domains, and log streaming. The exact tool count depends on the server version; check the Vercel docs for the current manifest.
+
+### How do I scope the Vercel token to minimize blast radius?
+
+When generating a token in Vercel's dashboard, choose 'Specific Projects' rather than 'All Projects'. For Claude Code usage, also enable only the permission scopes your workflow needs. Read-only scopes (list, get, logs) are safe for exploratory use; write scopes (promote, env write) should be narrowed to your target project.
