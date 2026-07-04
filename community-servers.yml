@@ -16,3 +16,10 @@ servers:
     description: "X and Twitter automation MCP server for tweet search, profile tweets, follower export, media workflows, webhooks, and confirmation-gated posting."
     package_type: "npm"
     category: "communication"
+ - name: "AIServices"
+ github_url: "https://github.com/vbkotecha/aiservices-api"
+ package_name: "to.aiservices/aiservices"
+ description: "Remote MCP server for AI agents to access x402-paid crypto market data, URL intelligence, on-chain analytics, marketing intelligence, and dispute resolution APIs."
+ package_type: "docker"
+ category: "api-integration"
+
