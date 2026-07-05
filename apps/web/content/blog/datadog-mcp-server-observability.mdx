@@ -1,0 +1,111 @@
+---
+title: "Datadog MCP Server: Observability and Monitoring with Claude"
+description: "Set up the official Datadog MCP server to query metrics, logs, dashboards, and monitors from Claude or Cursor. API key scoping and read-only best practices."
+excerpt: "Datadog has an official MCP server that lets Claude and Cursor query metrics, read logs, check monitors, and surface dashboards. This guide covers installation, authentication, the full tool surface, and how to scope your API key for safe read-only agent access to production observability data."
+date: "2026-07-03"
+updatedAt: "2026-07-03"
+author: "Adam Bush"
+authorUrl: "https://www.linkedin.com/in/adam-bush/"
+authorSameAs:
+  - "https://www.linkedin.com/in/adam-bush/"
+tags:
+  - "mcp"
+  - "developer"
+  - "monitoring"
+  - "datadog"
+  - "observability"
+category: "monitoring"
+focusKeyword: "datadog mcp server"
+draft: false
+cornerstone: false
+topic_source: new_topic
+faqItems:
+  - question: "Is the Datadog MCP server official?"
+    answer: "Yes. The Datadog MCP server is maintained by Datadog Labs (github.com/DataDog/mcp-server-datadog) and documented at docs.datadoghq.com. It is not a community fork. It receives updates from Datadog's engineering team."
+  - question: "What Datadog features can Claude access through the MCP server?"
+    answer: "Claude can query metrics and timeseries data, search and read logs, list and inspect dashboards, check monitor status and alert history, and retrieve infrastructure inventory including host and container metadata."
+  - question: "Does the Datadog MCP server require write permissions?"
+    answer: "No. By default the server is read-only. Write capabilities (muting monitors, creating downtime, posting events) are available but require explicit opt-in during configuration. For most AI agent use cases, read-only access is the appropriate choice."
+  - question: "Can I use the Datadog MCP server alongside other monitoring MCP servers?"
+    answer: "Yes. Teams running Grafana alongside Datadog often configure both servers in the same MCP client. Grafana handles Prometheus-based infrastructure metrics while Datadog covers APM, logs, and business KPIs. Each server runs independently and Claude can query both in the same conversation."
+---
+
+Say you want Claude to dig into an incident, or answer a quick question about how a service is holding up, or glance at an alert and tell you whether it's real. Normally that means copying data out of Datadog and pasting it into a chat window. The Datadog MCP server skips that step. It's an official connection that lets Claude and Cursor talk straight to your Datadog account, querying metrics, reading logs, pulling up dashboards, and checking monitor status. This post walks through what the server can actually do, how to set it up with API keys that won't get you into trouble, and what's worth being careful about when you point an AI agent at production data. Datadog is one of the 178 servers in MCPFind's [monitoring category](/categories/monitoring), and one of the handful there that's fully official and genuinely maintained.
+
+## What Is the Datadog MCP Server and What Tools Does It Expose?
+
+The Datadog MCP server is an official Datadog Labs project (github.com/DataDog/mcp-server-datadog). It takes the core things you'd normally do inside Datadog and turns them into tools Claude can call mid-conversation. No exporting, no tab-switching.
+
+There are five buckets of tools. **Metrics** is the big one: Claude queries timeseries data using the same query language you'd type into the metrics explorer, so you can ask for average latency on a service over the last hour, p95 error rates by region, or this week stacked against last week. **Logs** works the same way, running searches in Datadog's syntax and handing back structured events you can actually talk through. **Dashboards** tools list what you've got and pull the widget definitions along with their data. Want to know if a monitor is firing? The **Monitors** tools give you current status, alert history, and configuration. And **Infrastructure** rounds it out with your host and container inventory, plus tags, agent versions, and the metadata sitting underneath all of it.
+
+Here's the part that matters if you're weighing this against building your own Datadog integration. You don't write a single line of API query code. You ask a question in plain English, Claude writes the query, and Claude reads the answer back to you.
+
+## How Do You Install and Authenticate the Datadog MCP Server?
+
+It's a Python package that runs as a subprocess inside your MCP client. Install it with pip or uv, then drop it into your Claude Desktop or Cursor settings:
+
+```json
+{
+  "mcpServers": {
+    "datadog": {
+      "command": "uvx",
+      "args": ["mcp-server-datadog"],
+      "env": {
+        "DD_API_KEY": "your-api-key-here",
+        "DD_APP_KEY": "your-application-key-here",
+        "DD_SITE": "datadoghq.com"
+      }
+    }
+  }
+}
+```
+
+Set `DD_SITE` to match your org's region. US1 is `datadoghq.com`, EU is `datadoghq.eu`, and the rest are listed in Datadog's docs.
+
+You'll need two keys: an API key and an application key. Both live under Organization Settings, in the API Keys and Application Keys sections. Don't hand them more power than they need. The API key should be read-only for monitoring. The application key should belong to a service account, not to you personally. And if your plan offers fine-grained scopes, use them to fence the key into just the metrics, logs, and monitor namespaces your agent will ever touch.
+
+## How Can You Query Metrics and Logs With Datadog MCP in Claude?
+
+Once it's wired up, you just talk to it. You ask a question, Claude turns it into the right Datadog API call, and the answer comes back in the same window. A few examples:
+
+Ask "what was the average response time for the checkout service over the last 4 hours?" and it runs a metrics query against `trace.web.request.duration`, filtered to the checkout service tag.
+
+Ask "show me error logs from the payment service in the last 30 minutes" and you get a log search scoped to that service and error status, with timestamps and message bodies attached.
+
+Ask "is the database connection pool monitor in an alert state?" and it pulls the current status, tells you whether it's OK, Warning, Alert, or No Data, and shows when it last flipped.
+
+Where this earns its keep is speed during an incident. Normally you're bouncing between the metrics explorer, the log search, and the monitors view, trying to hold the whole picture in your head. Here you keep asking questions in one thread and let Claude assemble the context as you go. It pairs well with the [Sentry MCP server for error tracking](/blog/sentry-mcp-server-error-tracking) and the [Kubernetes MCP server for infrastructure context](/blog/kubernetes-mcp-server-cluster-management) if you want a fuller incident stack.
+
+## What Are the Security Best Practices for Datadog MCP API Keys?
+
+Pointing an AI agent at your production observability data is a real security decision, not a formality. Default to read-only, and keep the scope tight. A few things worth doing.
+
+Make a service account own the application key, not you. If that key ever leaks, your personal Datadog session stays untouched, and you can rotate the service account's key without locking yourself out of anything.
+
+Leave the write tools off unless you have a concrete reason to turn them on. Muting monitors, creating downtime, that stuff is opt-in by design, and it should stay that way for everyday use. Think about the blast radius. An agent that can silence alerts or schedule downtime on production is a lot of damage waiting to happen if someone feeds it bad instructions or gets hold of your MCP config.
+
+Check what the key can actually see, too. If your org tags production and staging separately, scope the key to staging while you're still kicking the tires, then promote it to production once you trust how your team uses it.
+
+The [MCP server security deep dive](/blog/mcp-server-security-deep-dive-permissions) goes deeper on permission scoping and blast radius for exactly this kind of high-privilege integration.
+
+## How Does the Datadog MCP Server Compare to Other Monitoring MCP Options?
+
+MCPFind's [monitoring category](/categories/monitoring) lists 178 servers, but let's be honest: most are early-stage community projects without much traction. Datadog's is different. It's one of the few with an official vendor build, maintained by the people who own the tool rather than a third party who might wander off next quarter.
+
+What actually competes with it depends on what you're already running. On Grafana with Prometheus? There's a Grafana MCP server that handles PromQL, Loki logs, and alerting. The Sentry MCP server (covered at [/blog/sentry-mcp-server-error-tracking](/blog/sentry-mcp-server-error-tracking)) is about error tracking and stack traces, which complements Datadog rather than replacing it. And you don't have to choose. Run Datadog for infrastructure metrics and Sentry for application errors in the same MCP client, and Claude gets a fuller read on an incident than either one gives you alone.
+
+If you're sizing up the broader DevOps MCP toolkit, the [DevOps and CI/CD MCP roundup](/blog/best-mcp-servers-devops-cicd) covers the wider set for infrastructure, deployment, and monitoring.
+
+## Frequently Asked Questions
+
+### Is the Datadog MCP server official?
+Yes. The Datadog MCP server is maintained by Datadog Labs (github.com/DataDog/mcp-server-datadog) and documented at docs.datadoghq.com. It is not a community fork. It receives updates from Datadog's engineering team.
+
+### What Datadog features can Claude access through the MCP server?
+Claude can query metrics and timeseries data, search and read logs, list and inspect dashboards, check monitor status and alert history, and retrieve infrastructure inventory including host and container metadata.
+
+### Does the Datadog MCP server require write permissions?
+No. By default the server is read-only. Write capabilities (muting monitors, creating downtime, posting events) are available but require explicit opt-in during configuration. For most AI agent use cases, read-only access is the appropriate choice.
+
+### Can I use the Datadog MCP server alongside other monitoring MCP servers?
+Yes. Teams running Grafana alongside Datadog often configure both servers in the same MCP client. Grafana handles Prometheus-based infrastructure metrics while Datadog covers APM, logs, and business KPIs. Each server runs independently and Claude can query both in the same conversation.

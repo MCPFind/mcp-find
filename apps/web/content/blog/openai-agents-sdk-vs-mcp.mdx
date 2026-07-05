@@ -1,0 +1,95 @@
+---
+title: "OpenAI Agents SDK vs MCP: Which Should You Build With?"
+description: "Compare the OpenAI Agents SDK and MCP: when SDK built-in tools are enough and when MCP server portability changes the equation for your project."
+excerpt: "The OpenAI Agents SDK and MCP are not competing standards. OpenAI added native MCP support to the Responses API in May 2025. This guide shows when to use SDK built-in tools, when MCP server portability matters, and how to wire both together in the same agent."
+date: "2026-06-29"
+updatedAt: "2026-06-29"
+author: "Adam Bush"
+authorUrl: "https://www.linkedin.com/in/adam-bush/"
+authorSameAs:
+  - "https://www.linkedin.com/in/adam-bush/"
+tags:
+  - "mcp"
+  - "developer"
+  - "architecture"
+  - "openai"
+  - "multi-agent"
+category: "other"
+focusKeyword: "openai agents sdk vs mcp"
+draft: false
+cornerstone: false
+topic_source: new_topic
+faqItems:
+  - question: "Does the OpenAI Agents SDK support all MCP servers?"
+    answer: "It handles servers on the SSE and stdio transports, which is most of what's out there. If a server uses something nonstandard, you may need extra config or a small bridge layer to get it talking."
+  - question: "Can I use MCP servers alongside SDK built-in tools in the same agent?"
+    answer: "Yes. The agent takes both, merges the lists, and the model sees every tool together on each turn. No either/or here."
+  - question: "Do I need to rewrite existing SDK tools to add MCP support?"
+    answer: "No. You can layer MCP servers onto an existing app whenever you want. Your current SDK tools keep humming along while the new server capabilities sit right next to them."
+  - question: "Is the Responses API required to use MCP with the Agents SDK?"
+    answer: "As of May 2025, the SDK already runs on the Responses API under the hood, and that's exactly what powers native MCP tool discovery. Update to the latest SDK version and you're set."
+---
+
+People keep framing the OpenAI Agents SDK and the Model Context Protocol as a versus. They aren't. Back in May 2025, OpenAI wired native MCP support into the Responses API, and the Agents SDK can now find and call MCP tools on its own. So the real question was never which one wins. It's which combination fits the thing you're actually trying to build.
+
+Say your tools live inside your Python codebase and you own every dependency. The SDK's built-in tool definitions are quick to set up and get out of your way. But if you want tools that also run inside Claude Desktop, Cursor, Windsurf, and whatever custom agents you've got, without rebuilding them four times over, that's the job MCP servers were made for. Here's how to think about both.
+
+## What Is the OpenAI Agents SDK and How Does It Compare to MCP?
+
+The OpenAI Agents SDK is a Python library for building multi-step AI workflows. You write your tools as plain Python functions, hand them to an agent, and the SDK runs the loop for you: the back-and-forth with the model, the tool calls, the handoffs between agents. It all sits in your codebase. Nothing extra to spin up.
+
+MCP lives one layer down. A Model Context Protocol server is a separate process that exposes tools over stdio or HTTP, and any MCP client can talk to it. Claude Desktop, Cursor, the OpenAI Agents SDK, your own homegrown agent, take your pick. None of them need a copy of the tool code. The server runs its own auth, its own state, and its own logic no matter who's on the far end.
+
+So what actually separates them? Portability. An SDK tool is glued to your Python process, and only your app can see it. An MCP server doesn't care what's on the other end of the wire, so any compatible runtime can pick it up. MCPFind indexes over 14,899 MCP servers across [21 categories](/categories/devtools), and every one of them became reachable from Agents SDK apps the moment that May 2025 Responses API update landed. New to the whole idea of MCP servers? The [plain-English MCP overview](/blog/what-is-mcp) starts from zero.
+
+## How Does the OpenAI Agents SDK Support MCP Natively?
+
+Since the May 2025 update, the SDK ships two classes for this: `MCPServerSse` and `MCPServerStdio`. Point either one at a running server, a URL or a subprocess, and it handles the busywork: it pulls the tool list, turns each tool's JSON schema into something callable, and drops the whole set into your agent's toolbox.
+
+```python
+from agents import Agent
+from agents.mcp import MCPServerSse
+
+async with MCPServerSse(
+    params={"url": "https://your-mcp-server.example.com/sse"}
+) as server:
+    agent = Agent(name="assistant", model="gpt-4o", mcp_servers=[server])
+```
+
+That's the whole setup. A handful of lines and any server in the ecosystem is suddenly on tap for your OpenAI-powered agent. Need to query Postgres, post to Slack, or read pull requests off GitHub? Same pattern every time. The SDK negotiates capabilities, routes the tool calls, and bubbles up errors on its own, so you're never down in the weeds implementing the protocol by hand. One catch: the server has to be up and reachable from your Python app.
+
+## When Should You Use SDK Built-In Tools Instead of MCP Servers?
+
+Sometimes the built-in tools are just the right call. The clearest case is a tool wired into state that never leaves your Python process, like an in-memory cache, a private function, or some resource with no network version to point at. Prototyping is another. If you're moving fast and don't want to babysit a separate server, built-in tools get you running in minutes. And if your deployment locks down subprocesses or outbound calls, well, that decision already got made for you.
+
+Now flip it around. The moment you're reaching for a real external data source that other clients might want too, an MCP server earns its keep. Build the integration once, and every MCP-compatible client gets it for free, with nothing to change on your end. That shared surface is exactly why teams keep pulling tooling out of SDK function definitions and into standalone servers, even the ones living mostly on OpenAI's stack. The same [architecture tradeoffs between remote and local MCP servers](/blog/remote-vs-local-mcp-server) show up in this decision too.
+
+## How Do You Decide Which MCP Servers to Add to an Agents SDK Application?
+
+Start with the job. What does your agent actually have to do? An agent that answers questions about your internal docs needs a search server pointed at those docs. One handling customer tickets wants a CRM or a project-management server behind it. Watching production behavior? That's an observability server. The [AI-ML category on MCPFind](/categories/ai-ml) by itself lists 1,784 servers spanning memory, vector search, embeddings, and model orchestration, which is plenty to pull from once you know what the agent is for. Pick a tight starting set. An agent buried in tools it never touches is just a worse agent.
+
+Then there's the boring-but-important filter: who's keeping the thing alive. Every server you add is a runtime dependency you now own. A repo with a healthy star count and commits from this month is a safer bet than some fork nobody's touched in a year. MCPFind puts star counts, last-updated dates, and transport type right on each listing, so you can size that up in seconds instead of opening ten README files across ten tabs.
+
+For teams already using the Agents SDK, adding one or two solid servers for wherever your agent hurts most is the right starting point. Going zero to ten in one sitting is a great way to spend your afternoon guessing which one broke.
+
+## What Are the Ecosystem Trade-Offs Between the Two Approaches?
+
+Out of the box, the Agents SDK gives you three tools: web search, code execution, and file search. Short list, and that's on purpose. OpenAI's team runs those against its own infrastructure, so they're rock solid, but they don't reach very far.
+
+The MCP side is where the breadth lives. The ecosystem MCPFind tracks runs across databases, DevOps, communication, finance, AI-ML workflows, security, and more than a dozen other categories, and all of it is fair game for any Agents SDK app that connects up. Want Supabase for your database, Datadog for observability, and Slack for messages? Bolt on three servers and write zero integration code.
+
+The catch is ops. Every MCP server is one more process you're on the hook to keep running, while the built-in three ride on OpenAI's infrastructure and ask nothing of you. Already managing deployments? Then this barely registers. Want a zero-ops footprint? Stick with the built-ins. For everyone in the middle, the [comparison of open-source and commercial MCP servers](/blog/open-source-vs-commercial-mcp-servers-2026) digs into how managed options are closing this gap, so you can get the ecosystem breadth without babysitting the infrastructure.
+
+## Frequently Asked Questions
+
+### Does the OpenAI Agents SDK support all MCP servers?
+It handles servers on the SSE and stdio transports, which is most of what's out there. If a server uses something nonstandard, you may need extra config or a small bridge layer to get it talking.
+
+### Can I use MCP servers alongside SDK built-in tools in the same agent?
+Yep. The agent takes both, merges the lists, and the model sees every tool together on each turn. No either/or here.
+
+### Do I need to rewrite existing SDK tools to add MCP support?
+No. You can layer MCP servers onto an existing app whenever you want. Your current SDK tools keep humming along while the new server capabilities sit right next to them.
+
+### Is the Responses API required to use MCP with the Agents SDK?
+As of May 2025, the SDK already runs on the Responses API under the hood, and that's exactly what powers native MCP tool discovery. Update to the latest SDK version and you're set.
