@@ -4,6 +4,11 @@
 # Required fields: name, github_url, package_name, description
 # Optional fields: package_type (npm|pypi|docker), category
 servers:
+  - name: "BDE Score"
+    github_url: "https://github.com/hbhqq9/bde-score"
+    package_name: "bde-score-mcp"
+    description: "Score stocks across US, HK, CN markets with one query. 6 MCP tools for BDE scoring, stock analysis, multi-market comparison, screening, sector analysis, and ESG scoring."
+    category: "finance"
   - name: "BuyWhere MCP Server"
     github_url: "https://github.com/BuyWhere/buywhere-mcp"
     package_name: "@buywhere/mcp-server"
