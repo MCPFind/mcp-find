@@ -67,6 +67,11 @@ function applyDescriptionFloor(description: string): string {
 }
 
 export function generateServerJsonLd(server: ServerWithTools): object {
+  // Use canonical_slug if available (stable URL); fall back to slug (pre-migration path).
+  // Must match the sitemap (apps/web/lib/sitemap-servers.ts) and generateStaticParams
+  // (apps/web/app/servers/[slug]/page.tsx) exactly, or the self-canonical URL and the
+  // sitemap URL for this page can disagree — a signal search engines use to drop pages.
+  const canonicalSlug = server.canonical_slug ?? server.slug;
   // Extract author/org name from GitHub URL (e.g. "https://github.com/org/repo" -> "org")
   const githubAuthor = server.github_url
     ? server.github_url.replace('https://github.com/', '').split('/')[0]
@@ -146,7 +151,7 @@ export function generateServerJsonLd(server: ServerWithTools): object {
         '@type': 'SoftwareApplication',
         name: server.name,
         description: server.description || '',
-        url: `${SITE_URL}/servers/${server.slug}`,
+        url: `${SITE_URL}/servers/${canonicalSlug}`,
         applicationCategory: 'DeveloperApplication',
         operatingSystem: 'Cross-platform',
         version: server.version || undefined,
@@ -177,11 +182,11 @@ export function generateServerJsonLd(server: ServerWithTools): object {
       },
       {
         '@type': 'BreadcrumbList',
-        '@id': `${SITE_URL}/servers/${server.slug}#breadcrumb`,
+        '@id': `${SITE_URL}/servers/${canonicalSlug}#breadcrumb`,
         itemListElement: [
           { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
           { '@type': 'ListItem', position: 2, name: 'MCP Servers', item: `${SITE_URL}/servers` },
-          { '@type': 'ListItem', position: 3, name: server.name, item: `${SITE_URL}/servers/${server.slug}` },
+          { '@type': 'ListItem', position: 3, name: server.name, item: `${SITE_URL}/servers/${canonicalSlug}` },
         ],
       },
       ...faqPage,
@@ -260,13 +265,18 @@ export function generateServerMetadata(server: ServerWithTools): Metadata {
   }
   if (!description) description = fullDesc.slice(0, 157) + '...';
   description = applyDescriptionFloor(description);
+  // Use canonical_slug if available (stable URL); fall back to slug (pre-migration path).
+  // Must match the sitemap (apps/web/lib/sitemap-servers.ts) and generateStaticParams
+  // (apps/web/app/servers/[slug]/page.tsx) exactly, or the self-canonical URL and the
+  // sitemap URL for this page can disagree — a signal search engines use to drop pages.
+  const canonicalSlug = server.canonical_slug ?? server.slug;
   return {
     title,
     description,
     openGraph: {
       title,
       description,
-      url: `${SITE_URL}/servers/${server.slug}`,
+      url: `${SITE_URL}/servers/${canonicalSlug}`,
       siteName: SITE_NAME,
       type: 'website',
       images: [{ url: `${SITE_URL}/og-image-mcp.png`, width: 1200, height: 630, alt: server.name }],
@@ -277,7 +287,7 @@ export function generateServerMetadata(server: ServerWithTools): Metadata {
       description,
     },
     alternates: {
-      canonical: `${SITE_URL}/servers/${server.slug}`,
+      canonical: `${SITE_URL}/servers/${canonicalSlug}`,
     },
   };
 }
