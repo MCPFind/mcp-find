@@ -20,3 +20,13 @@ supabase/.temp/
 logs/
 .claude/
 mcp-hub/
+
+# --- Private foundation / agent framework — NEVER commit to the public OSS repo ---
+/CONSTITUTION.md
+/CLAUDE.md
+/PROCESS.md
+/STATUS.md
+/decisions/
+/specs/
+/.claude/
+/.foundation/
