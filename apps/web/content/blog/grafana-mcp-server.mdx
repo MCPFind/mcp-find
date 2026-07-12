@@ -1,0 +1,98 @@
+---
+title: "Grafana MCP Server: Query Metrics and Alerts With Claude"
+description: "Set up the official Grafana MCP server to query PromQL metrics, Loki logs, alerts, and OnCall schedules from Claude. Covers the full tool surface and auth."
+excerpt: "Grafana's official MCP server, grafana/mcp-grafana, lets Claude query Prometheus metrics, Loki logs, dashboards, and alerting rules directly. This guide covers the full tool surface, the new hosted remote option Grafana Labs previewed in 2026, and where it fits alongside Datadog and Sentry."
+date: "2026-07-10"
+updatedAt: "2026-07-10"
+author: "Adam Bush"
+authorUrl: "https://www.linkedin.com/in/adam-bush/"
+authorSameAs:
+  - "https://www.linkedin.com/in/adam-bush/"
+tags:
+  - "mcp"
+  - "developer"
+  - "grafana"
+  - "monitoring"
+  - "devops"
+category: "monitoring"
+focusKeyword: "grafana mcp server"
+draft: false
+cornerstone: false
+topic_source: new_topic
+faqItems:
+  - question: "Does the Grafana MCP server work with Loki logs?"
+    answer: "Yes. grafana/mcp-grafana exposes LogQL queries against Loki, including label search, log statistics, and pattern detection, alongside its Prometheus and dashboard tools. A separate grafana/loki-mcp repository also exists, so check which one you're installing if log queries are your main use case."
+  - question: "Is there a hosted version of the Grafana MCP server?"
+    answer: "Grafana Labs previewed a hosted remote MCP server at GrafanaCON 2026, using OAuth 2.1 and Streamable HTTP with more than 50 tools. It's a separate product in public preview, distinct from the self-hosted open-source server this guide covers."
+  - question: "Can Claude create or acknowledge Grafana alerts through MCP?"
+    answer: "Yes, the alerting toolset covers listing, fetching, creating, updating, and deleting alert rules, plus routing. Some write operations need Editor-level permissions on the underlying Grafana instance, not just a viewer API key."
+  - question: "Does the Grafana MCP server require Grafana Cloud, or does it work with self-hosted Grafana?"
+    answer: "It works with both. The open-source server connects to any Grafana instance, self-hosted or Grafana Cloud, through a service account token and the instance's API URL."
+---
+
+If you want Claude answering questions about your Grafana dashboards instead of you clicking through them yourself, the official MCP server is how you get there. Grafana lives in MCPFind's [monitoring category](/categories/monitoring) next to Datadog and Sentry, all indexed with the same star and activity data. What grafana/mcp-grafana does is turn the queries you'd normally run by hand into tools Claude can call: PromQL against Prometheus, LogQL against Loki, alert rule status, OnCall schedules. It sits at roughly 3,200 GitHub stars and shipped a release as recently as July 7, 2026. Grafana Labs is also previewing a separate hosted remote version with more tools stacked on top. This guide covers what the open-source server exposes today, how to wire it up against a self-hosted or Grafana Cloud instance, and where it fits next to Datadog and Sentry when Claude is helping you chase down a production issue. New to MCP entirely? [Start here](/blog/what-is-mcp) first.
+
+## What Tools Does the Grafana MCP Server Expose?
+
+grafana/mcp-grafana covers nine categories of tools: Prometheus queries and metadata, Loki log search, dashboard search and retrieval, alerting rules, Grafana OnCall schedules, Grafana Incident management, datasource listing across Prometheus, Loki, ClickHouse, CloudWatch, Elasticsearch, Snowflake, and Athena, admin and user management, and Sift for automated error pattern analysis.
+
+That's a wide surface for one server. Most teams only touch a fraction of it. If your setup is pure Prometheus and dashboards, just ignore the OnCall and Incident tools. Claude won't have them available to call, so there's nothing to clean up on your end. One thing worth doing regardless of what you plan to ask: check the datasource listing tool first. It tells you exactly which backends your instance can reach, so you know upfront what Claude can and can't query. Similar automated analysis tools turn up across MCPFind's [devtools category](/categories/devtools) if Sift's pattern-matching approach interests you on its own.
+
+## How Do You Set Up the Grafana MCP Server With Claude?
+
+Before you touch any config, decide how much access Claude actually needs, because the token you generate is the whole security story here. Viewer at minimum. Then generate that Grafana service account token, and point the server at your Grafana instance URL and the token through environment variables. The server runs as a standalone binary or through Docker, and connects over stdio for local Claude Desktop or Cursor use.
+
+```json
+{
+  "mcpServers": {
+    "grafana": {
+      "command": "mcp-grafana",
+      "args": ["-t", "stdio"],
+      "env": {
+        "GRAFANA_URL": "https://your-instance.grafana.net",
+        "GRAFANA_API_KEY": "your-service-account-token"
+      }
+    }
+  }
+}
+```
+
+Start the token at Viewer permissions. Raise it only if you need Claude to create incidents or modify alert rules, since several of those write paths require Editor-level access on the underlying instance. If you provision the Grafana instance itself through code, the [Terraform MCP server guide](/blog/terraform-mcp-server-iac-guide) covers managing that infrastructure the same way. Restart your MCP client after saving the config, and confirm the tool list includes at minimum the Prometheus and dashboard tools before you move on to anything log or alert related.
+
+Docker is the other common path. It works the same way once the environment variables are in place: pass `GRAFANA_URL` and `GRAFANA_API_KEY` through `-e` flags rather than baking a token into an image. Self-hosted instances behind a reverse proxy sometimes need the URL to include a trailing path segment, so double-check the exact API base your Grafana admin gave you before you assume a connection failure is a token problem. A quick call to the datasource listing tool right after setup confirms both the token and the URL are correct in one step, so you're not guessing which half of the config is broken.
+
+## How Is the Hosted Grafana MCP Server Different From the Open-Source Version?
+
+Grafana Labs previewed a hosted remote MCP server at GrafanaCON in April 2026, built on OAuth 2.1 and Streamable HTTP, and documented at more than 50 tools compared to the open-source server's roughly nine tool categories. It's a separate product, currently in public preview. Treat it as its own thing rather than an upgrade path off the open-source binary.
+
+What actually separates them is the deployment model, not just the tool count. The open-source server, the one this guide sets up, runs wherever you put it, authenticated with a token you control directly. The hosted version removes that step. Grafana Labs runs it, and you authenticate through OAuth instead of managing a long-lived API key. So you're weighing control against convenience. If you run a small footprint and prefer to own your credentials, the open-source path is still the more predictable pick, since the hosted tool surface will probably keep shifting during preview. If you're already leaning toward managed infrastructure elsewhere in your stack, the [Vercel MCP server guide](/blog/vercel-mcp-server-deployment-guide) walks through a similar hosted-versus-self-run decision.
+
+## Can You Query Loki Logs Through the Grafana MCP Server?
+
+Yes. grafana/mcp-grafana exposes LogQL queries, label search, log statistics, and pattern detection against Loki, so Claude can pull the relevant log lines around an incident without you writing the LogQL query by hand.
+
+Ask Claude something like which errors spiked on the checkout service in the last hour. It runs the label search, narrows to the right stream, and pulls the matching log lines back into the conversation instead of you tabbing over to Grafana's Explore view yourself. This pairs directly with the alerting tools: Claude can check whether an alert fired, then pull the logs from that same window to explain why, all in one pass rather than two separate lookups across two tabs. Add a [Kubernetes MCP server](/blog/kubernetes-mcp-server-cluster-management) next to Grafana and you get pod-level context in the same thread, which often explains what a log spike alone can't. One thing to watch, though: there's also a separate grafana/loki-mcp repository floating around, so double-check which one you actually installed before you go debugging phantom missing tools.
+
+## How Does Grafana MCP Fit Alongside Datadog in an AI Observability Stack?
+
+Grafana, Datadog, and Sentry cover different stages of an incident. Grafana and its Prometheus and Loki backends are strong on raw metrics and logs. Datadog adds APM and business KPIs on top. Sentry catches the code-level error that kicked the whole thing off.
+
+Run more than one of these as MCP servers and Claude can move across that chain in a single conversation. Check a Grafana dashboard for a metric spike, cross-reference it against [Datadog's APM traces](/blog/datadog-mcp-server-observability), then check whether [Sentry](/blog/sentry-mcp-server-error-tracking) already logged the same event as a code-level exception, all before you write up the incident summary yourself. Say latency on your checkout service jumps at 2am. Grafana shows you the Prometheus metric and the Loki logs for that window, Datadog's trace tells you which downstream call slowed down, and Sentry surfaces the null-pointer exception that started it. That's three servers answering one question, and Claude stitches the answer together instead of you opening three browser tabs and holding the timeline in your head.
+
+## Frequently Asked Questions
+
+### Does the Grafana MCP server work with Loki logs?
+
+Yes. grafana/mcp-grafana exposes LogQL queries against Loki, including label search, log statistics, and pattern detection, alongside its Prometheus and dashboard tools. A separate grafana/loki-mcp repository also exists, so check which one you're installing if log queries are your main use case.
+
+### Is there a hosted version of the Grafana MCP server?
+
+Grafana Labs previewed a hosted remote MCP server at GrafanaCON 2026, using OAuth 2.1 and Streamable HTTP with more than 50 tools. It's a separate product in public preview, distinct from the self-hosted open-source server this guide covers.
+
+### Can Claude create or acknowledge Grafana alerts through MCP?
+
+Yes, the alerting toolset covers listing, fetching, creating, updating, and deleting alert rules, plus routing. Some write operations need Editor-level permissions on the underlying Grafana instance, not just a viewer API key.
+
+### Does the Grafana MCP server require Grafana Cloud, or does it work with self-hosted Grafana?
+
+It works with both. The open-source server connects to any Grafana instance, self-hosted or Grafana Cloud, through a service account token and the instance's API URL.
