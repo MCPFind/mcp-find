@@ -1,6 +1,7 @@
-import { getServerBySlug, getTopServers, getServersByCategory } from "@/lib/queries";
+import { getServerBySlug, getServersByCategory, getIndexableServerSlugs } from "@/lib/queries";
 import { generateServerMetadata, generateServerJsonLd } from "@/lib/metadata";
 import { getQualityStatus } from "@/lib/quality-status";
+import { isIndexable } from "@/lib/indexable";
 import { safeJsonLd } from "@/lib/json-ld";
 import { generateConfig, CLIENT_CONFIGS, CATEGORY_LABELS } from "@mcpfind/shared";
 import type { ClientType } from "@mcpfind/shared";
@@ -90,15 +91,22 @@ const compatibilityClients = (Object.keys(CLIENT_CONFIGS) as ClientType[]).map(
   })
 );
 
+// Pre-render cap for the isIndexable() core. If the gated core is at or below
+// this size, every indexable server is pre-rendered at build time; if it's
+// larger, we pre-render the top INDEXABLE_PRERENDER_CAP by github_stars and
+// let the remainder serve via ISR (revalidate = 86400 above) on first request.
+const INDEXABLE_PRERENDER_CAP = 1200;
+
 export async function generateStaticParams() {
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
     return [];
   }
-  const topServers = await getTopServers(200);
-  // Use canonical_slug if available (stable URL); fall back to slug (pre-migration path).
-  return topServers.map((s) => ({
-    slug: s.canonical_slug ?? s.slug,
-  }));
+  // Pre-render the gated core (isIndexable() servers, capped and ordered by
+  // github_stars) instead of a flat top-200 — see lib/indexable.ts and
+  // lib/queries.ts#getIndexableServerSlugs. getIndexableServerSlugs already
+  // resolves canonical_slug ?? slug per row.
+  const slugs = await getIndexableServerSlugs(INDEXABLE_PRERENDER_CAP);
+  return slugs.map((slug) => ({ slug }));
 }
 
 export async function generateMetadata({
@@ -128,6 +136,20 @@ export async function generateMetadata({
     return {
       ...base,
       // noindex to hide from search results; follow:true preserves link equity flow (standard SEO)
+      robots: {
+        index: false,
+        follow: true,
+      },
+    };
+  }
+
+  // Noindex thin pages: source-data quality gate (lib/indexable.ts), independent
+  // of the manifest-driven BROKEN check above. This is the same predicate used
+  // by the sitemap and generateStaticParams — a server must clear this bar in
+  // all three places or none (single source of truth, see lib/indexable.ts).
+  if (!isIndexable(server)) {
+    return {
+      ...base,
       robots: {
         index: false,
         follow: true,
