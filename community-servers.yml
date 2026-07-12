@@ -4,6 +4,12 @@
 # Required fields: name, github_url, package_name, description
 # Optional fields: package_type (npm|pypi|docker), category
 servers:
+  - name: "ActableSite MCP"
+    github_url: "https://github.com/unitedideas/actablesite-mcp"
+    package_name: "ghcr.io/unitedideas/actablesite-mcp:1.2.1"
+    description: "Audit public website readiness and check robots.txt policy for eight AI crawler tokens through three bounded read-only MCP tools."
+    package_type: "docker"
+    category: "devtools"
   - name: "BuyWhere MCP Server"
     github_url: "https://github.com/BuyWhere/buywhere-mcp"
     package_name: "@buywhere/mcp-server"
