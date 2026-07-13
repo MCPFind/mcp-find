@@ -16,11 +16,18 @@
  * This is intentionally a Server Component so it renders at build/request
  * time with no client-side JS overhead. All data fetching is SSR-only.
  * Emits data-conversion attributes for GA4 funnel tracking.
+ *
+ * Indexing-recovery Slice 4: the candidate pool is sourced from
+ * getIndexableServersByCategory(), which is pre-filtered to isIndexable()
+ * (Slice 2's quality gate) — this block must NEVER link a non-gated/thin
+ * server, regardless of includeDegraded. The separate quality_status
+ * manifest (STALE/BROKEN/HEALTHY) is layered on top purely for visual
+ * muting within the already-gated pool, not as the base filter.
  */
 
 import Link from "next/link";
 import { IconServer, IconArrowRight } from "@tabler/icons-react";
-import { getServersByCategory } from "@/lib/queries";
+import { getIndexableServersByCategory } from "@/lib/queries";
 import { getQualityStatus } from "@/lib/quality-status";
 import { ServerCard } from "@/components/ui/server-card";
 import { CATEGORY_LABELS } from "@mcpfind/shared";
@@ -53,17 +60,24 @@ export async function RelatedServersForCategory({
   if (!category) return null;
 
   // Guard: degrade gracefully when Supabase credentials are absent (CI / static builds).
+  // getIndexableServersByCategory() is pre-filtered to isIndexable() — every
+  // row here has already cleared Slice 2's quality gate.
   let allServers;
   try {
-    allServers = await getServersByCategory(category);
+    allServers = await getIndexableServersByCategory(category);
   } catch {
     return null;
   }
 
   // Build status map — one getQualityStatus call per server (avoids 2N lookups).
+  // This is the separate manifest-driven visual-muting gate, layered on top
+  // of the already-isIndexable()-gated pool from allServers.
   const statusMap = new Map(allServers.map((s) => [s.slug, getQualityStatus(s.slug)]));
 
-  // Filter candidates: correct category, not self, status gate.
+  // Filter candidates: correct category (defensive — query is already
+  // category-scoped), not self, and (when includeDegraded is false) the
+  // manifest status gate. The isIndexable() gate itself was already applied
+  // by getIndexableServersByCategory(), so it is never re-checked here.
   const candidates = allServers.filter((server) => {
     if (server.category !== category) return false;
     if (currentSlug && server.slug === currentSlug) return false;
@@ -71,7 +85,7 @@ export async function RelatedServersForCategory({
     if (!includeDegraded) {
       return status === "HEALTHY";
     }
-    // includeDegraded: include all statuses (undefined treated as available)
+    // includeDegraded: include all manifest statuses (undefined treated as available)
     return true;
   });
 
