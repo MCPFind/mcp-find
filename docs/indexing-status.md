@@ -1,22 +1,14 @@
 # mcpfind Indexing Status
-_Last updated: 2026-06-29 14:01 CT_
-_Window: since 2026-06-22_
+_Last updated: 2026-07-13 14:00 CT_
+_Window: since 2026-07-06_
 
-| URL | First Seen (commit) | GSC Status | Last Checked |
-|---|---|---|---|
-| https://mcpfind.org/blog/mcp-server-directories-compared | 2026-06-28 | URL is unknown to Google | 2026-06-29 14:00 CT |
-| https://mcpfind.org/blog/kubernetes-mcp-server-cluster-management | 2026-06-28 | URL is unknown to Google | 2026-06-29 14:00 CT |
-| https://mcpfind.org/blog/redis-mcp-server-caching-guide | 2026-06-28 | URL is unknown to Google | 2026-06-29 14:00 CT |
-| https://mcpfind.org/blog/sentry-mcp-server-error-tracking | 2026-06-28 | URL is unknown to Google | 2026-06-29 14:00 CT |
-| https://mcpfind.org/blog/mysql-mcp-server-setup-guide | 2026-06-24 | URL is unknown to Google | 2026-06-29 14:00 CT |
-| https://mcpfind.org/blog/todoist-mcp-server-task-management | 2026-06-24 | URL is unknown to Google | 2026-06-29 14:00 CT |
-| https://mcpfind.org/blog/twilio-mcp-server-sms-voice | 2026-06-24 | URL is unknown to Google | 2026-06-29 14:00 CT |
+No new MDX blog posts in 7-day window.
 
 ## Sitemap Coverage
-**Status:** PASS
-**Summary:** PASS: sitemap coverage 100.0% (14028/14028 servers, 3 shard(s)) — all checks passed
-- DB total: 14028
-- Sitemap URLs: 14028
-- Coverage: 100.0%
-- Listed shards: 3
+**Status:** FAIL
+**Summary:** FAIL: sitemap coverage 2.8% (457/16287 servers, 1 shard(s)) — coverage 2.8% < 99% (457/16287)
+- DB total: 16287
+- Sitemap URLs: 457
+- Coverage: 2.8%
+- Listed shards: 1
 - Under-listing detected: False
