@@ -186,45 +186,71 @@ export const getTopServers = cache(
 // Columns needed to evaluate isIndexable() in addition to the sitemap's own
 // slug/canonical_slug/updated_at fields. readme_content is the one signal not
 // already in SERVER_LIST_COLUMNS (excluded there as a large blob) — safe to
-// select here since sitemap batches are capped at BATCH_SIZE (5000) per page
-// and this text is never returned in the XML response.
+// select here since this is scanned once per sitemap generation and this
+// text is never returned in the XML response.
 const SITEMAP_SIGNAL_COLUMNS =
   'slug,canonical_slug,updated_at,registry_status,github_archived,readme_content,has_tools,tool_count,package_name,package_type,github_stars,category';
 
 type SitemapRow = Pick<ServerListItem, 'slug' | 'canonical_slug' | 'updated_at'> & IndexableServerInput;
 
-// Fetch a page of servers for sitemap generation (offset-based, no total count needed).
-// Supabase caps each query at 1,000 rows, so we paginate internally in 1,000-row chunks
-// to return up to pageSize rows per sitemap batch.
-// Only isIndexable() servers are returned — this is the load-bearing quality
-// gate that prunes thin pages out of the sitemap (see lib/indexable.ts).
-export const getServersSitemapPage = cache(
-  (offset: number, pageSize: number): Promise<Pick<ServerListItem, 'slug' | 'canonical_slug' | 'updated_at'>[]> =>
+// Fetches the FULL ordered (github_stars desc) list of indexable servers'
+// sitemap fields, scanning the raw `servers` table past Supabase's 1,000-row
+// cap the same way getIndexableServerSlugs does.
+//
+// This is the single source of truth the sitemap shards over: indexable
+// servers cluster in the high-star head of the raw table, so filtering
+// *inside* a raw-offset window (the old, buggy approach) leaves later
+// shards empty. Filtering across the whole ordered table first, then
+// slicing the ALREADY-FILTERED list per shard, guarantees every advertised
+// shard is dense — see sitemap.xml/route.ts and sitemap-servers.ts.
+const _getIndexableSitemapRows = cache(
+  (): Promise<Pick<ServerListItem, 'slug' | 'canonical_slug' | 'updated_at'>[]> =>
     unstable_cache(
       async () => {
         const SUPABASE_MAX = 1000;
-        const allRows: SitemapRow[] = [];
-        for (let i = 0; i < pageSize; i += SUPABASE_MAX) {
-          const chunkSize = Math.min(SUPABASE_MAX, pageSize - i);
+        const results: Pick<ServerListItem, 'slug' | 'canonical_slug' | 'updated_at'>[] = [];
+        for (let offset = 0; ; offset += SUPABASE_MAX) {
           const { data } = await supabase
             .from('servers')
             .select(SITEMAP_SIGNAL_COLUMNS)
             .eq('registry_status', 'active')
             .order('github_stars', { ascending: false })
-            .range(offset + i, offset + i + chunkSize - 1);
+            .range(offset, offset + SUPABASE_MAX - 1);
           if (!data || data.length === 0) break;
-          allRows.push(...(data as SitemapRow[]));
-          if (data.length < chunkSize) break;
+          for (const row of data as SitemapRow[]) {
+            if (isIndexable(row)) {
+              results.push({
+                slug: row.slug,
+                canonical_slug: row.canonical_slug,
+                updated_at: row.updated_at,
+              });
+            }
+          }
+          if (data.length < SUPABASE_MAX) break;
         }
-        return allRows.filter(isIndexable).map((r) => ({
-          slug: r.slug,
-          canonical_slug: r.canonical_slug,
-          updated_at: r.updated_at,
-        }));
+        return results;
       },
-      ['servers-sitemap-page', String(offset), String(pageSize)],
+      ['indexable-sitemap-rows'],
       { tags: ['servers'], revalidate: 3600 }
     )()
+);
+
+// Total count of indexable servers — drives how many shards sitemap.xml
+// advertises. Derived from the same pre-filtered list the shards slice from,
+// so the index and the shard contents can never drift apart.
+export const getIndexableServerCount = cache(
+  async (): Promise<number> => (await _getIndexableSitemapRows()).length
+);
+
+// Fetch a page of servers for sitemap generation, sliced from the
+// pre-filtered, ordered INDEXABLE list (not the raw table) — offset/pageSize
+// address positions within the indexable sequence, so every in-range shard
+// is guaranteed non-empty and dense.
+export const getServersSitemapPage = cache(
+  async (offset: number, pageSize: number): Promise<Pick<ServerListItem, 'slug' | 'canonical_slug' | 'updated_at'>[]> => {
+    const rows = await _getIndexableSitemapRows();
+    return rows.slice(offset, offset + pageSize);
+  }
 );
 
 // Columns needed to evaluate isIndexable() for the generateStaticParams gate,

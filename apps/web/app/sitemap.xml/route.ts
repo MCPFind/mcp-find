@@ -1,13 +1,17 @@
-import { getServerCount } from '@/lib/queries';
+import { getIndexableServerCount } from '@/lib/queries';
 import { SITE_URL } from '@mcpfind/shared';
 import { BATCH_SIZE, MAX_BATCHES } from '@/lib/sitemap-servers';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const totalServerCount = await getServerCount();
-  const totalServerBatches = Math.min(
-    Math.ceil(totalServerCount / BATCH_SIZE),
+  // Shard count is derived from the INDEXABLE count, not the raw server
+  // count — otherwise the index advertises shards that the isIndexable()
+  // gate empties out downstream, and those shards 404 (see
+  // getServersSitemapPage / getServersSitemapBatch for the matching fix).
+  const indexableServerCount = await getIndexableServerCount();
+  const totalServerBatches = indexableServerCount === 0 ? 0 : Math.min(
+    Math.ceil(indexableServerCount / BATCH_SIZE),
     MAX_BATCHES,
   );
 
