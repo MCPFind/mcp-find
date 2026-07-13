@@ -6,6 +6,7 @@ import { unstable_cache } from 'next/cache';
 import { supabase } from './supabase';
 import type { Server, ServerListItem, ServerWithTools, ServerListParams, ServerListResponse } from '@mcpfind/shared';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@mcpfind/shared';
+import { isIndexable, type IndexableServerInput } from './indexable';
 
 // Excludes readme_content and search_vector to avoid pulling large blobs in list queries.
 // canonical_slug is included so route generation (sitemap, links) can use the stable URL column.
@@ -182,31 +183,118 @@ export const getTopServers = cache(
     )()
 );
 
-// Fetch a page of servers for sitemap generation (offset-based, no total count needed).
-// Supabase caps each query at 1,000 rows, so we paginate internally in 1,000-row chunks
-// to return up to pageSize rows per sitemap batch.
-export const getServersSitemapPage = cache(
-  (offset: number, pageSize: number): Promise<Pick<ServerListItem, 'slug' | 'canonical_slug' | 'updated_at'>[]> =>
+// Columns needed to evaluate isIndexable() in addition to the sitemap's own
+// slug/canonical_slug/updated_at fields. readme_content is the one signal not
+// already in SERVER_LIST_COLUMNS (excluded there as a large blob) — safe to
+// select here since this is scanned once per sitemap generation and this
+// text is never returned in the XML response.
+const SITEMAP_SIGNAL_COLUMNS =
+  'slug,canonical_slug,updated_at,registry_status,github_archived,readme_content,has_tools,tool_count,package_name,package_type,github_stars,category';
+
+type SitemapRow = Pick<ServerListItem, 'slug' | 'canonical_slug' | 'updated_at'> & IndexableServerInput;
+
+// Fetches the FULL ordered (github_stars desc) list of indexable servers'
+// sitemap fields, scanning the raw `servers` table past Supabase's 1,000-row
+// cap the same way getIndexableServerSlugs does.
+//
+// This is the single source of truth the sitemap shards over: indexable
+// servers cluster in the high-star head of the raw table, so filtering
+// *inside* a raw-offset window (the old, buggy approach) leaves later
+// shards empty. Filtering across the whole ordered table first, then
+// slicing the ALREADY-FILTERED list per shard, guarantees every advertised
+// shard is dense — see sitemap.xml/route.ts and sitemap-servers.ts.
+const _getIndexableSitemapRows = cache(
+  (): Promise<Pick<ServerListItem, 'slug' | 'canonical_slug' | 'updated_at'>[]> =>
     unstable_cache(
       async () => {
         const SUPABASE_MAX = 1000;
-        const allRows: Pick<ServerListItem, 'slug' | 'canonical_slug' | 'updated_at'>[] = [];
-        for (let i = 0; i < pageSize; i += SUPABASE_MAX) {
-          const chunkSize = Math.min(SUPABASE_MAX, pageSize - i);
+        const results: Pick<ServerListItem, 'slug' | 'canonical_slug' | 'updated_at'>[] = [];
+        for (let offset = 0; ; offset += SUPABASE_MAX) {
           const { data } = await supabase
             .from('servers')
-            // Include canonical_slug so the sitemap emits stable URLs after migration 005.
-            .select('slug,canonical_slug,updated_at')
+            .select(SITEMAP_SIGNAL_COLUMNS)
             .eq('registry_status', 'active')
             .order('github_stars', { ascending: false })
-            .range(offset + i, offset + i + chunkSize - 1);
+            .range(offset, offset + SUPABASE_MAX - 1);
           if (!data || data.length === 0) break;
-          allRows.push(...(data as Pick<ServerListItem, 'slug' | 'canonical_slug' | 'updated_at'>[]));
-          if (data.length < chunkSize) break;
+          for (const row of data as SitemapRow[]) {
+            if (isIndexable(row)) {
+              results.push({
+                slug: row.slug,
+                canonical_slug: row.canonical_slug,
+                updated_at: row.updated_at,
+              });
+            }
+          }
+          if (data.length < SUPABASE_MAX) break;
         }
-        return allRows;
+        return results;
       },
-      ['servers-sitemap-page', String(offset), String(pageSize)],
+      ['indexable-sitemap-rows'],
+      { tags: ['servers'], revalidate: 3600 }
+    )()
+);
+
+// Total count of indexable servers — drives how many shards sitemap.xml
+// advertises. Derived from the same pre-filtered list the shards slice from,
+// so the index and the shard contents can never drift apart.
+export const getIndexableServerCount = cache(
+  async (): Promise<number> => (await _getIndexableSitemapRows()).length
+);
+
+// Fetch a page of servers for sitemap generation, sliced from the
+// pre-filtered, ordered INDEXABLE list (not the raw table) — offset/pageSize
+// address positions within the indexable sequence, so every in-range shard
+// is guaranteed non-empty and dense.
+export const getServersSitemapPage = cache(
+  async (offset: number, pageSize: number): Promise<Pick<ServerListItem, 'slug' | 'canonical_slug' | 'updated_at'>[]> => {
+    const rows = await _getIndexableSitemapRows();
+    return rows.slice(offset, offset + pageSize);
+  }
+);
+
+// Columns needed to evaluate isIndexable() for the generateStaticParams gate,
+// plus canonical_slug/slug for the static param itself.
+const INDEXABLE_SLUG_COLUMNS =
+  'slug,canonical_slug,registry_status,github_archived,readme_content,has_tools,tool_count,package_name,package_type,github_stars,category';
+
+type IndexableSlugRow = { slug: string; canonical_slug: string | null } & IndexableServerInput;
+
+/**
+ * Returns the stable slug (canonical_slug ?? slug) for every isIndexable()
+ * active server, ordered by github_stars desc, capped at `limit`.
+ *
+ * Used by generateStaticParams to pre-render the gated core instead of a
+ * flat top-N — see apps/web/app/servers/[slug]/page.tsx. Paginates past
+ * Supabase's 1,000-row cap the same way getServersSitemapPage does.
+ */
+export const getIndexableServerSlugs = cache(
+  (limit: number): Promise<string[]> =>
+    unstable_cache(
+      async () => {
+        const SUPABASE_MAX = 1000;
+        const allRows: IndexableSlugRow[] = [];
+        const results: string[] = [];
+        for (let offset = 0; results.length < limit; offset += SUPABASE_MAX) {
+          const { data } = await supabase
+            .from('servers')
+            .select(INDEXABLE_SLUG_COLUMNS)
+            .eq('registry_status', 'active')
+            .order('github_stars', { ascending: false })
+            .range(offset, offset + SUPABASE_MAX - 1);
+          if (!data || data.length === 0) break;
+          allRows.push(...(data as IndexableSlugRow[]));
+          for (const row of data as IndexableSlugRow[]) {
+            if (isIndexable(row)) {
+              results.push(row.canonical_slug ?? row.slug);
+              if (results.length >= limit) break;
+            }
+          }
+          if (data.length < SUPABASE_MAX) break;
+        }
+        return results.slice(0, limit);
+      },
+      ['indexable-server-slugs', String(limit)],
       { tags: ['servers'], revalidate: 3600 }
     )()
 );

@@ -4,10 +4,13 @@
  * Regression tests for the dynamic sitemap shard system.
  *
  * Verifies:
- * 1. The index route lists exactly min(ceil(total/BATCH_SIZE), MAX_BATCHES) server shards.
- * 2. Shard handler returns non-empty XML for in-range indices (0, 1, 2).
+ * 1. The index route lists exactly min(ceil(indexableCount/BATCH_SIZE), MAX_BATCHES)
+ *    server shards, sized from the INDEXABLE count (not the raw server count).
+ * 2. Shard handler returns non-empty XML for in-range indices.
  * 3. Shard handler calls notFound() for out-of-range indices.
- * 4. Zero-server edge case: index lists 0 shards; shard-0 calls notFound().
+ * 4. Zero-indexable-server edge case: index lists 0 shards; shard-0 calls notFound().
+ * 5. Invariant: the number of shards advertised in the index == the number of
+ *    shards that return 200 with non-empty content. No advertised shard 404s.
  *
  * All DB/query calls are mocked — no real Supabase connection required.
  */
@@ -31,9 +34,9 @@ vi.mock('@/lib/escape-xml', () => ({
   escapeXml: (s: string) => s,
 }));
 
-// getServerCount and getServersSitemapPage are mocked per-test via vi.mock
+// getIndexableServerCount and getServersSitemapPage are mocked per-test via vi.mock
 vi.mock('@/lib/queries', () => ({
-  getServerCount: vi.fn(),
+  getIndexableServerCount: vi.fn(),
   getServersSitemapPage: vi.fn(),
 }));
 
@@ -51,24 +54,34 @@ function makeServerBatch(size: number, startIndex = 0) {
   );
 }
 
+// Simulates the real getServersSitemapPage contract: slices a pre-filtered,
+// ordered INDEXABLE list by offset/pageSize. Used so the "invariant" tests
+// below exercise the actual shard/index consistency rather than independently
+// mocked per-shard fixtures.
+function makeIndexableSlicer(indexableRows: ReturnType<typeof makeServerRow>[]) {
+  return async (offset: number, pageSize: number) =>
+    indexableRows.slice(offset, offset + pageSize);
+}
+
+const BATCH_SIZE = 5000;
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('sitemap index — shard count', () => {
+describe('sitemap index — shard count sized from indexable count', () => {
   beforeEach(() => {
     vi.resetModules();
   });
 
-  it('lists exactly 3 server shards when total=12555 (ceil(12555/5000)=3, capped at 10)', async () => {
-    const { getServerCount } = await import('@/lib/queries');
-    vi.mocked(getServerCount).mockResolvedValue(12555);
+  it('lists exactly 3 server shards when indexableCount=12555 (ceil(12555/5000)=3, capped at 10)', async () => {
+    const { getIndexableServerCount } = await import('@/lib/queries');
+    vi.mocked(getIndexableServerCount).mockResolvedValue(12555);
 
     const { GET } = await import('@/app/sitemap.xml/route');
     const response = await GET();
     const body = await response.text();
 
-    // Should contain exactly 3 sitemap-servers-N.xml entries
     const shardMatches = body.match(/sitemap-servers-\d+\.xml/g) ?? [];
     expect(shardMatches).toHaveLength(3);
     expect(shardMatches).toContain('sitemap-servers-0.xml');
@@ -77,9 +90,9 @@ describe('sitemap index — shard count', () => {
     expect(shardMatches).not.toContain('sitemap-servers-3.xml');
   });
 
-  it('caps at MAX_BATCHES=10 when total exceeds 50000', async () => {
-    const { getServerCount } = await import('@/lib/queries');
-    vi.mocked(getServerCount).mockResolvedValue(99999);
+  it('caps at MAX_BATCHES=10 when indexableCount exceeds 50000', async () => {
+    const { getIndexableServerCount } = await import('@/lib/queries');
+    vi.mocked(getIndexableServerCount).mockResolvedValue(99999);
 
     const { GET } = await import('@/app/sitemap.xml/route');
     const response = await GET();
@@ -91,9 +104,9 @@ describe('sitemap index — shard count', () => {
     expect(shardMatches).not.toContain('sitemap-servers-10.xml');
   });
 
-  it('lists 1 shard when total=1', async () => {
-    const { getServerCount } = await import('@/lib/queries');
-    vi.mocked(getServerCount).mockResolvedValue(1);
+  it('lists 1 shard when indexableCount=1', async () => {
+    const { getIndexableServerCount } = await import('@/lib/queries');
+    vi.mocked(getIndexableServerCount).mockResolvedValue(1);
 
     const { GET } = await import('@/app/sitemap.xml/route');
     const response = await GET();
@@ -104,9 +117,23 @@ describe('sitemap index — shard count', () => {
     expect(shardMatches).toContain('sitemap-servers-0.xml');
   });
 
-  it('lists 0 server shards when total=0', async () => {
-    const { getServerCount } = await import('@/lib/queries');
-    vi.mocked(getServerCount).mockResolvedValue(0);
+  it('lists 1 shard when indexableCount=457 (realistic post-gate count, well under BATCH_SIZE)', async () => {
+    const { getIndexableServerCount } = await import('@/lib/queries');
+    vi.mocked(getIndexableServerCount).mockResolvedValue(457);
+
+    const { GET } = await import('@/app/sitemap.xml/route');
+    const response = await GET();
+    const body = await response.text();
+
+    const shardMatches = body.match(/sitemap-servers-\d+\.xml/g) ?? [];
+    expect(shardMatches).toHaveLength(1);
+    expect(shardMatches).toContain('sitemap-servers-0.xml');
+    expect(shardMatches).not.toContain('sitemap-servers-1.xml');
+  });
+
+  it('lists 0 server shards when indexableCount=0', async () => {
+    const { getIndexableServerCount } = await import('@/lib/queries');
+    vi.mocked(getIndexableServerCount).mockResolvedValue(0);
 
     const { GET } = await import('@/app/sitemap.xml/route');
     const response = await GET();
@@ -195,5 +222,77 @@ describe('getServersSitemapBatch — shard handler', () => {
 
     await expect(getServersSitemapBatch(0)).rejects.toThrow('NEXT_NOT_FOUND');
     expect(notFound).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Invariant: advertised shard count == non-empty shard count.
+//
+// This is the regression test for the live-verified bug: the index used to
+// size shards from the RAW server count while each shard independently
+// filtered by isIndexable() inside its raw-offset window, so indexable rows
+// (clustered in the high-star head) emptied out shards 1+ and those shards
+// 404'd despite being advertised. Both the index and the shard handler now
+// derive from the SAME pre-filtered, ordered indexable list, so this
+// invariant must hold for any N.
+// ---------------------------------------------------------------------------
+
+describe('sitemap invariant — advertised shards == non-empty shards', () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  async function assertInvariant(indexableCount: number) {
+    const { getIndexableServerCount, getServersSitemapPage } = await import('@/lib/queries');
+    const indexableRows = makeServerBatch(indexableCount, 0);
+
+    vi.mocked(getIndexableServerCount).mockResolvedValue(indexableCount);
+    vi.mocked(getServersSitemapPage).mockImplementation(makeIndexableSlicer(indexableRows));
+
+    const { GET } = await import('@/app/sitemap.xml/route');
+    const indexResponse = await GET();
+    const indexBody = await indexResponse.text();
+    const shardMatches = indexBody.match(/sitemap-servers-(\d+)\.xml/g) ?? [];
+    const advertisedShardCount = shardMatches.length;
+
+    const expectedShardCount = indexableCount === 0
+      ? 0
+      : Math.min(Math.ceil(indexableCount / BATCH_SIZE), 10);
+    expect(advertisedShardCount).toBe(expectedShardCount);
+
+    const { getServersSitemapBatch } = await import('@/lib/sitemap-servers');
+
+    let nonEmptyShardCount = 0;
+    for (let i = 0; i < advertisedShardCount; i++) {
+      const shardResponse = await getServersSitemapBatch(i);
+      const shardBody = await shardResponse.text();
+      expect(shardResponse.status).toBe(200);
+      // Every advertised shard must contain at least one <url> entry — no
+      // advertised shard may be empty (which would mean it 404'd instead).
+      expect(shardBody).toContain('<url>');
+      nonEmptyShardCount++;
+    }
+
+    expect(nonEmptyShardCount).toBe(advertisedShardCount);
+
+    // The LAST advertised shard specifically must be non-empty (the exact
+    // failure mode of the original bug: shards past shard 0 filtered to zero).
+    if (advertisedShardCount > 0) {
+      const lastShardResponse = await getServersSitemapBatch(advertisedShardCount - 1);
+      const lastShardBody = await lastShardResponse.text();
+      expect(lastShardBody).toContain('<url>');
+    }
+  }
+
+  it('holds for N=0 (no indexable servers — zero shards advertised)', async () => {
+    await assertInvariant(0);
+  });
+
+  it('holds for N=457 (realistic post-gate count, under BATCH_SIZE — 1 shard advertised)', async () => {
+    await assertInvariant(457);
+  });
+
+  it('holds for N=12555 (spans 3 batches — the exact regression scenario)', async () => {
+    await assertInvariant(12555);
   });
 });
