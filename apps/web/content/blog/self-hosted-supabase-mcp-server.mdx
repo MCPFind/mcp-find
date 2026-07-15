@@ -1,0 +1,105 @@
+---
+title: "Self-Hosted Supabase MCP: Setup Beyond the Cloud API"
+description: "Running Supabase on your own infrastructure instead of the managed cloud? Here is how to connect Claude to a self-hosted instance with a dedicated MCP server."
+excerpt: "Most Supabase MCP tutorials assume you're on Supabase Cloud. If you're running your own self-hosted stack via Docker Compose, the auth model and setup steps look different. This guide covers a dedicated community server built for exactly that case, plus how it differs from pointing the official server at self-hosted infrastructure."
+date: "2026-07-10"
+updatedAt: "2026-07-10"
+author: "Adam Bush"
+authorUrl: "https://www.linkedin.com/in/adam-bush/"
+authorSameAs:
+  - "https://www.linkedin.com/in/adam-bush/"
+tags:
+  - "mcp"
+  - "developer"
+  - "supabase"
+  - "self-hosted"
+  - "databases"
+category: "databases"
+focusKeyword: "self-hosted supabase mcp"
+draft: false
+cornerstone: false
+topic_source: new_topic
+faqItems:
+  - question: "Is there a dedicated MCP server for self-hosted Supabase?"
+    answer: "Yes. HenkDz/selfhosted-supabase-mcp is a community project built specifically to bridge MCP clients to local or privately hosted Supabase stacks, distinct from the official cloud-oriented Supabase MCP server."
+  - question: "Can I just point the official Supabase MCP server at my self-hosted instance instead?"
+    answer: "You can, and it works for basic queries. But the official server assumes the management API and OAuth flow that Supabase Cloud provides, which a bare self-hosted stack does not expose the same way."
+  - question: "What do I need to run to self-host Supabase in the first place?"
+    answer: "The typical setup is Supabase's own Docker Compose stack, which bundles Postgres, GoTrue for auth, PostgREST for the API layer, and Kong as the gateway. The MCP server connects to that stack once it's running."
+  - question: "Does self-hosting Supabase mean I lose MCP features compared to the cloud version?"
+    answer: "Not features exactly, but the connection details differ. Self-hosted setups authenticate with a direct database connection string and your instance's service role key rather than a managed OAuth flow."
+---
+
+If you've read a Supabase MCP tutorial, it almost certainly assumed you're running on Supabase Cloud. That's the majority use case, and it's what the official MCP server is built around. But plenty of teams run Supabase on their own infrastructure, most commonly through Supabase's Docker Compose self-hosting stack. When they do, the setup steps and the auth model both look different. This guide covers a community server built specifically for that case, plus how to weigh it against just pointing the official tooling at your own instance.
+
+## What Is Different About Self-Hosting Supabase?
+
+Self-hosting means running Supabase's own open-source components yourself instead of renting their managed cloud. The usual path is Supabase's published Docker Compose setup. It bundles Postgres, GoTrue for authentication, PostgREST as the auto-generated REST API, and Kong as the API gateway tying everything together. Same core stack. It's just running on infrastructure you control.
+
+That changes how an MCP server connects to it. Supabase Cloud exposes a management API and OAuth-based project access that a self-hosted stack simply doesn't have, because there's no hosted control plane sitting behind it. So anything built around Supabase's cloud management layer, including the official MCP server's typical connection flow, needs a different way in once the whole stack lives on your own servers.
+
+## Is There a Dedicated MCP Server for Self-Hosted Supabase?
+
+Yes. And it's worth knowing it exists separately from the official one. HenkDz/selfhosted-supabase-mcp is a community project built specifically to bridge MCP clients to local or privately hosted Supabase stacks. It's a distinct project from [Supabase's official cloud-first server](/servers/com-supabase-mcp), which leads [MCPFind's databases category](/categories/databases) at 2,556 GitHub stars.
+
+The distinction matters. The official server's tooling assumes things a bare self-hosted stack won't have on hand, like the project-level metadata that Supabase Cloud's management API provides. A server built around self-hosting instead expects the pieces you'd actually have sitting in front of you: a Postgres connection, your GoTrue instance's URL, and the service role key you generated when you stood up the stack yourself.
+
+## How Do You Authenticate an MCP Server Against a Self-Hosted Instance?
+
+Where the official server leans on Supabase Cloud's OAuth flow, a self-hosted connection usually comes down to two things: a direct Postgres connection string and a service role key scoped to your own GoTrue instance. Your MCP client config ends up looking something like this:
+
+```json
+{
+  "mcpServers": {
+    "supabase-self-hosted": {
+      "command": "npx",
+      "args": ["-y", "selfhosted-supabase-mcp"],
+      "env": {
+        "SUPABASE_URL": "http://localhost:8000",
+        "SUPABASE_SERVICE_ROLE_KEY": "your-service-role-key",
+        "DATABASE_URL": "postgresql://user:pass@localhost:5432/postgres"
+      }
+    }
+  }
+}
+```
+
+Treat that service role key the way you'd treat a database admin password, because that's effectively what it is. If your self-hosted stack sits behind a VPN or an internal network only, you've already got a meaningful layer of protection that a cloud-hosted project doesn't get by default. One rule stays firm: don't expose the Kong gateway to the open internet without authentication in front of it.
+
+## What Can You Actually Ask Claude to Do Once It's Connected?
+
+Once the connection is live, day-to-day usage looks a lot like working with any other Postgres-backed MCP setup, with a few Supabase-specific conveniences layered on top. Ask "what tables exist in the public schema" and you get a live answer straight from your self-hosted Postgres instance, rather than a stale copy of some schema doc someone wrote three months ago.
+
+Ask it to check row-level security policies on a specific table, and it reads the policy definitions directly. That's a real help when you're debugging why a query that should return rows is returning nothing instead. Row-level security misconfigurations are one of the more common self-hosted Supabase headaches, and having an agent that can read the actual policy SQL, rather than leaving you to guess, saves a real amount of time.
+
+You can also ask more workflow-shaped questions, like "generate a migration to add an index on the orders table's customer_id column." The agent drafts the SQL. You review it before running it against your instance, the same caution you'd apply to any AI-suggested schema change against a database you're on the hook for.
+
+## What Should You Watch for When Running This in Production?
+
+A self-hosted Supabase stack puts more of the operational burden on your team than the managed cloud does, and that extends to how carefully you scope the MCP connection. Start with a read-only database role for exploratory work. Grant write access only once you trust the workflow.
+
+Keep the service role key out of version control the same way you would any other production secret. It belongs in your secrets manager, or a local environment file that's gitignored, and never hardcoded into an MCP config file that might get committed by accident.
+
+And test any schema-modifying suggestion against a staging copy of your stack first. Self-hosted setups often lack the automatic backups and point-in-time recovery that Supabase Cloud bundles by default, so a bad migration is harder to walk back when you're managing your own Postgres backups. A quick pg_dump before letting an agent touch anything schema-related costs you a minute. It saves you a much worse afternoon of restoring from whatever backup strategy you actually have in place.
+
+## Should You Just Point the Official Server at Your Self-Hosted Stack Instead?
+
+You can, and for a lot of teams that's honestly the simpler path. The official Supabase MCP server's own documentation confirms it can target a self-hosted project by configuring the project URL and service role key directly, and the same tool surface works against both managed and self-hosted setups in practice.
+
+So where does a dedicated self-hosted-first server earn its place? In the details the official one doesn't specifically design around: things like Kong routing quirks, or GoTrue configuration that diverges from what Supabase Cloud auto-manages for you. If your setup is a fairly standard Docker Compose deployment following Supabase's own instructions, either path works fine. If you've customized the stack more heavily, a server written with self-hosting as the primary case tends to handle the edge cases with less friction.
+
+For the cloud-first setup and the full 32-tool surface Supabase's official server exposes, see the [full Supabase MCP server guide](/blog/supabase-mcp-server-deep-dive). If you're comparing database options more broadly, the [Postgres MCP guide](/blog/connect-postgresql-claude-mcp) and [database MCP server roundup](/blog/best-database-mcp-servers) are useful next stops, and the [what is MCP cornerstone guide](/blog/what-is-mcp) is the place to start if the protocol itself is still new to you.
+
+## Frequently Asked Questions
+
+### Is there a dedicated MCP server for self-hosted Supabase?
+Yes. HenkDz/selfhosted-supabase-mcp is a community project built specifically to bridge MCP clients to local or privately hosted Supabase stacks, distinct from the official cloud-oriented Supabase MCP server.
+
+### Can I just point the official Supabase MCP server at my self-hosted instance instead?
+You can, and it works for basic queries. But the official server assumes the management API and OAuth flow that Supabase Cloud provides, which a bare self-hosted stack does not expose the same way.
+
+### What do I need to run to self-host Supabase in the first place?
+The typical setup is Supabase's own Docker Compose stack, which bundles Postgres, GoTrue for auth, PostgREST for the API layer, and Kong as the gateway. The MCP server connects to that stack once it's running.
+
+### Does self-hosting Supabase mean I lose MCP features compared to the cloud version?
+Not features exactly, but the connection details differ. Self-hosted setups authenticate with a direct database connection string and your instance's service role key rather than a managed OAuth flow.
