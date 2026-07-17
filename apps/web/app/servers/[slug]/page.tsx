@@ -1,4 +1,4 @@
-import { getServerBySlug, getServersByCategory, getIndexableServerSlugs } from "@/lib/queries";
+import { getServerBySlug, getIndexableServerSlugs } from "@/lib/queries";
 import { generateServerMetadata, generateServerJsonLd } from "@/lib/metadata";
 import { getQualityStatus } from "@/lib/quality-status";
 import { isIndexable } from "@/lib/indexable";
@@ -44,6 +44,7 @@ const ReadmeSection = dynamic(
 import { ServerCard } from "@/components/ui/server-card";
 import { formatNumber } from "@/components/ui/stat-badge";
 import { RelatedArticles } from "@/components/related-articles";
+import { RelatedServersForCategory } from "@/components/RelatedServersForCategory";
 import { StaleServerBadge } from "@/components/StaleServerBadge";
 import { VerifiedServerBadge } from "@/components/VerifiedServerBadge";
 import { Navbar } from "@/components/ui/navbar";
@@ -181,12 +182,6 @@ export default async function ServerDetailPage({
   }
 
   const qualityStatus = getQualityStatus(slug);
-
-  const relatedServers = server.category
-    ? (await getServersByCategory(server.category))
-        .filter((s) => s.id !== server.id)
-        .slice(0, 4)
-    : [];
 
   // Build install config for Claude Desktop (primary)
   let claudeConfig: string | null = null;
@@ -757,36 +752,20 @@ export default async function ServerDetailPage({
                 </ul>
               </div>
             )}
-
-            {/* Related Servers */}
-            {relatedServers.length > 0 && (
-              <div className="rounded-xl bg-neutral-900 border border-neutral-800 p-5 space-y-3">
-                <h2 className="text-sm font-semibold text-neutral-300 uppercase tracking-wider">
-                  Related Servers
-                </h2>
-                <ul className="space-y-2" role="list">
-                  {relatedServers.map((related) => (
-                    <li key={related.id}>
-                      <Link
-                        href={`/servers/${related.slug}`}
-                        className="flex flex-col gap-0.5 p-3 rounded-lg bg-neutral-800/50 hover:bg-neutral-800 border border-neutral-700/50 hover:border-neutral-700 transition-all duration-200 group"
-                      >
-                        <span className="text-white text-sm font-medium group-hover:text-blue-300 transition-colors duration-200 line-clamp-1">
-                          {related.name}
-                        </span>
-                        {related.description && (
-                          <span className="text-neutral-500 text-xs line-clamp-1">
-                            {related.description}
-                          </span>
-                        )}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
           </aside>
         </div>
+
+        {/* Related servers — gated (isIndexable()) servers in the same
+            category only; self-excluded via currentSlug. Indexing-recovery
+            Slice 4: this is a required internal-linking surface on every
+            server detail page so gated servers stay reachable in <=3 clicks
+            from the homepage. */}
+        <RelatedServersForCategory
+          category={server.category ?? ""}
+          currentSlug={server.slug}
+          includeDegraded={false}
+          limit={6}
+        />
       </div>
     </div>
   );

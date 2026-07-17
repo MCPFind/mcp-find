@@ -1,4 +1,4 @@
-import { getServersByCategory, getCategoryCount } from '@/lib/queries';
+import { getIndexableServersByCategory, getCategoryCount } from '@/lib/queries';
 import { generateCategoryMetadata, generateCategoryJsonLd } from '@/lib/metadata';
 import { getQualityStatus } from '@/lib/quality-status';
 import { safeJsonLd } from '@/lib/json-ld';
@@ -45,10 +45,14 @@ export default async function CategoryPage({
   if (!(CATEGORIES as readonly string[]).includes(category)) notFound();
 
   const label = CATEGORY_LABELS[category as keyof typeof CATEGORY_LABELS] || category;
-  // Fetch servers (up to 200 for display) and the true total count in parallel.
-  // The true count feeds JSON-LD numberOfItems; servers feeds the card grid.
+  // Indexing-recovery Slice 4: this hub must link every isIndexable() (gated)
+  // server in the category — getIndexableServersByCategory() is the full,
+  // uncapped, pre-filtered set (not getServersByCategory()'s 200-row raw
+  // cap), so a large category can never silently drop gated servers from
+  // its own hub page. categoryCount (JSON-LD numberOfItems) intentionally
+  // still reflects the true active-server count, not just the gated subset.
   const [servers, categoryCount] = await Promise.all([
-    getServersByCategory(category),
+    getIndexableServersByCategory(category),
     getCategoryCount(category),
   ]);
 
@@ -90,7 +94,7 @@ export default async function CategoryPage({
           </p>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
             <p className="text-neutral-500 text-lg">
-              {categoryCount} servers in this category
+              {servers.length} servers in this category
             </p>
             <time
               dateTime={dateModified}

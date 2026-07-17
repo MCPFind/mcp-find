@@ -161,7 +161,15 @@ export default async function ServersPage({
                 </div>
               )}
 
-              {/* Pagination */}
+              {/* Pagination — indexing-recovery Slice 4: PaginationLink renders a
+                  real next/link <a href="/servers?page=N"> in the server-rendered
+                  HTML (not a client-side-only click handler), and this whole
+                  block lives inside the children passed through the "use client"
+                  ServersFilters wrapper, so it stays in the initial SSR payload.
+                  Default sort is stars-desc, which fronts the isIndexable()
+                  (gated) core (see queries.ts _getIndexableSitemapRows comment),
+                  so crawlers walking Prev/Next reach the gated set within the
+                  first pages without needing a JS-executing crawler. */}
               {result.totalPages > 1 && (
                 <div className="flex items-center justify-between mt-10 pt-6 border-t border-neutral-900">
                   <div className="flex items-center gap-2">

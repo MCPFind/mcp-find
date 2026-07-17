@@ -9,7 +9,7 @@ import { Navbar } from "@/components/ui/navbar";
 import { HeroSearch } from "@/components/ui/hero-search";
 import { safeJsonLd } from "@/lib/json-ld";
 import { getAllPosts } from "@/lib/blog";
-import { getTopServers, getServerCount, listServers } from "@/lib/queries";
+import { getIndexableTopServers, getServerCount, listServers } from "@/lib/queries";
 import { getQualityStatus } from "@/lib/quality-status";
 import { CATEGORIES, CATEGORY_LABELS, SITE_URL, FALLBACK_SERVER_COUNT_DISPLAY } from "@mcpfind/shared";
 import type { Category, ServerListItem } from "@mcpfind/shared";
@@ -169,9 +169,13 @@ function RecentServersSkeleton() {
 // ── Async server components (data-heavy, streamed below-the-fold) ───────────
 
 async function FeaturedServersSection() {
+  // Indexing-recovery Slice 4: homepage top-N linking surface must only
+  // link isIndexable() (gated) servers — getIndexableTopServers() is the
+  // gated equivalent of getTopServers(), pre-filtered by the Slice 2 quality
+  // bar so this never resurfaces a thin/non-gated server page.
   let featuredServers: ServerListItem[] = [];
   try {
-    featuredServers = await getTopServers(6);
+    featuredServers = await getIndexableTopServers(6);
   } catch {
     // Supabase not available
   }
@@ -616,9 +620,15 @@ export default async function HomePage() {
             {/* Browse — first 5 categories */}
             {/* Links point to /categories/<slug> so crawlers index the canonical */}
             {/* category pages. The interactive filter cards above are unchanged. */}
+            {/* Header links to /categories, the crawlable hub-of-hubs index. */}
             <div>
               <h4 className="text-sm font-semibold text-neutral-300 mb-4">
-                Browse
+                <Link
+                  href="/categories"
+                  className="hover:text-white transition-colors duration-200"
+                >
+                  Browse
+                </Link>
               </h4>
               <ul className="space-y-2">
                 {CATEGORIES.slice(0, 5).map((cat: string) => (
@@ -665,6 +675,14 @@ export default async function HomePage() {
                     className="text-neutral-500 hover:text-neutral-300 text-sm transition-colors duration-200"
                   >
                     Browse Servers
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/categories"
+                    className="text-neutral-500 hover:text-neutral-300 text-sm transition-colors duration-200"
+                  >
+                    All Categories
                   </Link>
                 </li>
                 <li>

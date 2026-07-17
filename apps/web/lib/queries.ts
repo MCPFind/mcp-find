@@ -183,6 +183,51 @@ export const getTopServers = cache(
     )()
 );
 
+// Columns needed for both list display (ServerListItem) and the isIndexable()
+// signal check — SERVER_LIST_COLUMNS plus readme_content (excluded from the
+// list columns as a large blob, but required to evaluate signal 1).
+const INDEXABLE_LIST_COLUMNS = `${SERVER_LIST_COLUMNS},readme_content`;
+
+type IndexableListRow = ServerListItem & IndexableServerInput;
+
+/**
+ * Gated top-N servers by github_stars, filtered to isIndexable() — the
+ * homepage "top servers" linking surface (Slice 4, internal linking). Unlike
+ * getTopServers(), this never surfaces a thin/non-gated server as a link.
+ *
+ * Scans in SUPABASE_MAX-row windows (same pagination technique as
+ * _getIndexableSitemapRows) so the star-ordered scan isn't truncated by
+ * Supabase's 1,000-row cap before enough indexable rows are found.
+ */
+export const getIndexableTopServers = cache(
+  (limit: number): Promise<ServerListItem[]> =>
+    unstable_cache(
+      async () => {
+        const SUPABASE_MAX = 1000;
+        const results: ServerListItem[] = [];
+        for (let offset = 0; results.length < limit; offset += SUPABASE_MAX) {
+          const { data } = await supabase
+            .from('servers')
+            .select(INDEXABLE_LIST_COLUMNS)
+            .eq('registry_status', 'active')
+            .order('github_stars', { ascending: false })
+            .range(offset, offset + SUPABASE_MAX - 1);
+          if (!data || data.length === 0) break;
+          for (const row of data as IndexableListRow[]) {
+            if (isIndexable(row)) {
+              results.push(row as ServerListItem);
+              if (results.length >= limit) break;
+            }
+          }
+          if (data.length < SUPABASE_MAX) break;
+        }
+        return results.slice(0, limit);
+      },
+      ['indexable-top-servers', String(limit)],
+      { tags: ['servers'], revalidate: 3600 }
+    )()
+);
+
 // Columns needed to evaluate isIndexable() in addition to the sitemap's own
 // slug/canonical_slug/updated_at fields. readme_content is the one signal not
 // already in SERVER_LIST_COLUMNS (excluded there as a large blob) — safe to
@@ -314,6 +359,46 @@ export const getServersByCategory = cache(
         return (data || []) as ServerListItem[];
       },
       ['servers-by-category', category],
+      { tags: ['servers', `category-${category}`], revalidate: 3600 }
+    )()
+);
+
+/**
+ * Gated (isIndexable()) servers for a category, ordered by github_stars
+ * desc — the source of truth for category-hub internal linking (Slice 4).
+ * Unlike getServersByCategory(), this never links a thin/non-gated server,
+ * so it is safe to use for category hub pages and the related-servers block
+ * without re-checking isIndexable() at the call site.
+ *
+ * Paginates past Supabase's 1,000-row cap the same way
+ * _getIndexableSitemapRows/getIndexableServerSlugs do, so large categories
+ * are fully scanned rather than silently truncated at the raw-row cap.
+ */
+export const getIndexableServersByCategory = cache(
+  (category: string): Promise<ServerListItem[]> =>
+    unstable_cache(
+      async () => {
+        const SUPABASE_MAX = 1000;
+        const results: ServerListItem[] = [];
+        for (let offset = 0; ; offset += SUPABASE_MAX) {
+          const { data } = await supabase
+            .from('servers')
+            .select(INDEXABLE_LIST_COLUMNS)
+            .eq('category', category)
+            .eq('registry_status', 'active')
+            .order('github_stars', { ascending: false })
+            .range(offset, offset + SUPABASE_MAX - 1);
+          if (!data || data.length === 0) break;
+          for (const row of data as IndexableListRow[]) {
+            if (isIndexable(row)) {
+              results.push(row as ServerListItem);
+            }
+          }
+          if (data.length < SUPABASE_MAX) break;
+        }
+        return results;
+      },
+      ['indexable-servers-by-category', category],
       { tags: ['servers', `category-${category}`], revalidate: 3600 }
     )()
 );
