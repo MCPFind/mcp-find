@@ -1,0 +1,110 @@
+---
+title: "How to Build an MCP Server in Go: A Step-by-Step Tutorial"
+description: "Build a production-ready MCP server in Go using the official SDK. Covers project setup, tool registration, error handling, and local testing with the Inspector."
+excerpt: "Go accounts for a small slice of MCPFind's language-tagged servers today, but its concurrency model and single-binary deployment suit high-throughput tools well. This guide builds a working server with the official Go SDK and compares it against the community library most Go servers use today."
+date: "2026-07-06"
+updatedAt: "2026-07-06"
+author: "Gus Marquez"
+authorUrl: "https://www.linkedin.com/in/gustavoamarquez"
+authorSameAs:
+  - "https://www.linkedin.com/in/gustavoamarquez"
+tags:
+  - "mcp"
+  - "developer"
+  - "go"
+  - "build-mcp-server"
+  - "devtools"
+category: "devtools"
+focusKeyword: "build mcp server go"
+draft: false
+cornerstone: false
+topic_source: new_topic
+faqItems:
+  - question: "Is the official Go SDK production-ready?"
+    answer: "The v1.x version line signals a stable public API, so breaking changes to core types are unlikely before a v2. The main gap versus a mature SDK is transport coverage: early releases lead with stdio, so if your deployment depends on Streamable HTTP or SSE today, confirm those are in the release you pull before you commit."
+  - question: "Should I use the official Go SDK or mark3labs/mcp-go for a new project?"
+    answer: "Use the official SDK for new projects that want long-term spec alignment and Google's backing. mark3labs/mcp-go still has a larger installed base and supports more transports today, so only migrate an existing project if the official SDK's roadmap matters more to you than switching cost."
+  - question: "Does stdio or HTTP transport work better for a Go MCP server?"
+    answer: "Start with stdio for local development in Claude Desktop or Cursor. Move to Streamable HTTP only when you need a remote, multi-client deployment, since HTTP requires session and auth handling that stdio does not."
+  - question: "How do I submit a Go MCP server to MCPFind once it's built?"
+    answer: "Push your server to GitHub with a valid go.mod and README, then submit it through the MCPFind directory form. The indexing pipeline detects the primary language automatically from your repository metadata, no manual tagging required."
+---
+
+Go accounts for 16 of the servers in MCPFind's language-tagged data. That's a sliver next to TypeScript's 226 and Python's 197. That gap is room to build in an underserved corner. Go's goroutines and static binaries suit servers that fan out to several tool calls at once, or that need to ship as a single deployable file with no runtime installed. This guide builds a working MCP server in Go using the official SDK, walks through tool registration and error handling, and compares that SDK against the community library most existing Go servers were built with. It assumes you know Go basics but haven't touched MCP before. If you want the concept-level primer first, start with [what MCP actually is](/blog/what-is-mcp).
+
+## What Is the Official Go SDK for Building MCP Servers?
+
+The official Go SDK, `modelcontextprotocol/go-sdk`, is maintained in collaboration with Google and hit v1.6.1 in May 2026. It gives Go developers a spec-aligned, first-party path instead of defaulting to a community package. It isn't backward compatible with the library that inspired it. Pick one SDK at the start of a project and commit to it; mixing the two packages mid-build will break your imports.
+
+Before the official SDK existed, `mark3labs/mcp-go` was the default choice. It's still the more widely deployed option today. It supports four transports (stdio, Streamable HTTP, SSE, and in-process), while the official SDK's early releases focused on stdio first. Two smaller projects, `metoro-io/mcp-golang` and `strowk/foxy-contexts`, cover niche cases but see far less adoption. For a new project in 2026, the official SDK is the safer bet. It tracks the MCP specification directly, including the stateless protocol core and Extensions framework slated for the next revision. Browse MCPFind's [devtools category](/categories/devtools) to see where Go servers sit next to their TypeScript and Python counterparts.
+
+## How Do You Set Up a New Go MCP Server Project?
+
+Initialize a Go module, pull in the official SDK, and create a minimal server that connects over stdio. You need Go 1.21 or later. The whole setup takes about five commands, and it produces a server MCP clients can already connect to, even before you register a single tool.
+
+```bash
+mkdir my-go-mcp-server && cd my-go-mcp-server
+go mod init github.com/yourname/my-go-mcp-server
+go get github.com/modelcontextprotocol/go-sdk
+```
+
+The SDK exposes an `mcp.NewServer` constructor that takes an implementation name and version, then a `Run` method that wires up whichever transport you choose. Stdio is the right default. It needs no port, no TLS certificate, and works out of the box in Claude Desktop, Cursor, and Claude Code. Save that constructor call in a `main.go` file and you've got a server that starts, advertises its capabilities, and waits for a client to connect, all before you write a single tool handler.
+
+## How Do You Define and Register Tools in a Go MCP Server?
+
+Tools in the official Go SDK are plain Go functions paired with a typed input struct. The SDK generates the JSON schema from your struct tags automatically, so you rarely hand-write schema definitions. Register the tool with `mcp.AddTool`, passing the function, a name, and a description string the model reads to decide when to call it.
+
+```go
+type SearchInput struct {
+    Query string `json:"query" jsonschema:"the search term"`
+    Limit int    `json:"limit,omitempty" jsonschema:"max results, default 10"`
+}
+
+func handleSearch(ctx context.Context, req *mcp.CallToolRequest, input SearchInput) (*mcp.CallToolResult, any, error) {
+    return &mcp.CallToolResult{
+        Content: []mcp.Content{&mcp.TextContent{Text: "results..."}},
+    }, nil, nil
+}
+
+mcp.AddTool(server, &mcp.Tool{Name: "search", Description: "Search the index"}, handleSearch)
+```
+
+Struct tags do double duty here. `json` controls the field name in the schema, and `jsonschema` supplies the description the model sees when deciding whether a field is required. Keep descriptions specific. A bare `Query string` field with no `jsonschema` tag gives the model nothing to reason about, and malformed calls follow. The second return value in the handler signature carries structured content alongside the plain-text block. That matters when a downstream tool call needs machine-parseable JSON it can pull fields out of programmatically.
+
+## How Do You Handle Errors and Validation in Go MCP Tools?
+
+Return errors through the result's content when the failure is something the model should see and potentially retry against. Reserve the actual `error` return value for transport-level failures the client needs to know about, like a broken connection. Expected validation failures such as a missing file belong in the content block, where the model can act on them.
+
+Set `IsError: true` on the `CallToolResult` and put a plain-text explanation in the content block. The model reads that text and can adjust its next call, maybe retrying with different arguments or asking the user for clarification. Panic or return a bare Go error instead, and the SDK surfaces a generic transport error with no recovery path, which shows up to the user as the assistant saying something vague broke. Validate input at the top of the handler, before you touch any external system. That way a bad argument never reaches your database or API client in the first place.
+
+## How Does Go Compare to Python and TypeScript for Building MCP Servers?
+
+TypeScript and Python dominate MCP server counts today (226 and 197 servers respectively among MCPFind's language-tagged entries, against Go's 16), mostly because the ecosystem started there and most tool wrappers are thin API clients where language performance barely matters. Go pulls ahead when a server needs real concurrency, like fanning out to several backends per tool call, or when a single static binary with no runtime is a deployment requirement.
+
+Goroutines make concurrent tool execution cheap to write correctly. The Python equivalent usually means reaching for asyncio and managing an event loop by hand. Deployment is the other differentiator: a compiled Go binary runs on a bare container image with nothing else installed, while Python and Node servers carry their runtime and dependencies along. None of this makes Go a universal upgrade, though. A straightforward wrapper around a low-traffic REST API still favors TypeScript, since the SDK examples are more mature there. My rule: reach for Go the moment a single tool call fans out to multiple backends, or the moment you need to ship one binary onto a scratch container. For everything else, start in TypeScript.
+
+## How Do You Test a Go MCP Server Locally Before Deploying?
+
+Run the MCP Inspector against your server before connecting it to Claude Desktop or Cursor. It lets you call tools directly, inspect the raw JSON responses, and catch schema mistakes without a live model burning tokens on a broken tool.
+
+Point the Inspector at your compiled binary using stdio, the same transport your production clients will use, so what you test matches what ships. Write a small Go test file that calls each tool handler directly with both valid and invalid input, checking that validation failures come back as `IsError: true` results rather than panics. Once the Inspector session looks clean, add the server to Claude Desktop's config with the full path to your binary, restart the client, and confirm the tool list appears before you test it in a real conversation. This last step catches config typos that unit tests never will.
+
+## Frequently Asked Questions
+
+### Is the official Go SDK production-ready?
+
+The v1.x version line signals a stable public API, so breaking changes to core types are unlikely before a v2. The main gap versus a mature SDK is transport coverage: early releases lead with stdio, so if your deployment depends on Streamable HTTP or SSE today, confirm those are in the release you pull before you commit.
+
+### Should I use the official Go SDK or mark3labs/mcp-go for a new project?
+
+Use the official SDK for new projects that want long-term spec alignment and Google's backing. mark3labs/mcp-go still has a larger installed base and supports more transports today, so only migrate an existing project if the official SDK's roadmap matters more to you than switching cost.
+
+### Does stdio or HTTP transport work better for a Go MCP server?
+
+Start with stdio for local development in Claude Desktop or Cursor. Move to Streamable HTTP only when you need a remote, multi-client deployment, since HTTP requires session and auth handling that stdio does not.
+
+### How do I submit a Go MCP server to MCPFind once it's built?
+
+Push your server to GitHub with a valid go.mod and README, then submit it through the MCPFind directory form. The indexing pipeline detects the primary language automatically from your repository metadata, no manual tagging required.
+
+This is the first post in MCPFind's how-to language tutorial cluster alongside the [Python](/blog/build-mcp-tools-python-tutorial) and [TypeScript](/blog/build-mcp-server-typescript) guides. Future how-to posts in this cluster should link back here. For more build guides and server comparisons, browse the full [MCPFind blog](/blog).

@@ -1,0 +1,102 @@
+---
+title: "GitLab MCP Server: Pipelines, MRs, and CI/CD for Claude"
+description: "Set up GitLab's official MCP server or the community alternative to manage merge requests, pipelines, and issues from Claude. Covers tier gating for both."
+excerpt: "GitLab's official MCP server is still in beta and gated to Premium and Ultimate, which pushes many teams toward zereight/gitlab-mcp, a community server with more tools than GitLab ships itself. This guide covers both paths and which one fits a Free-tier or self-managed instance."
+date: "2026-07-07"
+updatedAt: "2026-07-07"
+author: "Gus Marquez"
+authorUrl: "https://www.linkedin.com/in/gustavoamarquez"
+authorSameAs:
+  - "https://www.linkedin.com/in/gustavoamarquez"
+tags:
+  - "mcp"
+  - "developer"
+  - "gitlab"
+  - "devops"
+  - "ci-cd"
+category: "devtools"
+focusKeyword: "gitlab mcp server"
+draft: false
+cornerstone: false
+topic_source: new_topic
+faqItems:
+  - question: "Is GitLab's official MCP server available on the Free tier?"
+    answer: "It isn't. Premium and Ultimate are the only tiers that can run it. If you're on Free or self-managed Community Edition, a community server like zereight/gitlab-mcp is how you get MCP access to your instance, and it's what most teams in that position end up using."
+  - question: "Is GitLab's MCP server the same thing as GitLab Duo Agent Platform?"
+    answer: "No. Duo Agent Platform went GA in GitLab 18.8 (January 2026), while the MCP server underneath it is still beta."
+  - question: "How many tools does zereight/gitlab-mcp expose compared to the official server?"
+    answer: "Roughly 178 on the community side, against a much narrower official set built around the core Duo workflow. That count spans projects, merge requests, issues, pipelines, wikis, and CI/CD variables, which is the main reason some paid-tier teams run zereight even though they qualify for the official server."
+  - question: "Can I run a GitLab MCP server against a self-hosted GitLab instance?"
+    answer: "Both routes work here. The official server supports Self-Managed and Dedicated editions, and community servers like zereight/gitlab-mcp run against self-hosted GitLab too. The one prerequisite either way: a personal or project access token carrying the right scopes."
+---
+
+GitLab shipped an official MCP server as a beta feature in 2026. The catch: it only works if you're paying for Premium or Ultimate. That tier gate is the detail most GitLab MCP write-ups skip, and it's the reason a community server, zereight/gitlab-mcp, has become the default choice for anyone on GitLab Free or self-managed Community Edition. GitLab sits in MCPFind's [devtools category](/categories/devtools) alongside GitHub, Jira, and Linear, all indexed with the same star and activity data. This guide covers both paths: what GitLab's own server exposes and what the community alternative adds on top. Then it walks through wiring either one into Claude so it can read pipelines and open merge requests without you leaving the chat. New to MCP? [Start with the basics](/blog/what-is-mcp) first.
+
+## What Does GitLab's Official MCP Server Do?
+
+GitLab's official MCP server, part of GitLab Duo, exposes core GitLab data (projects, merge requests, issues, pipelines) as MCP tools any compatible client can call. It moved from an experimental feature in GitLab 18.3 to beta in GitLab 18.6, and as of the current docs it's still labeled beta, not generally available.
+
+You'll need GitLab Premium or Ultimate to run it, on GitLab.com, Self-Managed, or Dedicated. As of GitLab 18.7 it supports both the 2025-03-26 and 2025-06-18 versions of the MCP spec. It connects over HTTP by default with no extra dependencies, or stdio through the `mcp-remote` bridge if your client needs it. Auth runs through OAuth 2.0 with dynamic client registration rather than a static token. One thing worth getting straight: don't confuse this beta MCP server with GitLab Duo Agent Platform, a separate and broader product that reached general availability in January 2026. That GA milestone applies to Duo Agent Platform, not to the MCP server underneath it.
+
+## Why Do Free Tier and Self-Hosted Teams Use a Community GitLab MCP Server Instead?
+
+GitLab Free and self-managed Community Edition can't use the official MCP server at all. It's gated to Premium and Ultimate, full stop. Teams on those tiers turn to community projects, and zereight/gitlab-mcp has become the de facto standard, with roughly 1.8k GitHub stars and active weekly releases as of July 2026.
+
+zereight/gitlab-mcp also exposes far more surface area than GitLab's own server: about 178 tools spanning projects, merge requests, issues, pipelines, wikis, releases, tags, milestones, and CI/CD variables. Two smaller alternatives exist too. yoda-digital covers 86 tools, and mcpland adds a policy engine on top of a similar tool count. Neither has caught up to zereight's adoption, though. Paid-tier teams sometimes reach for zereight anyway, since it ships more tools than the official beta does today, and on Free or CE it's effectively the only door in.
+
+## How Do You Set Up the Community GitLab MCP Server?
+
+Generate a GitLab personal access token with `api` scope, then run zereight/gitlab-mcp with that token and your GitLab instance URL as environment variables. The server ships as an npm package, so there's no separate build step before you point Claude at it.
+
+```json
+{
+  "mcpServers": {
+    "gitlab": {
+      "command": "npx",
+      "args": ["-y", "@zereight/mcp-gitlab"],
+      "env": {
+        "GITLAB_PERSONAL_ACCESS_TOKEN": "your-token-here",
+        "GITLAB_API_URL": "https://gitlab.yourcompany.com/api/v4"
+      }
+    }
+  }
+}
+```
+
+Scope the token narrowly. `api` grants broad read and write access, so if you only need Claude to read merge requests and pipeline status, check the server's read-only mode instead of handing over a full-access token. Restart your MCP client after saving the config so it picks up the new server. The [Terraform MCP server](/blog/terraform-mcp-server-iac-guide) has the same requirement after you rescope its credentials. Then confirm the tool list includes project and merge request tools before you trust it with a real workflow.
+
+## How Does GitLab MCP Compare to GitHub's MCP Server?
+
+GitHub's official MCP server is hosted, free on any plan, and backed by broad community adoption. GitLab's server is self-hosted or SaaS-gated to paid tiers, and it's still beta. That gating is what pushes lower-tier teams toward third-party servers in the first place.
+
+That asymmetry matters if your organization runs both platforms. A team migrating from GitHub to GitLab, or running both during a transition, should expect the MCP experience to diverge. GitHub tool access is close to a solved problem. GitLab MCP access still depends heavily on which tier you're on and whether you're comfortable running a community server in production. If your pipeline deploys to a cluster, a [Kubernetes MCP server](/blog/kubernetes-mcp-server-cluster-management) covers the deployment target while GitLab covers source control, and the two run side by side in one client.
+
+## Can Claude Use GitLab MCP for CI/CD Pipeline Debugging?
+
+Yes. Both the official and community servers expose pipeline status and job data as tools, so Claude can pull the latest pipeline run, identify which job failed, and read the relevant log lines without you opening the GitLab UI. It's one of the highest-value use cases teams report.
+
+In practice this looks like asking Claude why the last pipeline on a branch failed, then watching it fetch the job list, find the failed step, and pull just the log tail around the error instead of the full multi-thousand-line output. Similar tooling lives in MCPFind's [monitoring category](/categories/monitoring), where servers like [Sentry](/blog/sentry-mcp-server-error-tracking) and [Datadog](/blog/datadog-mcp-server-observability) sit. Connect one of those alongside GitLab and Claude can correlate a pipeline failure with an error spike in the same conversation. If your pipeline also deploys to Vercel, the [Vercel MCP deployment guide](/blog/vercel-mcp-server-deployment-guide) covers that half of the workflow.
+
+## What Should You Watch for When Granting Claude Write Access to GitLab?
+
+Scope tokens to the smallest set of write actions Claude actually needs. Before you connect anything that merges, closes, or deletes, confirm those are behaviors you actually want an agent performing on your repositories. Both the official server and community alternatives support read-only modes, and starting there is the safer default.
+
+Merge request creation is the write action teams reach for first, and it's also the one worth the most caution. An agent that can open an MR can usually close or update one too. So a token scoped for "open a draft MR" often carries more power than the task needs. Test any write-enabled workflow against a throwaway project first, not a production repository, and watch the first few calls closely before you trust the agent unsupervised. Pipeline variable tools deserve the same care, since one mis-set variable can break every build that follows.
+
+## Frequently Asked Questions
+
+### Is GitLab's official MCP server available on the Free tier?
+
+It isn't. Premium and Ultimate are the only tiers that can run it. If you're on Free or self-managed Community Edition, a community server like zereight/gitlab-mcp is how you get MCP access to your instance, and it's what most teams in that position end up using.
+
+### Is GitLab's MCP server the same thing as GitLab Duo Agent Platform?
+
+No. Duo Agent Platform went GA in GitLab 18.8 (January 2026), while the MCP server underneath it is still beta.
+
+### How many tools does zereight/gitlab-mcp expose compared to the official server?
+
+Roughly 178 on the community side, against a much narrower official set built around the core Duo workflow. That count spans projects, merge requests, issues, pipelines, wikis, and CI/CD variables, which is the main reason some paid-tier teams run zereight even though they qualify for the official server.
+
+### Can I run a GitLab MCP server against a self-hosted GitLab instance?
+
+Both routes work here. The official server supports Self-Managed and Dedicated editions, and community servers like zereight/gitlab-mcp run against self-hosted GitLab too. The one prerequisite either way: a personal or project access token carrying the right scopes.
