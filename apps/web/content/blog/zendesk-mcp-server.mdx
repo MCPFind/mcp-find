@@ -1,0 +1,108 @@
+---
+title: "Zendesk MCP Server: Customer Support Data for AI Agents"
+description: "There is no official Zendesk MCP server yet, but a community project lets Claude query tickets, ticket comments, and your Help Center articles directly."
+excerpt: "Zendesk doesn't publish its own MCP server, but a community project called zendesk-mcp-server gives Claude and Cursor access to tickets, ticket comments, and your Help Center articles. This guide covers what it exposes, how to authenticate it, and where it fits alongside your CRM stack."
+date: "2026-07-09"
+updatedAt: "2026-07-09"
+author: "Adam Bush"
+authorUrl: "https://www.linkedin.com/in/adam-bush/"
+authorSameAs:
+  - "https://www.linkedin.com/in/adam-bush/"
+tags:
+  - "mcp"
+  - "developer"
+  - "zendesk"
+  - "customer-support"
+  - "crm"
+category: "productivity"
+focusKeyword: "zendesk mcp server"
+draft: false
+cornerstone: false
+topic_source: new_topic
+faqItems:
+  - question: "Is there an official Zendesk MCP server?"
+    answer: "Not yet. Zendesk hasn't published its own MCP server. The most maintained option right now is the community project zendesk-mcp-server, built by an independent developer."
+  - question: "What can the Zendesk MCP server actually do with tickets?"
+    answer: "It can fetch, create, update, filter, sort, and paginate through tickets, plus read and post both public and private ticket comments."
+  - question: "How does the Zendesk MCP server authenticate?"
+    answer: "It uses an API token stored as an environment variable, not OAuth. You generate the token from your Zendesk admin settings and drop it into your MCP client config."
+  - question: "Can the Zendesk MCP server draft ticket responses automatically?"
+    answer: "It comes with built-in prompts designed for ticket analysis and response drafting, so Claude can suggest a reply based on the ticket history, though a human should still review before sending."
+  - question: "Does the Zendesk MCP server work alongside Salesforce or HubSpot MCP servers?"
+    answer: "Yes. Support and CRM data live in different systems, and running multiple MCP servers at once lets an agent pull ticket context from Zendesk while checking account details in Salesforce or HubSpot in the same conversation."
+---
+
+If you want Claude to look up a customer's ticket history, draft a reply, or check what's still open, you'd normally have to leave your AI client and log into Zendesk yourself. There's no official Zendesk MCP server that closes that gap yet. A community project fills the space reasonably well, though. This post walks through what it exposes, how to get it authenticated, and what it's actually good for once it's wired up. If you run support on Zendesk and want an agent that can read tickets, pull Help Center articles, and draft responses without you copying text between windows, keep reading.
+
+## What Is the Zendesk MCP Server and What Can It Do?
+
+The most maintained option is a community project, zendesk-mcp-server, currently sitting at 108 stars on GitHub. It's a Python server. It covers three main areas. Tickets are the biggest piece: you can fetch, create, update, filter, sort, and paginate through them, which covers most of what a support agent would normally do inside the Zendesk console itself.
+
+Ticket comments are the second piece. That means both public replies visible to the customer and the private internal notes your team uses to coordinate. Claude can read the whole thread, not just the latest message, so it can catch context from three exchanges back if that's where the relevant detail is buried.
+
+The third piece is your Help Center. The server can pull full article content, which means Claude can answer a question by checking your published docs instead of guessing. MCPFind's [productivity category](/categories/productivity) holds 33 servers built for exactly this kind of workflow automation, though the CRM and support-tooling corner of the directory is still thin compared to categories like devtools.
+
+## How Do You Set Up and Authenticate the Zendesk MCP Server?
+
+Authentication runs on an API token, not OAuth. Generate one from your Zendesk admin settings under API access, then drop it into your MCP client's config alongside your subdomain and email:
+
+```json
+{
+  "mcpServers": {
+    "zendesk": {
+      "command": "uvx",
+      "args": ["zendesk-mcp-server"],
+      "env": {
+        "ZENDESK_SUBDOMAIN": "your-company",
+        "ZENDESK_EMAIL": "you@company.com",
+        "ZENDESK_API_TOKEN": "your-api-token"
+      }
+    }
+  }
+}
+```
+
+A token tied to a dedicated service account is a better call than one tied to your personal login. If a teammate leaves or the token needs rotating, you won't be scrambling to update every place your own credentials happen to be wired in. And if your Zendesk plan supports role-based tokens, scope it to the narrowest role that still lets your workflow run.
+
+Test the connection with a read-only question first. Something like "list my five most recently updated tickets," before you ask it to touch anything. That confirms the token and subdomain are wired up correctly, and it gives you a feel for the response format before you build a workflow around it.
+
+## What Can You Ask Claude to Do With Zendesk Tickets?
+
+Once it's connected, you talk to it the way you'd talk to a colleague who already has the ticket open. Ask "what's the status on ticket 4521" and you get the current state, assignee, and the last update, pulled live rather than from memory. Ask "summarize the last five messages on this thread" and Claude reads through the comment history and hands you the gist instead of you scrolling.
+
+Where it earns its keep is drafting. The server ships with built-in prompts tuned for ticket analysis and response drafting, so you can ask Claude to suggest a reply based on the customer's history and your Help Center's existing answer to a similar question. It's a draft, not an autosend. Someone should still read it before it goes out, especially early on while you're figuring out how much you trust the tone it lands on.
+
+There's a triage angle too, and it's probably the fastest win for a busy support team. Point Claude at a backlog and ask "which of these ten open tickets sound like they're about the same billing issue," and it groups them by reading the actual content instead of you eyeballing subject lines. Tedious for a person. Quick for an agent that can read fifty tickets in the time it takes you to open five.
+
+## Is the Zendesk MCP Server Safe to Use With Customer Data?
+
+Support tickets carry real customer information: names, emails, sometimes payment details or account numbers pasted into a message by someone trying to get help fast. Pointing an agent at that data is worth thinking through before you flip the switch.
+
+Start with a service account token instead of your own login, and give it a lower-privilege role if Zendesk's plan allows it. That way a leaked token doesn't hand over your whole account, and you can rotate it without locking yourself out of anything else. Handle regulated data, like health or financial details inside tickets? Check whether your Zendesk plan's compliance certifications actually extend to third-party API access before connecting any external tool at all, MCP or otherwise.
+
+One more thing worth deciding upfront: does the agent get write access, or just read? Read-only is the safer default while you're still learning how the responses land. Draft-only mode, where Claude suggests a reply but a person sends it, is a reasonable middle ground for most support teams in the first few weeks of using this.
+
+## How Does Zendesk MCP Fit Into a Broader Support and CRM Stack?
+
+Support tickets rarely tell the whole story on their own. A customer's account status, contract terms, and purchase history usually live somewhere else, most often a CRM like [Salesforce](/blog/salesforce-mcp-server-setup-guide) or [HubSpot](/blog/hubspot-mcp-server-marketing-setup). Running Zendesk MCP alongside one of those means an agent can pull ticket context and account context in the same conversation, without you flipping between three tabs to piece it together yourself.
+
+Weighing which CRM-adjacent tools are worth connecting first? The [CRM and sales MCP roundup](/blog/best-mcp-servers-crm-sales) is a good starting point, and MCPFind's data shows a real example already indexed: [Close's official MCP server](/servers/com-close-close-mcp) is one of the handful of CRM tools with a direct integration live today.
+
+New to MCP itself? The [cornerstone guide on what MCP actually is](/blog/what-is-mcp) is the place to start before wiring up any of these.
+
+## Frequently Asked Questions
+
+### Is there an official Zendesk MCP server?
+Not yet. Zendesk hasn't published its own MCP server. The most maintained option right now is the community project zendesk-mcp-server, built by an independent developer.
+
+### What can the Zendesk MCP server actually do with tickets?
+It can fetch, create, update, filter, sort, and paginate through tickets, plus read and post both public and private ticket comments.
+
+### How does the Zendesk MCP server authenticate?
+It uses an API token stored as an environment variable, not OAuth. You generate the token from your Zendesk admin settings and drop it into your MCP client config.
+
+### Can the Zendesk MCP server draft ticket responses automatically?
+It comes with built-in prompts designed for ticket analysis and response drafting, so Claude can suggest a reply based on the ticket history, though a human should still review before sending.
+
+### Does the Zendesk MCP server work alongside Salesforce or HubSpot MCP servers?
+Yes. Support and CRM data live in different systems, and running multiple MCP servers at once lets an agent pull ticket context from Zendesk while checking account details in Salesforce or HubSpot in the same conversation.
