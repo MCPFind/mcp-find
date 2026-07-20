@@ -38,7 +38,12 @@ export async function GET(request: NextRequest) {
 
   try {
     const result = await listServers({ q, category, sort, page, limit, status });
-    return NextResponse.json(result);
+    // CDN cache: matches listServers' own 6h unstable_cache window (see
+    // lib/queries.ts) so repeat identical query strings are served from
+    // Vercel's edge without invoking this function or touching Supabase.
+    return NextResponse.json(result, {
+      headers: { 'Cache-Control': 'public, s-maxage=21600, stale-while-revalidate=86400' },
+    });
   } catch (err) {
     console.error('listServers error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

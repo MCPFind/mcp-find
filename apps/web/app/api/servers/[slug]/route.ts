@@ -15,5 +15,10 @@ export async function GET(
   if (!server) {
     return NextResponse.json({ error: 'Server not found' }, { status: 404 });
   }
-  return NextResponse.json(server);
+  // CDN cache: matches getServerBySlug's own 7-day unstable_cache window
+  // (see lib/queries.ts) so repeat requests for the same slug are served
+  // from Vercel's edge without invoking this function or touching Supabase.
+  return NextResponse.json(server, {
+    headers: { 'Cache-Control': 'public, s-maxage=604800, stale-while-revalidate=86400' },
+  });
 }

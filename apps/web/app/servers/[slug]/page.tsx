@@ -71,7 +71,12 @@ import {
 } from "@tabler/icons-react";
 import { ServerOutboundLink } from "@/components/ServerOutboundLink";
 
-export const revalidate = 86400;
+// 7 days — was 24h. Primary lever against the Supabase Disk IO/egress
+// overage: this is the ISR window for every /servers/[slug] render
+// (prerendered or on-demand), matching getServerBySlug's cache in
+// lib/queries.ts. A directory entry changes slowly; repeat crawls of the
+// same URL within a week never re-hit Supabase.
+export const revalidate = 604800;
 
 // Backstop: cap the function at 15s so a hung Supabase upstream (queries now
 // carry their own 8s abort timeout, see lib/queries.ts) can never hold the
@@ -100,7 +105,17 @@ const compatibilityClients = (Object.keys(CLIENT_CONFIGS) as ClientType[]).map(
 // Pre-render cap for the isIndexable() core. If the gated core is at or below
 // this size, every indexable server is pre-rendered at build time; if it's
 // larger, we pre-render the top INDEXABLE_PRERENDER_CAP by github_stars and
-// let the remainder serve via ISR (revalidate = 86400 above) on first request.
+// let the remainder serve via ISR (revalidate = 604800 above) on first request.
+//
+// 2026-07-20 egress/IO investigation: measured the actual isIndexable()
+// population directly against Supabase (~457 of 16,751 active/non-archived
+// rows clear the quality bar) — well under this cap, so every indexable
+// server is ALREADY fully pre-rendered at build time. Raising this number
+// would add build time for zero additional static coverage; it isn't the
+// lever for the egress/Disk IO issue. The real long-tail traffic driver is
+// crawls of *non-indexable* slugs (which correctly 404 via notFound() after
+// a live lookup) — the revalidate bump above is what caches those repeat
+// hits instead of the prerender cap.
 const INDEXABLE_PRERENDER_CAP = 1200;
 
 export async function generateStaticParams() {

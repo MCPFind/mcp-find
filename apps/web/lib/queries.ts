@@ -12,6 +12,13 @@ import { isIndexable, type IndexableServerInput } from './indexable';
 // canonical_slug is included so route generation (sitemap, links) can use the stable URL column.
 const SERVER_LIST_COLUMNS = 'id,slug,canonical_slug,name,description,version,category,source,package_name,package_type,package_url,has_tools,has_resources,has_prompts,tool_count,github_url,github_stars,github_forks,github_open_issues,github_last_push,github_license,github_language,github_contributors,github_archived,npm_weekly_downloads,registry_status,registry_published_at,registry_updated_at,registry_tags,is_official,featured,created_at,updated_at,last_synced_at';
 
+// Detail-page column set: everything in SERVER_LIST_COLUMNS plus readme_content
+// (rendered by ReadmeSection). Deliberately excludes search_vector — the one
+// `servers` column no consumer of getServerBySlug (page JSX, metadata.ts,
+// isIndexable, or the /api/servers/[slug] route) ever reads. select('*') was
+// pulling it on every detail-page fetch for nothing.
+const SERVER_DETAIL_COLUMNS = `${SERVER_LIST_COLUMNS},readme_content`;
+
 async function _listServers(params: ServerListParams): Promise<ServerListResponse> {
   const page = Math.max(1, params.page || 1);
   const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, params.limit || DEFAULT_PAGE_SIZE));
@@ -97,7 +104,10 @@ export const listServers = cache(
       return await unstable_cache(
         () => _listServers(params),
         ['list-servers', cacheKey],
-        { tags: ['servers'], revalidate: 3600 }
+        // 6h — was 1h. The directory changes slowly; a longer window means
+        // repeat crawler hits on the same filter/sort/page combo reuse the
+        // cached result instead of re-querying Supabase.
+        { tags: ['servers'], revalidate: 21600 }
       )();
     } catch (err) {
       // Upstream failed or hit the 8s abort timeout — degrade to an empty
@@ -127,7 +137,7 @@ async function _getServerBySlug(slug: string): Promise<ServerWithTools | null> {
   // maxDuration ceiling.
   let { data: server, error } = await supabase
     .from('servers')
-    .select('*')
+    .select(SERVER_DETAIL_COLUMNS)
     .eq('canonical_slug', slug)
     .abortSignal(AbortSignal.timeout(8000))
     .maybeSingle();
@@ -138,7 +148,7 @@ async function _getServerBySlug(slug: string): Promise<ServerWithTools | null> {
     // canonical_slug has not yet been backfilled.
     const result = await supabase
       .from('servers')
-      .select('*')
+      .select(SERVER_DETAIL_COLUMNS)
       .eq('slug', slug)
       .abortSignal(AbortSignal.timeout(8000))
       .maybeSingle();
@@ -171,7 +181,12 @@ export const getServerBySlug = cache(
       return await unstable_cache(
         () => _getServerBySlug(slug),
         ['server-by-slug', slug],
-        { tags: ['servers', `server-${slug}`], revalidate: 86400 }
+        // 7 days — was 24h. This is the primary lever against the Supabase
+        // Disk IO/egress overage: it applies to every /servers/[slug]
+        // render, prerendered or on-demand (including long-tail slugs that
+        // resolve to notFound() — that render gets cached too), so a
+        // repeat crawl of the same URL within the window never re-queries.
+        { tags: ['servers', `server-${slug}`], revalidate: 604800 }
       )();
     } catch (err) {
       // Upstream failed or hit the 8s abort timeout — fall through to null
@@ -195,7 +210,7 @@ export const getServerCount = cache(
         return count || 0;
       },
       ['server-count'],
-      { tags: ['servers'], revalidate: 3600 }
+      { tags: ['servers'], revalidate: 21600 }
     )()
 );
 
@@ -212,7 +227,7 @@ export const getTopServers = cache(
         return (data || []) as ServerListItem[];
       },
       ['top-servers', String(limit)],
-      { tags: ['servers'], revalidate: 3600 }
+      { tags: ['servers'], revalidate: 21600 }
     )()
 );
 
@@ -257,7 +272,7 @@ export const getIndexableTopServers = cache(
         return results.slice(0, limit);
       },
       ['indexable-top-servers', String(limit)],
-      { tags: ['servers'], revalidate: 3600 }
+      { tags: ['servers'], revalidate: 21600 }
     )()
 );
 
@@ -392,7 +407,7 @@ export const getServersByCategory = cache(
         return (data || []) as ServerListItem[];
       },
       ['servers-by-category', category],
-      { tags: ['servers', `category-${category}`], revalidate: 3600 }
+      { tags: ['servers', `category-${category}`], revalidate: 21600 }
     )()
 );
 
@@ -432,7 +447,7 @@ export const getIndexableServersByCategory = cache(
         return results;
       },
       ['indexable-servers-by-category', category],
-      { tags: ['servers', `category-${category}`], revalidate: 3600 }
+      { tags: ['servers', `category-${category}`], revalidate: 21600 }
     )()
 );
 
@@ -453,7 +468,7 @@ export const getCategoryCount = cache(
         return count || 0;
       },
       ['category-count', category],
-      { tags: ['servers', `category-${category}`], revalidate: 3600 }
+      { tags: ['servers', `category-${category}`], revalidate: 21600 }
     )()
 );
 
@@ -476,7 +491,7 @@ export const getCategoryLastUpdated = cache(
         return result;
       },
       ['category-last-updated'],
-      { tags: ['servers'], revalidate: 3600 }
+      { tags: ['servers'], revalidate: 21600 }
     )()
 );
 
@@ -494,6 +509,6 @@ export const getLastSyncTime = cache(
         return data?.completed_at || null;
       },
       ['last-sync-time'],
-      { tags: ['servers'], revalidate: 3600 }
+      { tags: ['servers'], revalidate: 21600 }
     )()
 );

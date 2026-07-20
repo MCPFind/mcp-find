@@ -37,5 +37,10 @@ export async function GET(
     client as ClientType
   );
 
-  return NextResponse.json(config);
+  // CDN cache: same rationale as /api/servers/[slug] — this is derived
+  // entirely from the same 7-day-cached server row, so it's safe to cache
+  // at the same window.
+  return NextResponse.json(config, {
+    headers: { 'Cache-Control': 'public, s-maxage=604800, stale-while-revalidate=86400' },
+  });
 }
