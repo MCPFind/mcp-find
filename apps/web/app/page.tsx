@@ -58,6 +58,11 @@ const HomeFaq = dynamic(
 // the background. Warm LCP is already 2.2s; cold TTFB (6.2s) was the blocker.
 export const revalidate = 3600;
 
+// Backstop: cap the function at 15s so a hung Supabase upstream (queries now
+// carry their own 8s abort timeout, see lib/queries.ts) can never hold the
+// render open until the platform's default 300s ceiling.
+export const maxDuration = 15;
+
 // Static metadata — description uses a conservative number to avoid drift.
 // The live serverCount from Supabase is shown dynamically in the hero section.
 export async function generateMetadata(): Promise<Metadata> {

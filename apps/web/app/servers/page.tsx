@@ -12,6 +12,11 @@ import { parseFilterParams } from "@/lib/filter-utils";
 import { safeJsonLd } from "@/lib/json-ld";
 import { getQualityStatus } from "@/lib/quality-status";
 
+// Backstop: cap the function at 15s so a hung Supabase upstream (queries now
+// carry their own 8s abort timeout, see lib/queries.ts) can never hold the
+// render open until the platform's default 300s ceiling.
+export const maxDuration = 15;
+
 export async function generateMetadata(): Promise<Metadata> {
   let countStr = FALLBACK_SERVER_COUNT_DISPLAY;
   try {

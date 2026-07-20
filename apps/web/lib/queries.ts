@@ -61,7 +61,9 @@ async function _listServers(params: ServerListParams): Promise<ServerListRespons
     case 'downloads': query = query.order('npm_weekly_downloads', { ascending: false }); break;
   }
 
-  query = query.range(offset, offset + limit - 1);
+  // 8s abort timeout — prevents a hung/slow Supabase upstream from holding
+  // the render open until the platform's function-duration ceiling.
+  query = query.range(offset, offset + limit - 1).abortSignal(AbortSignal.timeout(8000));
 
   const { data, count, error } = await query;
   if (error) throw new Error(`Query failed: ${error.message}`);
@@ -76,7 +78,7 @@ async function _listServers(params: ServerListParams): Promise<ServerListRespons
 }
 
 export const listServers = cache(
-  (params: ServerListParams): Promise<ServerListResponse> => {
+  async (params: ServerListParams): Promise<ServerListResponse> => {
     const cacheKey = [
       params.category ?? '',
       params.q ?? '',
@@ -91,11 +93,26 @@ export const listServers = cache(
       params.isOfficial ? '1' : '',
       params.featured ? '1' : '',
     ].join('\x00');
-    return unstable_cache(
-      () => _listServers(params),
-      ['list-servers', cacheKey],
-      { tags: ['servers'], revalidate: 3600 }
-    )();
+    try {
+      return await unstable_cache(
+        () => _listServers(params),
+        ['list-servers', cacheKey],
+        { tags: ['servers'], revalidate: 3600 }
+      )();
+    } catch (err) {
+      // Upstream failed or hit the 8s abort timeout — degrade to an empty
+      // list instead of hanging/500ing the render. The try/catch sits
+      // OUTSIDE unstable_cache, so only successful results ever get
+      // persisted into the 1h cache; a bad upstream moment isn't cached.
+      console.error('listServers: upstream failed, returning empty result', err);
+      return {
+        servers: [],
+        total: 0,
+        page: params.page || 1,
+        limit: params.limit || DEFAULT_PAGE_SIZE,
+        totalPages: 0,
+      };
+    }
   }
 );
 
@@ -105,10 +122,14 @@ export const listServers = cache(
 async function _getServerBySlug(slug: string): Promise<ServerWithTools | null> {
   // Try canonical_slug first (populated after migration 005 runs).
   // If no match, fall back to the mutable slug column (pre-migration or community servers).
+  // 8s abort timeout on every Supabase call below — same rationale as
+  // _listServers: fail fast instead of hanging until the function's
+  // maxDuration ceiling.
   let { data: server, error } = await supabase
     .from('servers')
     .select('*')
     .eq('canonical_slug', slug)
+    .abortSignal(AbortSignal.timeout(8000))
     .maybeSingle();
 
   if (!server) {
@@ -119,6 +140,7 @@ async function _getServerBySlug(slug: string): Promise<ServerWithTools | null> {
       .from('servers')
       .select('*')
       .eq('slug', slug)
+      .abortSignal(AbortSignal.timeout(8000))
       .maybeSingle();
     server = result.data;
     error = result.error;
@@ -135,7 +157,8 @@ async function _getServerBySlug(slug: string): Promise<ServerWithTools | null> {
   const { data: tools } = await supabase
     .from('server_tools')
     .select('*')
-    .eq('server_id', server.id);
+    .eq('server_id', server.id)
+    .abortSignal(AbortSignal.timeout(8000));
 
   return { ...server, tools: tools || [] } as ServerWithTools;
 }
@@ -143,12 +166,22 @@ async function _getServerBySlug(slug: string): Promise<ServerWithTools | null> {
 // React cache() deduplicates within a single request; unstable_cache persists
 // across requests and supports tag-based on-demand revalidation.
 export const getServerBySlug = cache(
-  (slug: string): Promise<ServerWithTools | null> =>
-    unstable_cache(
-      () => _getServerBySlug(slug),
-      ['server-by-slug', slug],
-      { tags: ['servers', `server-${slug}`], revalidate: 86400 }
-    )()
+  async (slug: string): Promise<ServerWithTools | null> => {
+    try {
+      return await unstable_cache(
+        () => _getServerBySlug(slug),
+        ['server-by-slug', slug],
+        { tags: ['servers', `server-${slug}`], revalidate: 86400 }
+      )();
+    } catch (err) {
+      // Upstream failed or hit the 8s abort timeout — fall through to null
+      // so the page takes the existing notFound() path instead of
+      // hanging/500ing. Not cached: this try/catch sits outside
+      // unstable_cache, same reasoning as listServers above.
+      console.error(`getServerBySlug(${slug}): upstream failed, returning null`, err);
+      return null;
+    }
+  }
 );
 
 export const getServerCount = cache(

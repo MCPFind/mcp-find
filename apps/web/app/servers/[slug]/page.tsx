@@ -73,6 +73,11 @@ import { ServerOutboundLink } from "@/components/ServerOutboundLink";
 
 export const revalidate = 86400;
 
+// Backstop: cap the function at 15s so a hung Supabase upstream (queries now
+// carry their own 8s abort timeout, see lib/queries.ts) can never hold the
+// render open until the platform's default 300s ceiling.
+export const maxDuration = 15;
+
 // Hoisted to module scope — derived only from compile-time CLIENT_CONFIGS,
 // so there's no need to rebuild this array on every render.
 const CLIENT_DISPLAY_NAMES: Record<ClientType, string> = {
