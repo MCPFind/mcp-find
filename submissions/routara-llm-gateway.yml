@@ -1,0 +1,7 @@
+servers:
+  - name: "Routara LLM Gateway"
+    github_url: "https://github.com/36412749-collab/routara-mcp"
+    package_name: "routara-mcp"
+    description: "Open-source MCP server for 787+ LLMs plus image and video generation through the Routara OpenAI-compatible API."
+    package_type: "npm"
+    category: "ai-ml"
