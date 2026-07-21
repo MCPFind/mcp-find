@@ -1,0 +1,7 @@
+servers:
+  - name: "Dida Hotel MCP"
+    github_url: "https://github.com/DIDA-AI/Dida-Hotel-MCP-Global"
+    package_name: "@didaai/hotelbooking-ai"
+    description: "Official DIDA Hotel Booking MCP Server. World #3 B2B travel corp, 14y supply chain, 2M hotels at B2B rates, 40+ LLM compatible. Free access for businesses & solo developers with unlimited calls."
+    package_type: "npm"
+    category: "search"
