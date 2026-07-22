@@ -1,0 +1,99 @@
+---
+title: "Intercom MCP Server: AI-Powered Support Conversation Search"
+description: "Connect Claude to Intercom with MCP to search support conversations and contacts. Covers the official remote server and a faster local cache alternative."
+excerpt: "Intercom has an official MCP server for US workspaces plus a community alternative built for speed. Here is how each one authenticates, what they can search, and which one fits a high-volume support team."
+date: "2026-07-17"
+updatedAt: "2026-07-17"
+author: "Adam Bush"
+authorUrl: "https://www.linkedin.com/in/adam-bush/"
+authorSameAs:
+  - "https://www.linkedin.com/in/adam-bush/"
+tags:
+  - "mcp"
+  - "developer"
+  - "intercom"
+  - "communication"
+category: "communication"
+focusKeyword: "intercom mcp server"
+draft: false
+cornerstone: false
+topic_source: new_topic
+faqItems:
+  - question: "Can the Intercom MCP server run locally, or does it only work as a remote connection?"
+    answer: "Both, but they're two different servers. The official intercom/intercom-mcp-server is remote-only, so there's no binary to patch or keep current, which suits teams that don't want to babysit local infrastructure. If you'd rather keep the data path on your own machine, or you need lookups to work against a cache when the API is slow, the community fast-intercom-mcp runs over stdio locally. The real question is who you want owning updates: Intercom, or you."
+  - question: "Why does the official Intercom MCP server only support US-hosted workspaces?"
+    answer: "It comes down to data residency. Intercom pins customer data to the region you signed up in, and the MCP server currently only reaches the US region. Not sure which region you're on? Check your Intercom URL or workspace settings before you assume you're blocked, since plenty of teams don't actually know their hosting region until they go look. EU and Australian workspaces will either wait for coverage or route through the community server."
+  - question: "Does an AI assistant need special Intercom permissions to use MCP?"
+    answer: "Yes, and they're read-only by design. The OAuth flow requests scopes for users, companies, and conversations, and it won't connect until they're granted. The upside of that specific scope list is that it caps what the assistant can touch. It can read your support history but has no permission to alter or delete anything, which is usually the exact reassurance a security team wants before they sign off."
+  - question: "Can Intercom MCP write replies back into a conversation, or is it read-only for searching and replying?"
+    answer: "The tools documented in the official server's README focus on search and retrieval rather than sending replies. Treat it as a research and summarization layer; the actual reply still comes from a human agent."
+  - question: "Is fast-intercom-mcp actually faster than the official server?"
+    answer: "Usually, for anything you run more than once. The local SQLite cache means a repeated search reads from disk instead of hitting the Intercom API, and the project cites up to a 100x speedup for cached queries. One caveat: a brand-new query that isn't in the cache yet still waits on the API, and that very first full sync is slow. So the payoff shows up when your team hammers the same lookups all day, not on one-off searches."
+---
+
+Most support teams are sitting on years of Intercom conversation history they can barely search. Intercom's own inbox filters and saved views only get you so far, especially once a workspace has been running for a few years and nobody remembers how old tickets got tagged. MCP changes the math. It lets Claude search and summarize those conversations directly, then connect each one back to the contact who raised it, without a human deciding upfront which filters to apply. You've got two real options today. There's Intercom's official server, which is remote-only and limited to US-hosted workspaces, and there's `fast-intercom-mcp`, a community project built around a local cache for speed. This guide walks through how each one authenticates, what they can actually search, and which one fits depending on your conversation volume and where your workspace is hosted.
+
+## What Is the Intercom MCP Server and What Can It Search?
+
+An Intercom MCP server lets an AI assistant query your support conversations and the contacts behind them. You ask a question in plain language, and it pulls the matching conversations along with the people who raised them, right inside the tool you're already working in. MCPFind indexes 245 servers in the communication category, and Intercom fills a specific gap next to the Slack and email integrations: customer-facing support data rather than internal team chat, with its own patterns for how conversations, contacts, and companies relate to each other.
+
+The official server exposes tools including `search`, `fetch`, `search_conversations`, `get_conversation`, `search_contacts`, and `get_contact`. Together they cover the core support workflow. You find the conversation first. From there you can pull its full history and trace exactly who was involved and which company they belong to. Intercom builds and maintains the whole thing in-house, which carries real weight with a support team that's cautious about wiring an AI assistant into live customer data. A first-party integration is a far easier sell to a nervous security reviewer than a third-party one.
+
+## How Do You Connect the Official Intercom MCP Server?
+
+The official server is remote-only, reached over Streamable HTTP at `mcp.intercom.com/mcp`. There's a legacy SSE endpoint too, for clients that haven't moved to the newer transport yet. There's nothing to install or keep updated on your own machine. You point your MCP client at Intercom's hosted infrastructure and connect through a browser-based OAuth flow. If your client supports it, you can pass a Bearer token in the request header instead.
+
+```json
+{
+  "mcpServers": {
+    "intercom": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://mcp.intercom.com/mcp"]
+    }
+  }
+}
+```
+
+During the OAuth flow, Intercom asks you to approve specific scopes, including read access to users, companies, and conversations. If a teammate manages your workspace's app permissions separately from your own account, they'll be the one clicking approve, so loop them in before you start. The connection won't complete until every requested scope has been granted.
+
+## What Is fast-intercom-mcp and Why Would You Use It Instead?
+
+`fast-intercom-mcp` takes a different route. Instead of hitting Intercom's API on every single search, it runs a local SQLite cache with background sync. A query that would normally mean a live API round trip reads straight from disk instead. The project describes this as up to a 100x speedup for repeated searches, which adds up fast if your team runs the same lookup dozens of times a day.
+
+It runs over stdio as a local process rather than a remote connection, authenticated with an `INTERCOM_ACCESS_TOKEN` environment variable you generate from your Intercom developer settings. Configuration options include the sync interval and how far back the cache reaches. Say your workspace holds five years of tickets but your team only ever searches the last six months. Set the cache window to match and skip indexing everything older. And because it talks to the Intercom API directly rather than going through Intercom's own hosted server, it isn't limited to US-hosted workspaces the way the official option currently is. For teams outside the US right now, that fact alone can settle the decision, speed aside.
+
+Setup starts with a pip install. Then an init command walks you through connecting your access token and kicking off the first background sync. That first sync can take a while on a workspace with years of history, so let it run before you rely on the cache for anything time-sensitive.
+
+## What Are the Limitations of Intercom MCP Right Now?
+
+The official server's biggest limitation is regional. It only supports Intercom workspaces hosted on US infrastructure. Teams on EU or Australian hosting have two choices: wait for expanded coverage, or route through the community alternative, which isn't bound by the regional limit for the reason covered in the section above. Standard Intercom API rate limits apply to both servers regardless, so neither one lets you sidestep Intercom's own throttling.
+
+Neither server is built for sending replies. The documented tools focus on search, pulling context, and summarizing what's already there. Think of Intercom MCP as a research layer that surfaces context for a human agent who still writes and sends the actual reply. If your workflow needs write access to conversations, or wants to tag and close tickets automatically, confirm that gap before you build a process around either server. Discovering the read-only ceiling after you've already trained your team on an automated close-ticket workflow is a painful way to learn it.
+
+## How Does Intercom MCP Fit Into a Broader Support and Communication Stack?
+
+Support conversations rarely live in isolation from the rest of a team's communication tools. MCPFind's guide to [MCP servers for email](/blog/mcp-server-email-gmail-outlook-setup) covers the Gmail and Outlook side of customer communication, handy when support tickets often start as an email thread before landing in Intercom. Once an issue surfaces and needs internal coordination, [Slack and Teams MCP servers](/blog/best-mcp-servers-communication-slack-teams) round out the picture, and [Discord's MCP server](/blog/discord-mcp-server-community-bots) is relevant if your support or community team fields questions there too. Teams that page someone when a conversation needs urgent escalation may also want [Twilio's MCP server](/blog/twilio-mcp-server-sms-voice) for SMS and voice alerts. Browse the full [communication category](/categories/communication) for the rest of what MCPFind has indexed across 245 servers.
+
+Want the bigger picture behind all of these integrations? MCPFind's [cornerstone guide to MCP](/blog/what-is-mcp) explains what MCP is and why individual servers like these exist, instead of one all-purpose connector trying to speak every product's API at once.
+
+## Frequently Asked Questions
+
+### Can the Intercom MCP server run locally, or does it only work as a remote connection?
+
+Both, but they're two different servers. The official intercom/intercom-mcp-server is remote-only, so there's no binary to patch or keep current, which suits teams that don't want to babysit local infrastructure. If you'd rather keep the data path on your own machine, or you need lookups to work against a cache when the API is slow, the community fast-intercom-mcp runs over stdio locally. The real question is who you want owning updates: Intercom, or you.
+
+### Why does the official Intercom MCP server only support US-hosted workspaces?
+
+It comes down to data residency. Intercom pins customer data to the region you signed up in, and the MCP server currently only reaches the US region. Not sure which region you're on? Check your Intercom URL or workspace settings before you assume you're blocked, since plenty of teams don't actually know their hosting region until they go look. EU and Australian workspaces will either wait for coverage or route through the community server.
+
+### Does an AI assistant need special Intercom permissions to use MCP?
+
+Yes, and they're read-only by design. The OAuth flow requests scopes for users, companies, and conversations, and it won't connect until they're granted. The upside of that specific scope list is that it caps what the assistant can touch. It can read your support history but has no permission to alter or delete anything, which is usually the exact reassurance a security team wants before they sign off.
+
+### Can Intercom MCP write replies back into a conversation, or is it read-only for searching and replying?
+
+The tools documented in the official server's README focus on search and retrieval rather than sending replies. Treat it as a research and summarization layer; the actual reply still comes from a human agent.
+
+### Is fast-intercom-mcp actually faster than the official server?
+
+Usually, for anything you run more than once. The local SQLite cache means a repeated search reads from disk instead of hitting the Intercom API, and the project cites up to a 100x speedup for cached queries. One caveat: a brand-new query that isn't in the cache yet still waits on the API, and that very first full sync is slow. So the payoff shows up when your team hammers the same lookups all day, not on one-off searches.
