@@ -1,0 +1,98 @@
+---
+title: "monday.com MCP Server: Connect AI Agents to Your Boards"
+description: "Set up the official monday.com MCP server so Claude and other AI assistants can read, create, and update your boards, items, and status updates directly."
+excerpt: "monday.com's official MCP server lets an AI assistant create items, move them between groups, and post updates on your boards. This guide covers install, the read-only safety flag, and what the server can and cannot touch."
+date: "2026-07-15"
+updatedAt: "2026-07-15"
+author: "Gus Marquez"
+authorUrl: "https://www.linkedin.com/in/gustavoamarquez"
+authorSameAs:
+  - "https://www.linkedin.com/in/gustavoamarquez"
+tags:
+  - "mcp"
+  - "beginner"
+  - "monday.com"
+  - "productivity"
+category: "productivity"
+focusKeyword: "monday.com mcp server"
+draft: false
+cornerstone: false
+topic_source: new_topic
+faqItems:
+  - question: "Is the monday.com MCP server official, or a community project?"
+    answer: "Official. monday.com publishes and maintains the `mondaycom/mcp` package in-house, so support comes from the vendor rather than outside developers."
+  - question: "Can I run the monday.com MCP server without giving it write access to my boards?"
+    answer: "You can. Passing the `--read-only` flag limits the server to reading boards and items, with no ability to create, update, or delete. It's a sensible way to test the connection before you open up a live project board to writes."
+  - question: "Does the monday.com MCP server require a local install, or is there a hosted option?"
+    answer: "Either works. Run it locally with npx and a personal API token, or connect to the hosted remote server at mcp.monday.com through an installed marketplace app using OAuth."
+  - question: "Can the AI assistant run raw GraphQL queries against my monday.com account?"
+    answer: "Only if you explicitly enable it. Raw API access through the dynamic API tools is disabled by default and has to be turned on with a separate flag, since it bypasses the server's built-in tool boundaries."
+  - question: "What happens to my monday.com API rate limits when an AI assistant is using the server?"
+    answer: "The server calls the same monday.com API your account already uses, so it counts against your existing plan's rate limits. Heavy back-and-forth automation, like asking an assistant to update every item on a large board one at a time, can hit those limits faster than a human clicking through the UI would."
+---
+
+If you run projects out of monday.com boards, you know the drill. You update item statuses one at a time. You write the same update across a dozen rows, then go hunting for the board that actually holds the task you're picturing, only to remember it got shuffled to a different workspace a couple sprints back. monday.com's official MCP server closes that gap. It lets Claude or another AI assistant read your boards and, if you allow it, create items, move them between groups, and post updates directly, all from a normal conversation instead of a spreadsheet-style interface. This guide walks through installing the server, the read-only flag to turn on first, and the tools it actually exposes once connected, so you know exactly what you're handing an AI assistant before you do it.
+
+## What Is the monday.com MCP Server and What Can It Do?
+
+The monday.com MCP server is an official package, `mondaycom/mcp`, that connects an AI assistant to your monday.com account through the same API the web app itself uses. monday.com builds and maintains it directly. That matters if you're deciding whether to trust it with write access to real project data rather than a sandbox account.
+
+Once connected, it can create items, delete them, move an item to a different group, change column values, post updates, and spin up new boards or forms straight from a conversation. That replaces a fair amount of manual clicking through nested board views and status dropdowns. MCPFind indexes 33 servers in the productivity category, and monday.com is one of the few with a first-party integration rather than a community-built alternative, a distinction worth checking for before you connect any assistant to data you'd rather not hand to an unmaintained side project.
+
+## Installing and Configuring the Server
+
+Installation runs through `npx`, so there's no separate package to manage or keep updated yourself. Every time you launch the server, it pulls the latest version automatically. You'll need a personal API token from your monday.com account, generated under your profile's developer settings. If you plan to keep the connection running long-term, scope that token to a service-style account rather than your own login.
+
+```json
+{
+  "mcpServers": {
+    "monday-api-mcp": {
+      "command": "npx",
+      "args": ["@mondaydotcomorg/monday-api-mcp@latest"],
+      "env": { "MONDAY_TOKEN": "your_monday_api_token" }
+    }
+  }
+}
+```
+
+Prefer to skip the local process entirely and avoid managing a token file on your own machine? monday.com also runs a hosted remote server at `mcp.monday.com/mcp`. Connecting to it goes through an installed "Monday MCP" marketplace app and OAuth instead of a token in your config file. Some teams prefer that for shared or managed setups, where individual API tokens get harder to track across a growing team. The tradeoff is less control over exactly which version of the server you're running, since monday.com manages updates on its end rather than you pinning a version yourself.
+
+## What's in the Box: The Tools It Exposes
+
+The tool list covers the actions you'd expect from board management software: `create_item`, `delete_item`, `get_board_items_by_name`, `change_item_column_values`, `move_item_to_group`, `create_update`, `create_board`, and `get_board_schema`. A few less obvious ones round it out. There's `create_group`, `create_column`, `list_users_and_teams`, and tools for creating and reading forms, which come in handy if you use monday.com to collect intake requests rather than just track existing work.
+
+One thing is notably absent by default: raw GraphQL access. monday.com's underlying API is GraphQL-based, and the server can expose that directly through what it calls dynamic API tools. But that access stays off unless you explicitly enable it with a separate flag at startup, since an AI assistant with unrestricted GraphQL access could run a query well outside what any of the named tools were designed to do. The default set sticks to common actions like creating items, moving them, and reading board schemas.
+
+## Starting Safe with Read-Only Mode
+
+Start with the `--read-only` flag before granting write access. It restricts the server to reading boards, items, and updates. No ability to create, delete, or modify anything at all. That's the safest way to confirm the connection works and see what the assistant can find before it's able to change something you didn't expect it to touch.
+
+Once you're comfortable, drop the flag to enable writes. Because the server authenticates as you, every action it takes is attributed to your account in monday.com's activity log the same way a manual edit would be, so there's a clear audit trail if something unexpected happens. Check that trail the first few times you use write access. It builds confidence in what the assistant is actually doing on your boards, and it gives you a paper trail to point to if a teammate asks why an item suddenly moved groups or a status flipped overnight.
+
+## How Does monday.com MCP Compare to Other Productivity MCP Servers?
+
+monday.com sits in a productivity category that MCPFind indexes at 33 servers. That's small compared to categories like documentation or communication, which makes an official, actively maintained entry like this one stand out on its own rather than getting lost in a long list of thin community projects. If your team also tracks tasks outside of boards, [Todoist's MCP server](/blog/todoist-mcp-server-task-management) covers simpler personal and team task lists, while [Notion's advanced MCP workflows](/blog/notion-mcp-server-advanced-workflows) handle a more freeform docs-and-database model that some teams prefer over a rigid board structure. Teams managing files alongside their boards may also want [Google Drive's MCP server](/blog/google-drive-mcp-server-guide), and [Obsidian's MCP setup](/blog/obsidian-mcp-server-knowledge-base) is worth a look if anyone keeps personal notes outside monday.com entirely. Browse the full [productivity category](/categories/productivity) for the rest of what MCPFind has indexed, including tools for location and scheduling workflows.
+
+For background on the protocol these servers all speak, MCPFind's [cornerstone guide to MCP](/blog/what-is-mcp) explains what MCP is and why "one server per tool" has become the standard pattern rather than a single do-everything integration.
+
+## Frequently Asked Questions
+
+### Is the monday.com MCP server official, or a community project?
+
+Official. monday.com publishes and maintains the `mondaycom/mcp` package in-house, so support comes from the vendor rather than outside developers.
+
+### Can I run the monday.com MCP server without giving it write access to my boards?
+
+You can. Passing the `--read-only` flag limits the server to reading boards and items, with no ability to create, update, or delete. It's a sensible way to test the connection before you open up a live project board to writes.
+
+### Does the monday.com MCP server require a local install, or is there a hosted option?
+
+Either works. Run it locally with npx and a personal API token, or connect to the hosted remote server at mcp.monday.com through an installed marketplace app using OAuth.
+
+### Can the AI assistant run raw GraphQL queries against my monday.com account?
+
+Only if you explicitly enable it. Raw API access through the dynamic API tools is disabled by default and has to be turned on with a separate flag, since it bypasses the server's built-in tool boundaries.
+
+### What happens to my monday.com API rate limits when an AI assistant is using the server?
+
+The server calls the same monday.com API your account already uses, so it counts against your existing plan's rate limits. Heavy back-and-forth automation, like asking an assistant to update every item on a large board one at a time, can hit those limits faster than a human clicking through the UI would.

@@ -1,0 +1,106 @@
+---
+title: "Confluence MCP Server: Setup Guide for AI Assistants"
+description: "Connect Confluence to Claude and other AI assistants with MCP. Compare the multi-tool mcp-atlassian server against a lightweight, search-only alternative."
+excerpt: "Confluence has two real MCP paths: the full-featured mcp-atlassian server that also covers Jira, and a smaller search-only alternative. Here is how to pick between them, install each one, and authenticate correctly."
+date: "2026-07-13"
+updatedAt: "2026-07-13"
+author: "Adam Bush"
+authorUrl: "https://www.linkedin.com/in/adam-bush/"
+authorSameAs:
+  - "https://www.linkedin.com/in/adam-bush/"
+tags:
+  - "mcp"
+  - "developer"
+  - "confluence"
+  - "documentation"
+category: "documentation"
+focusKeyword: "confluence mcp server setup"
+draft: false
+cornerstone: false
+topic_source: new_topic
+faqItems:
+  - question: "Does the Confluence MCP server work with Confluence Server or Data Center, or only Confluence Cloud?"
+    answer: "mcp-atlassian supports both, but the auth path differs by edition. Cloud connections use an API token with your account email, while Server and Data Center installs use a Personal Access Token generated from your Confluence user profile rather than the Atlassian admin console. Anything older than version 6.0 won't connect at all, so check your edition before you start."
+  - question: "Can the Confluence MCP server create and edit pages, or is it read-only?"
+    answer: "mcp-atlassian can create pages, update existing ones, and add comments on top of search, while the lightweight confluence-mcp-server alternative is read-only by design. The real limiter is the token, though. Write access is only as broad as the credential behind it, so a read-only token turns even mcp-atlassian into a search-only tool no matter how many write tools it advertises."
+  - question: "Do I need separate MCP servers for Jira and Confluence?"
+    answer: "No. mcp-atlassian connects to both products from one process, and it counts as a single entry in your MCP client config. That keeps you under the server limits some clients impose and gives you one changelog to track instead of two."
+  - question: "Is there an official Atlassian-maintained MCP server?"
+    answer: "Yes. Atlassian publishes its own remote MCP server covering Jira, Confluence, Jira Service Management, Bitbucket, and Compass, authenticated with OAuth 2.1. Because it's remote, there's no local process to run, but connecting means clicking through a browser consent screen, which some headless or automated setups simply can't accommodate."
+  - question: "What happens if I only need to search Confluence and never write to it?"
+    answer: "Start with the read-only confluence-mcp-server alternative. It exposes a single search tool over an HTTP transport and carries no Jira surface area at all, so there are fewer permissions to misconfigure and less to keep patched as the project evolves."
+---
+
+Two MCP servers can connect an AI assistant to Confluence, and they don't do the same job. `mcp-atlassian` is a community server with roughly 5,000 GitHub stars that handles both Confluence and Jira. `confluence-mcp-server` is smaller, Confluence-only, and built for search and nothing else. Which one you want comes down to whether you need to write pages and reach into Jira, or just search a wiki your team already keeps in Confluence. This guide covers both installs, the auth differences between Confluence Cloud and Server or Data Center, and the tools each one exposes once it's connected.
+
+## What a Confluence MCP Server Actually Does
+
+A Confluence MCP server is a bridge. It lets Claude or another AI assistant search, read, and sometimes edit Confluence pages directly, so you're not copying and pasting content into a chat window every time you need context from an old page. MCPFind indexes 398 servers in the documentation category, and Confluence sits right alongside Notion and the dedicated wiki tools teams already wire into their assistants for the same reason.
+
+The most capable option, and the one most teams land on, is `mcp-atlassian`. It's unofficial but actively kept up, MIT-licensed, and bundles roughly 98 tools across Confluence and Jira. That includes `confluence_search`, `confluence_get_page`, `confluence_create_page`, and `confluence_add_comment`. Because it talks to Jira through the same process, it can pull a ticket and the spec it implements into a single answer. Need just search and a smaller footprint? `confluence-mcp-server` exposes one `search_confluence` tool over an HTTP transport, with nothing else to configure or accidentally misuse. Keep in mind both are community projects, not something Atlassian ships itself, so read the changelog before you upgrade either one in a production workflow.
+
+## Installing and Authenticating the Confluence MCP Server
+
+Installing `mcp-atlassian` runs through `uvx`, Python's tool runner, so there's no separate virtual environment to manage and no dependency conflicts with the other Python projects on your machine. Prefer Docker or a plain pip install? Both work too. Authentication comes down to your Confluence edition. Cloud accounts need an API token paired with your account email. Server and Data Center installs (version 6.0 and up) use a Personal Access Token instead, because those editions don't support the same token format.
+
+Add this to your MCP client configuration for Confluence Cloud:
+
+```json
+{
+  "mcpServers": {
+    "confluence": {
+      "command": "uvx",
+      "args": ["mcp-atlassian"],
+      "env": {
+        "CONFLUENCE_URL": "https://your-domain.atlassian.net/wiki",
+        "CONFLUENCE_USERNAME": "your-email@example.com",
+        "CONFLUENCE_API_TOKEN": "your-api-token"
+      }
+    }
+  }
+}
+```
+
+Generate the API token from your Atlassian account settings, not your account password, and guard it the way you'd guard any other credential. Restart your MCP client after you save the config so it picks up the new server. Then confirm the connection by asking it to list a few recent pages before you try anything fancier.
+
+## Choosing Between mcp-atlassian and the Search-Only Server
+
+For most teams, `mcp-atlassian` is the default. Reach for it if you also use Jira, need to create or update Confluence pages, or want an assistant that can move between specs and tickets in one conversation. The search-only `confluence-mcp-server` fits a narrower case: you want search and nothing more, you'd rather keep a smaller permission footprint, and you're on Confluence Cloud. One catch to know up front, it doesn't support Server or Data Center at all, so on-premises teams are out.
+
+There's a third path worth a mention. Atlassian publishes its own remote MCP server covering Jira, Confluence, Jira Service Management, Bitbucket, and Compass, authenticated through OAuth 2.1 rather than API tokens. It's a fair choice if you want a first-party integration and don't mind the browser-based OAuth flow. That said, it's a separate project from the two community servers this guide focuses on. If your workflow depends on a specific tool being available, note that it doesn't expose the same fine-grained tool list mcp-atlassian offers today.
+
+## What Can You Do Once Confluence MCP Is Connected?
+
+Once you're connected, you can ask Claude to find a specific runbook, summarize a project's decision history across a handful of pages, or draft a new page from a conversation and have it created straight in your space without you ever opening the Confluence editor. With `mcp-atlassian`, you can go further and have it cross-reference a Jira ticket against the Confluence spec it implements. That's normally a three-tab, one-search-bar, copy-it-all-by-hand kind of job.
+
+Scope write access carefully. Both servers inherit whatever permissions your API token or Personal Access Token carries in Confluence. For shared or automated setups, a token tied to a restricted service account is the safer bet. A personal admin account with edit rights across every space in the wiki carries far more blast radius when something goes wrong. Rolling this out for a team rather than just yourself? Start with a token scoped to the spaces people actually need, then widen access once the workflow earns its keep and nobody has complained about a page getting edited by mistake.
+
+## Confluence MCP in a Broader Knowledge Stack
+
+Confluence rarely runs on its own. Most teams on Confluence also run Jira, and MCPFind's guide to the [Jira MCP server](/blog/jira-mcp-server-setup-claude-cursor) covers the same `mcp-atlassian` project from the ticket-tracking side. Handy if you want both products wired into one assistant. Browse the [documentation category](/categories/documentation) for all 398 indexed servers, or the [productivity category](/categories/productivity) if you're weighing Confluence against other knowledge-base tools.
+
+If Confluence is one piece of a bigger toolkit, a few other MCPFind guides pair well with this one. [Notion's advanced MCP workflows](/blog/notion-mcp-server-advanced-workflows) cover a similar page-and-database model for teams split between the two. [Obsidian's MCP setup](/blog/obsidian-mcp-server-knowledge-base) is the closer analog if your team keeps personal or engineering notes outside Confluence. For file-heavy teams, [Google Drive's MCP server](/blog/google-drive-mcp-server-guide) handles the documents Confluence pages so often link out to, [Todoist's MCP integration](/blog/todoist-mcp-server-task-management) turns page action items into tracked tasks, and [Google Maps MCP](/blog/google-maps-mcp-server-location-guide) rounds out the productivity category for location-aware workflows.
+
+Want the wider view of what MCP is and why one-server-per-tool became the norm? MCPFind's [cornerstone guide to MCP](/blog/what-is-mcp) explains the protocol from first principles.
+
+## Frequently Asked Questions
+
+### Does the Confluence MCP server work with Confluence Server or Data Center, or only Confluence Cloud?
+
+mcp-atlassian supports both, but the auth path differs by edition. Cloud connections use an API token with your account email, while Server and Data Center installs use a Personal Access Token generated from your Confluence user profile rather than the Atlassian admin console. Anything older than version 6.0 won't connect at all, so check your edition before you start.
+
+### Can the Confluence MCP server create and edit pages, or is it read-only?
+
+mcp-atlassian can create pages, update existing ones, and add comments on top of search, while the lightweight confluence-mcp-server alternative is read-only by design. The real limiter is the token, though. Write access is only as broad as the credential behind it, so a read-only token turns even mcp-atlassian into a search-only tool no matter how many write tools it advertises.
+
+### Do I need separate MCP servers for Jira and Confluence?
+
+No. mcp-atlassian connects to both products from one process, and it counts as a single entry in your MCP client config. That keeps you under the server limits some clients impose and gives you one changelog to track instead of two.
+
+### Is there an official Atlassian-maintained MCP server?
+
+Yes. Atlassian publishes its own remote MCP server covering Jira, Confluence, Jira Service Management, Bitbucket, and Compass, authenticated with OAuth 2.1. Because it's remote, there's no local process to run, but connecting means clicking through a browser consent screen, which some headless or automated setups simply can't accommodate.
+
+### What happens if I only need to search Confluence and never write to it?
+
+Start with the read-only confluence-mcp-server alternative. It exposes a single search tool over an HTTP transport and carries no Jira surface area at all, so there are fewer permissions to misconfigure and less to keep patched as the project evolves.
