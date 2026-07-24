@@ -1,0 +1,7 @@
+servers:
+  - name: "Webhound"
+    github_url: "https://github.com/WebhoundAI/webhound-mcp"
+    package_name: "webhound-mcp"
+    description: "Web research agent where the prompt defines the question and a dollar budget controls how much effort goes into an inspectable report or dataset."
+    package_type: "npm"
+    category: "search"
