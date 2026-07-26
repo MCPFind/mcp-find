@@ -1,0 +1,84 @@
+---
+title: "Open Source Plaid MCP Server: Connect Bank Data to AI"
+description: "Set up a read-only, open source MCP server that connects Plaid, Teller, or Tink bank data to Claude, with setup steps and a security-first framing."
+excerpt: "Want an AI agent to see your bank transactions without handing over write access? bank-mcp is a read-only, open source server built on Plaid, Teller, Enable Banking, and Tink. Here's how it works and how to set it up safely."
+date: "2026-07-22"
+updatedAt: "2026-07-22"
+author: "Adam Bush"
+authorUrl: "https://www.linkedin.com/in/adam-bush/"
+authorSameAs:
+  - "https://www.linkedin.com/in/adam-bush/"
+tags:
+  - "mcp"
+  - "beginner"
+  - "finance"
+  - "plaid"
+category: "finance"
+focusKeyword: "open source plaid mcp server"
+draft: false
+cornerstone: false
+topic_source: "new_topic"
+faqItems:
+  - question: "Is it safe to connect my bank account to an AI agent through MCP?"
+    answer: "It's safer than it sounds if you use a read-only server. bank-mcp cannot move money or authorize transfers, so the worst-case outcome is an AI seeing your transaction history, not touching your funds."
+  - question: "Do I need a Plaid developer account to use bank-mcp?"
+    answer: "Yes, or an account with one of the other supported aggregators (Teller, Enable Banking, or Tink). Plaid's free developer tier covers sandbox testing, and production access requires a paid Plaid plan once you connect real accounts."
+  - question: "What is the difference between bank-mcp and the official Plaid Dashboard MCP server?"
+    answer: "They solve different problems. bank-mcp gives an AI agent access to your own bank transaction data. Plaid's official Dashboard MCP server is a developer tool for monitoring your Plaid integration's API usage and Link conversion, not for reading personal bank data."
+  - question: "Which banks work with a Plaid-based MCP server?"
+    answer: "Whatever Plaid itself supports, which covers most major U.S. and Canadian banks plus thousands of smaller institutions. If your bank isn't on Plaid, bank-mcp's support for Teller, Enable Banking, and Tink covers additional regional and European institutions."
+---
+
+Handing an AI agent the keys to your bank account sounds reckless. For most commercial tools, it is. A lot of them ask for write permissions you never actually need to run a budget or figure out where your money went. bank-mcp works differently. It's open source, read-only by design, and it supports four account aggregators (Plaid, Teller, Enable Banking, and Tink) rather than boxing you into one. This guide walks through how it works, where it parts ways with Plaid's own developer-facing MCP server, and how to set it up so Claude can answer questions about your spending without ever getting near a transfer.
+
+## What Is an Open Source Plaid MCP Server?
+
+bank-mcp, built by a developer who goes by elcukro, wires Plaid's API into an AI agent through standard MCP tool calls, so you're not writing one-off glue code for a proprietary integration. It's the best-known server of its kind, and it's read-only by design.
+
+Under the hood, it wraps four bank data aggregators behind a single MCP interface: Plaid, Teller, Enable Banking, and Tink. Plaid hands you the richest data of the four, with 104 sub-categories of transaction classification and a confidence score attached to every categorization. There's also a setup wizard. It generates your Claude Code configuration file directly, which spares you most of the manual JSON editing that other finance integrations demand. And because the whole thing is read-only, no tool exists for initiating transfers or payments. The AI sees balances, transaction history, and spending categories. That's the ceiling. For context, MCPFind's finance category currently indexes 76 servers with an average of 18.68 GitHub stars, and Stripe's official server leads that group at 1,395 stars.
+
+## How Does bank-mcp Differ From Plaid's Official Dashboard MCP Server?
+
+These two tools solve completely different problems, and mixing them up sends you down the wrong setup path. bank-mcp reads your personal or business bank transactions. Plaid's official Dashboard MCP server is a developer diagnostics tool. It monitors your own Plaid API integration, and it does not read bank data.
+
+Say you're a developer building on Plaid and you want an AI agent to help debug Link conversion rates or check API usage against your quota. The official Plaid Dashboard MCP server at `api.dashboard.plaid.com/mcp/` is the right tool for that. It runs on OAuth and Streamable HTTP transport. But if you're an individual or a small business owner who just wants an agent to answer questions like "how much did I spend on software subscriptions last quarter," bank-mcp is the one you want. It connects to your linked bank accounts through Plaid, not to Plaid's own developer console. Confuse the two and you'll burn setup time wiring up the wrong integration.
+
+## How Do You Set Up bank-mcp With Plaid?
+
+Setup runs about 15 minutes if you already have Plaid developer credentials. You clone the repository, run the included setup wizard, then link your bank account through Plaid's standard connection flow.
+
+First, spin up a free Plaid developer account and generate a client ID and secret from the Plaid dashboard. Next, clone `elcukro/bank-mcp` from GitHub and run its setup script. The script walks you through picking Plaid as your aggregator and writes the config block for Claude Code automatically, so you skip the hand-editing of JSON. When you link an account, Plaid opens its standard Link flow in a browser window and you log into your bank directly there. Your credentials never touch bank-mcp or Claude. Once you're linked, ask Claude something like "what were my top three spending categories last month" and it pulls transaction data through the read-only tools. Before you connect anything real, run the whole flow in sandbox mode against Plaid's fake test institutions. Do that first.
+
+## How Do You Limit What an AI Agent Can See in Your Bank Data?
+
+You control exposure at the account-linking step, not afterward. Link only the accounts you want visible. Plaid lets you pick individual accounts instead of granting blanket access to everything you hold at a given bank.
+
+Bank with a smaller or regional institution that Plaid doesn't reach? MCPFind's directory also lists regional bank-specific servers like [Monobank](/servers/io-github-akutishevsky-monobank-mcp-server), built for one banking provider rather than routed through an aggregator. The principle is the same: read-only access scoped to a single institution, no aggregator middleman in between. Whichever server you land on, read its tool list before you connect a thing. A genuinely read-only server should expose tools with names like `get_transactions` or `get_balance` and absolutely nothing called `transfer`, `pay`, or `initiate_payment`. Spot write-capable tools in a finance server's list and treat it as a flag. Dig into how it handles authorization before connecting a real account, and check whether those write tools demand a separate, harder-to-obtain credential.
+
+## Should You Pick a Free Open Source Server or a Paid Finance MCP Tool?
+
+It comes down to how much setup time you're willing to trade for support and polish. bank-mcp is free, but you run and maintain it yourself. Commercial alternatives like BankSync charge a monthly fee and hand you hosted infrastructure plus a support team in return.
+
+BankSync, which we cover in our [full review](/blog/banksync-mcp-server-review), costs $7 a month and ships 36 tools on a managed backend. That suits anyone who'd rather not touch a terminal. bank-mcp costs nothing past your own hosting, but the upkeep lands on you: updating dependencies, chasing down connection issues, all of it. Open source wins if you're comfortable running a local process and you want full transparency into what data leaves your machine. Prefer to skip that entirely? A hosted commercial option takes the maintenance off your plate for a few dollars a month. MCPFind's finance category spans both models, from Stripe's official server at 1,395 stars down to smaller community projects, so starting with the free option usually makes sense.
+
+For the underlying protocol, [what MCP is and how it fits into AI agent workflows](/blog/what-is-mcp) covers it. Or browse the [finance category](/categories/finance) to line bank-mcp up against the other financial data servers in the directory.
+
+## Frequently Asked Questions
+
+### Is it safe to connect my bank account to an AI agent through MCP?
+
+Safer than it sounds, as long as you use a read-only server. bank-mcp can't move money or authorize transfers. The worst case is an AI seeing your transaction history, not touching your funds.
+
+### Do I need a Plaid developer account to use bank-mcp?
+
+Yes, or an account with one of the other supported aggregators (Teller, Enable Banking, or Tink). Plaid's free developer tier covers sandbox testing. Production access needs a paid Plaid plan once you connect real accounts.
+
+### What is the difference between bank-mcp and the official Plaid Dashboard MCP server?
+
+They solve different problems. bank-mcp gives an AI agent access to your own bank transaction data. Plaid's official Dashboard MCP server is a developer tool. It monitors your Plaid integration's API usage and Link conversion, and it isn't built for reading personal bank data.
+
+### Which banks work with a Plaid-based MCP server?
+
+Whatever Plaid supports, which covers most major U.S. and Canadian banks plus thousands of smaller institutions. If yours isn't on Plaid, bank-mcp's support for Teller, Enable Banking, and Tink picks up additional regional and European institutions.
+
+Related reading in the finance cluster: [Best MCP Servers for Banking and Personal Finance](/blog/best-mcp-servers-finance-banking), [BankSync MCP Server review](/blog/banksync-mcp-server-review), [MCP for Accountants: QuickBooks, Xero, and Financial Automation](/blog/mcp-for-accountants-quickbooks-xero), and [Digits MCP Server for accounting firms](/blog/digits-mcp-server-accounting-firms).
