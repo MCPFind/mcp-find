@@ -1,0 +1,106 @@
+---
+title: "Attio MCP Server: Open Source CRM Automation Guide"
+description: "Set up kesslerio/attio-mcp-server, the open source Attio MCP server, and compare it to Attio's new official hosted server for AI-driven CRM work."
+excerpt: "Attio shipped its own official MCP server in 2026, but kesslerio/attio-mcp-server has been the open source option since before that, covering deals, tasks, and contacts through 19 consolidated tools. Here's how to set it up and when to pick each."
+date: "2026-07-24"
+updatedAt: "2026-07-24"
+author: "Gus Marquez"
+authorUrl: "https://www.linkedin.com/in/gustavoamarquez"
+authorSameAs:
+  - "https://www.linkedin.com/in/gustavoamarquez"
+tags:
+  - "mcp"
+  - "developer"
+  - "crm"
+  - "attio"
+category: "crm"
+focusKeyword: "attio mcp server open source"
+draft: false
+cornerstone: false
+topic_source: "new_topic"
+faqItems:
+  - question: "Does Attio have an official MCP server now?"
+    answer: "Yes. Attio launched a hosted official MCP server at mcp.attio.com/mcp using OAuth, with read actions auto-approved and write actions requiring confirmation. It sits alongside the open source kesslerio/attio-mcp-server, which predates it."
+  - question: "How many tools does the Attio MCP server expose?"
+    answer: "kesslerio/attio-mcp-server consolidates over 40 resource-specific operations into 19 universal tools covering companies, people, deals, tasks, lists, and notes, which keeps the tool list manageable for an AI agent to reason about."
+  - question: "Can I use API keys instead of OAuth with the open source Attio MCP server?"
+    answer: "Yes. kesslerio/attio-mcp-server supports both an ATTIO_API_KEY environment variable and OAuth access tokens, giving you a simpler setup path for personal or scripted use compared to Attio's official OAuth-only server."
+  - question: "Does the Attio MCP server validate deal stages before moving a record?"
+    answer: "Yes. Deal stage transitions in kesslerio/attio-mcp-server are validated against your Attio workspace's configured pipeline stages, which prevents an AI agent from moving a deal into a stage that doesn't exist in your setup."
+---
+
+Attio made its name as an API-first CRM. So community AI tooling showing up early was never much of a surprise. For a while, kesslerio/attio-mcp-server was the open source pick if you wanted an agent wired into Attio, and then in 2026 Attio put out an official hosted server of its own. Say you want Claude or Cursor to update deals, log notes, or push a record through your pipeline without ever touching the Attio UI. You've now got two ways to do it, and they don't fit the same kind of team. Here's what the open source server actually does, how it stacks up against Attio's own, and the steps to get it running.
+
+## What Is the Attio MCP Server and What Can It Do?
+
+kesslerio/attio-mcp-server is an open source MCP server. It hands an AI agent full read and write access to your Attio CRM data, which covers companies, people, deals, tasks, lists, and notes. MCPFind's directory lists it at 59 stars, and it's still under active development.
+
+Here's the part worth pausing on. Instead of exposing a separate tool for every Attio resource type, the server folds more than 40 resource-specific operations into 19 universal tools. That matters more for AI agents than it might sound. A model picks the right tool far more reliably from a short, general list than from a sprawl of near-duplicate options. So you get search, create, update, and list operations that work generically across record types, plus dedicated deal-stage transitions that validate against your workspace's actual pipeline configuration. And the gap is real. MCPFind's crm category is thin, only 7 servers total, with `com.close/close-mcp` sitting at the top right now, so a well-maintained Attio option fills a spot that teams on that platform genuinely need.
+
+## How Does the Open Source Server Compare to Attio's Official MCP Server?
+
+Two things separate them in practice: how you authenticate, and where the thing actually runs. Attio's official server is OAuth-only, and Attio hosts it. The open source kesslerio/attio-mcp-server takes either OAuth or a plain API key, and you're the one running it.
+
+The official server lives at `mcp.attio.com/mcp`. It auto-approves reads but makes you confirm every write, then layers on full audit logging plus revocable sessions on Attio's side. Admins get a clean trail of every change an agent touched. For a team that wants each CRM write gated behind a human click, that's a sensible default. The open source server leans developer. Set an `ATTIO_API_KEY` environment variable and you're running in minutes, no OAuth flow at all, which is the faster route for personal automation or internal scripts where you already trust what the agent can write. Neither one wins outright. If you're rolling this out across a whole org, the official server is the safer call. If you're a solo developer who wants full control and doesn't need Attio logging every single action, the open source path gets you there quicker.
+
+## How Do You Set Up kesslerio/attio-mcp-server?
+
+With an API key, setup runs about five minutes. OAuth takes a little longer. Either way you'll need an Attio account, plus an API key from your workspace settings or an OAuth access token.
+
+Grab an API key from Attio's workspace settings under Developers, then install the server:
+
+```bash
+npx -y @kesslerio/attio-mcp-server
+```
+
+Add it to your Claude Desktop config with the key set as an environment variable:
+
+```json
+{
+  "mcpServers": {
+    "attio": {
+      "command": "npx",
+      "args": ["-y", "@kesslerio/attio-mcp-server"],
+      "env": { "ATTIO_API_KEY": "your-api-key-here" }
+    }
+  }
+}
+```
+
+Restart Claude Desktop. That's it. You can ask it to search companies, create a task, or bump a deal's stage right away. Thanks to the universal tool design, there's nothing to memorize per object type. The same `search` and `update` tools do the work whether you're touching a person record, a company, or a deal. The [full setup guide](https://github.com/kesslerio/attio-mcp-server) on GitHub walks through OAuth for teams that would rather use it over API keys, and it lists all 19 consolidated tools and their parameters.
+
+## Which Attio MCP Server Setup Fits Your Team?
+
+Pick on team size and risk tolerance, not on which server shipped more recently. A solo developer, or a small team that's fine trusting an agent with CRM writes, will move faster on the open source server's API key auth. A bigger sales org handing this to a dozen reps gets more out of the official server, where every write needs confirmation and the audit trail lives in one place.
+
+Cost won't decide it. Both are free at the point of use. The real split is operational. Self-host the open source server and you're the one patching it when Attio's API shifts. Run the official one and keeping it current is Attio's job, not yours. If you're weighing CRM options more broadly, it's worth a look at the [Salesforce](/blog/salesforce-mcp-server-setup-guide) and [HubSpot](/blog/hubspot-mcp-server-marketing-setup) MCP servers too, since Attio tends to go up against lighter-weight CRMs more than the big enterprise suites.
+
+## How Do You Prevent an AI Agent From Making Unwanted CRM Changes?
+
+In any CRM MCP server, write access is where the risk lives, not reads. The fix is to scope what the agent can do before you connect it, rather than trusting the model to ask permission on its own.
+
+With kesslerio/attio-mcp-server, start narrow. Scope the API key to the minimum object types you actually need automated, because Attio lets you restrict key permissions right at generation time instead of handing over blanket workspace access to every record type in your CRM. Deal-stage changes get an extra layer for free. The server's built-in validation checks your pipeline configuration and rejects any move to a stage that doesn't exist in your Attio setup, so it guards that path on its own. Want a stronger net than a scoped key gives you? Attio's own official server forces a write-confirmation step on every mutating action, which is the more conservative default for a sales team where several people might be prompting the same agent and one slip could touch live pipeline data. You can also mix the two. Run the open source server for read-heavy personal work like pipeline summaries and reporting, then route anything that writes deal data through the official server's confirmation flow instead.
+
+New to MCP in general? Start with [what MCP is and how it works](/blog/what-is-mcp), or browse the [crm category](/categories/crm) to see every CRM server currently indexed.
+
+## Frequently Asked Questions
+
+### Does Attio have an official MCP server now?
+
+Yes. Attio now runs a hosted official MCP server at mcp.attio.com/mcp over OAuth, with reads auto-approved and writes needing confirmation. It sits next to the open source kesslerio/attio-mcp-server, which came first.
+
+### How many tools does the Attio MCP server expose?
+
+kesslerio/attio-mcp-server folds over 40 resource-specific operations into 19 universal tools. They cover companies, people, deals, tasks, lists, and notes, which keeps the list short enough for an AI agent to reason about cleanly.
+
+### Can I use API keys instead of OAuth with the open source Attio MCP server?
+
+Yes. kesslerio/attio-mcp-server takes both an ATTIO_API_KEY environment variable and OAuth access tokens. For personal or scripted use, that's a simpler path than Attio's official server, which is OAuth-only.
+
+### Does the Attio MCP server validate deal stages before moving a record?
+
+Yes. Deal-stage transitions in kesslerio/attio-mcp-server get validated against the pipeline stages configured in your Attio workspace. That stops an AI agent from shoving a deal into a stage that doesn't exist in your setup.
+
+Related reading in the CRM cluster: [Best MCP Servers for CRM and Sales Teams](/blog/best-mcp-servers-crm-sales), [Salesforce MCP Server setup guide](/blog/salesforce-mcp-server-setup-guide), [HubSpot MCP Server for marketing teams](/blog/hubspot-mcp-server-marketing-setup), and [Zendesk MCP Server for support intelligence](/blog/zendesk-mcp-server).
+
+The [Attio MCP Server](/servers/io-github-kesslerio-attio-mcp-server) is indexed in the MCPFind directory.
