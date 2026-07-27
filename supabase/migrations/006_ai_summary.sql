@@ -26,7 +26,10 @@ CREATE INDEX IF NOT EXISTS idx_servers_ai_summary_null
 -- Comment block to document intent alongside the schema.
 COMMENT ON COLUMN servers.ai_summary IS
   'AI-generated 150-200 word factual summary generated via local Mac Mini queue. '
-  'NULL until backfilled. Prefer over description for structured-data SoftwareApplication.description.';
+  'NULL until backfilled. Labeled supplement ONLY — must render as a clearly labeled '
+  '"AI Summary" block, never substituted into structured-data SoftwareApplication.description '
+  'or used as primary on-page body copy (see specs/stage-6-slices/00-recovery-plan.md, '
+  'Guardrails: anti scaled-content-abuse).';
 
 COMMENT ON COLUMN servers.ai_summary_generated_at IS
   'Timestamp when ai_summary was last generated or regenerated.';
