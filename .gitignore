@@ -10,8 +10,6 @@ dist/
 .DS_Store
 .env.*
 coverage/
-__pycache__/
-*.pyc
 
 # GitHub PAT / token files — belt-and-suspenders
 *github-pat*
