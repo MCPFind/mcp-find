@@ -69,6 +69,13 @@ export interface Server {
   is_official: boolean;
   featured: boolean;
 
+  // AI summary enrichment (migration 006) — labeled supplement only.
+  // Never use in place of `description` for SoftwareApplication.description
+  // in JSON-LD or as primary on-page body copy (see
+  // specs/stage-6-slices/00-recovery-plan.md, Guardrails section).
+  ai_summary: string | null;
+  ai_summary_generated_at: string | null;
+
   // Timestamps
   created_at: string;
   updated_at: string;
@@ -84,7 +91,9 @@ export interface ServerTool {
   created_at: string;
 }
 
-export type ServerListItem = Omit<Server, 'readme_content'>;
+// ai_summary / ai_summary_generated_at are detail-page-only (not selected by
+// SERVER_LIST_COLUMNS, same rationale as readme_content — see queries.ts).
+export type ServerListItem = Omit<Server, 'readme_content' | 'ai_summary' | 'ai_summary_generated_at'>;
 
 export interface ServerWithTools extends Server {
   tools: ServerTool[];

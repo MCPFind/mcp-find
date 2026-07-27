@@ -13,11 +13,13 @@ import { isIndexable, type IndexableServerInput } from './indexable';
 const SERVER_LIST_COLUMNS = 'id,slug,canonical_slug,name,description,version,category,source,package_name,package_type,package_url,has_tools,has_resources,has_prompts,tool_count,github_url,github_stars,github_forks,github_open_issues,github_last_push,github_license,github_language,github_contributors,github_archived,npm_weekly_downloads,registry_status,registry_published_at,registry_updated_at,registry_tags,is_official,featured,created_at,updated_at,last_synced_at';
 
 // Detail-page column set: everything in SERVER_LIST_COLUMNS plus readme_content
-// (rendered by ReadmeSection). Deliberately excludes search_vector — the one
+// (rendered by ReadmeSection) and the AI summary enrichment columns (migration 006,
+// ai_summary + ai_summary_generated_at — rendered as a labeled supplement, see
+// apps/web/app/servers/[slug]/page.tsx). Deliberately excludes search_vector — the one
 // `servers` column no consumer of getServerBySlug (page JSX, metadata.ts,
 // isIndexable, or the /api/servers/[slug] route) ever reads. select('*') was
 // pulling it on every detail-page fetch for nothing.
-const SERVER_DETAIL_COLUMNS = `${SERVER_LIST_COLUMNS},readme_content`;
+const SERVER_DETAIL_COLUMNS = `${SERVER_LIST_COLUMNS},readme_content,ai_summary,ai_summary_generated_at`;
 
 async function _listServers(params: ServerListParams): Promise<ServerListResponse> {
   const page = Math.max(1, params.page || 1);

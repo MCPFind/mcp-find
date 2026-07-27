@@ -1,0 +1,13 @@
+# Dependencies for scripts/mcpfind/ai_summary_generate.py (and future scripts
+# in this directory). This repo is otherwise a pnpm/Node monorepo with no
+# existing Python tooling, so this is a minimal standalone requirements file
+# rather than a full poetry/uv project.
+#
+# Run via a venv:
+#   python3 -m venv .venv && source .venv/bin/activate
+#   pip install -r scripts/mcpfind/requirements.txt
+#   python3 scripts/mcpfind/ai_summary_generate.py
+#
+# Or via uv, without a persistent venv:
+#   uv run --with requests scripts/mcpfind/ai_summary_generate.py
+requests>=2.31.0,<3
