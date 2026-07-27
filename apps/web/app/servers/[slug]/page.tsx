@@ -68,6 +68,7 @@ import {
   IconInfoCircle,
   IconLink,
   IconAlertCircle,
+  IconRobot,
 } from "@tabler/icons-react";
 import { ServerOutboundLink } from "@/components/ServerOutboundLink";
 
@@ -328,6 +329,32 @@ export default async function ServerDetailPage({
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
           {/* Left: Main content */}
           <div className="lg:col-span-2 space-y-10">
+            {/* AI Summary — labeled supplement ONLY (migration 006, Slice 3 of the
+                indexing-recovery plan). Never replaces `description` on-page and
+                never feeds SoftwareApplication.description in the JSON-LD (see
+                lib/metadata.ts#generateServerJsonLd, which reads server.description).
+                Rendered only when a summary has been backfilled. */}
+            {server.ai_summary && (
+              <section
+                aria-labelledby="ai-summary-heading"
+                className="rounded-xl border border-purple-800/40 bg-purple-950/10 p-5"
+              >
+                <h2
+                  id="ai-summary-heading"
+                  className="text-sm font-semibold text-purple-300 uppercase tracking-wider mb-3 flex items-center gap-2"
+                >
+                  <IconRobot size={16} className="text-purple-400" />
+                  AI Summary
+                </h2>
+                <p className="text-neutral-300 text-sm leading-relaxed whitespace-pre-line">
+                  {server.ai_summary}
+                </p>
+                <p className="text-neutral-600 text-xs mt-3">
+                  Generated summary — supplements, not a substitute for the README below.
+                </p>
+              </section>
+            )}
+
             {/* Overview / README */}
             <ReadmeSection
               readmeContent={server.readme_content}
