@@ -1,0 +1,94 @@
+---
+title: "Claude Skills vs MCP Servers: What's the Difference?"
+description: "Claude Skills and MCP servers solve different problems in the same agent stack. Here is how each works, what they cost in context, and when to build which one."
+excerpt: "Claude Skills and MCP servers are not competitors. Skills package instructions an agent loads on demand; MCP servers connect that agent to systems outside its own process. This guide breaks down how each works, what each costs in context tokens, and how to decide which one to build next."
+date: "2026-07-21"
+updatedAt: "2026-07-21"
+author: "Gus Marquez"
+authorUrl: "https://www.linkedin.com/in/gustavoamarquez"
+authorSameAs:
+  - "https://www.linkedin.com/in/gustavoamarquez"
+tags:
+  - "mcp"
+  - "developer"
+  - "architecture"
+  - "claude-skills"
+  - "how-to"
+category: "other"
+focusKeyword: "claude skills vs mcp servers"
+draft: false
+cornerstone: false
+topic_source: new_topic
+faqItems:
+  - question: "Can Claude use Skills and MCP servers in the same conversation?"
+    answer: "Yes. A Skill can call tools exposed by an MCP server as part of its instructions, and an agent can have both loaded at once. They are not mutually exclusive configurations."
+  - question: "Do Skills replace the need for MCP servers?"
+    answer: "No. A Skill without a connected data source or API still cannot read your database, post to Slack, or query a live system. MCP servers are what give Skills (and any other agent) that external reach."
+  - question: "Why did MCP move to the Agentic AI Foundation instead of staying under Anthropic?"
+    answer: "Multi-vendor governance was the point. Once Google, Microsoft, AWS, Cloudflare, and Bloomberg were all shipping MCP integrations, a foundation structure signals the protocol will not bend to any single company's roadmap, which matters if you are building on it long term."
+  - question: "Is there a directory for Claude Skills the way MCPFind is a directory for MCP servers?"
+    answer: "Not yet at the same scale. Skills are newer and mostly distributed through individual repos and Anthropic's own examples, while MCP has years of registry infrastructure (MCPFind included) already built around it."
+---
+
+Claude Skills and MCP servers hit the news cycle close enough together that people keep asking which one wins, but the versus framing falls apart the moment you look at what each actually does. A Skill is a folder of instructions, scripts, and reference files that Claude loads only when a task calls for it. An MCP server is a separate process. It exposes tools, data, or prompts over a standard protocol, and any MCP client can reach it, whether that's Claude Desktop, Cursor, or something you wrote yourself. We currently index 18,209 MCP servers in the MCPFind directory, and a Skill can't replace a single one of them, because a Skill still needs something to connect to.
+
+## What Is the Difference Between Claude Skills and MCP Servers?
+
+A Claude Skill is a bundle of markdown instructions, plus the occasional helper script, that Claude pulls into context only when a task matches what the Skill covers. An MCP server is different in kind. It's a running process, local or remote, exposing tools over stdio, SSE, or HTTP so any compatible client can call them. A PDF-generation Skill spells out how Claude should format an invoice; a Postgres MCP server is what actually pulls the line items that go into it.
+
+Anthropic frames it the same way. Claude ships with "75+ connectors powered by MCP" right now, and Skills sit on top of that connector layer instead of replacing it. Think about a Skill for writing quarterly reports. It still needs an MCP server, or a built-in tool, to actually pull the sales numbers it's reporting on. Cut off the data source and the Skill is well-organized advice with nothing to act on. Get that distinction straight first. Everything else in this comparison depends on it.
+
+## How Do Claude Skills and MCP Servers Work Together?
+
+Skills orchestrate and MCP servers connect. A Skill's instructions can name specific MCP tools and tell Claude exactly when and how to call them inside a multi-step task, while the server does the unglamorous work of actually reaching your database, ticketing system, or file store.
+
+Picture a "close the sprint" Skill. The instructions say: check open pull requests, flag the ones without reviews, post a summary to the team channel. Not one of those steps runs without a GitHub MCP server and a Slack MCP server already wired up.
+
+```json
+{
+  "mcpServers": {
+    "github": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-github"] },
+    "slack": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-slack"] }
+  }
+}
+```
+
+With both servers configured, the Skill references their tools by name in its instructions and Claude resolves the calls on its own. MCPFind's [devtools category](/categories/devtools) alone lists 5,082 servers a Skill like this could draw from, everything from repo intelligence to CI log parsing.
+
+There's a knock-on effect here. Teams already running several MCP servers tend to add Skills one at a time rather than in a big push, and the reason is cost. The hard part, the actual connections, is already done. Writing the workflow instructions on top of it takes an afternoon, not a new deployment.
+
+## Why Was MCP Donated to the Agentic AI Foundation?
+
+MCP moved out from under Anthropic and into a directed fund at the Linux Foundation called the Agentic AI Foundation. The transfer finalized on December 9, 2025. What it did was hand day-to-day stewardship of the protocol to a multi-vendor foundation. Anthropic, Block, and OpenAI co-founded the foundation, with Google, Microsoft, AWS, Cloudflare, and Bloomberg backing it. MCP joined as a founding project next to Block's goose agent and OpenAI's AGENTS.md spec.
+
+The real driver is scale. Anthropic's announcement noted MCP had crossed 10,000 active public servers inside its first year, with every major agent vendor shipping integrations against it. When a protocol carries that much cross-vendor weight, it needs neutral stewardship. Otherwise every roadmap call looks like it favors whoever owns the repo. Foundation governance is the standard fix for that exact problem, and it's the same route AGENTS.md and goose took by joining the same body. If you're building against MCP for the long haul, read this as a stability signal. The protocol itself works the same day to day.
+
+## How Much Context Do Skills Save Compared to Loading MCP Tools?
+
+Skills are dramatically cheaper on context, right up until you actually use them. A Skill's metadata runs roughly 30 to 50 tokens sitting idle in Claude's context window, because only the name and a one-line description load by default. The full instructions expand into context later, once Claude decides the task matches.
+
+MCP tools don't behave that way. Connect five servers, each with a typical tool count, and you can blow past 50,000 tokens of tool schemas before a single tool ever gets called, because every connected server dumps its full tool list up front. That gap is exactly why teams increasingly wrap heavily-used MCP tool chains inside a Skill. The Skill's thin metadata stays in context by default. The expensive tool schemas only load when the Skill decides they're needed. Once your tool count grows past a handful of servers, this progressive-disclosure pattern becomes the default way serious agent builders keep their context budget under control.
+
+## When Should You Build a Skill Instead of an MCP Server?
+
+Build a Skill when you're packaging a repeatable process Claude can already carry out. Report templates. Code review checklists. Multi-step runbooks. All of that is Skill territory, because Claude already has, or can already reach, everything it needs to run them. What's missing is the instructions for doing it your team's specific way.
+
+Build an MCP server when Claude flat-out can't reach something yet. If no existing tool queries your internal API, reads your specific database, or posts to your specific ticketing system, you're looking at a server problem, not an instructions problem. No amount of well-written Skill markdown stands in for a real connection. And most real projects end up needing both: an MCP server (or several, pulled from [MCPFind's ai-ml category](/categories/ai-ml) and its 2,100 servers) to establish reach, then a Skill on top to make that reach usable. New to servers? The [plain-English MCP guide](/blog/what-is-mcp) starts from zero, and the [Go MCP server tutorial](/blog/build-mcp-server-go-tutorial) walks you through building one once you've spotted the gap you're filling.
+
+## Frequently Asked Questions
+
+### Can Claude use Skills and MCP servers in the same conversation?
+
+Yes. A Skill can call tools exposed by an MCP server as part of its instructions, and an agent can have both loaded at once. They are not mutually exclusive configurations.
+
+### Do Skills replace the need for MCP servers?
+
+No. A Skill without a connected data source or API still cannot read your database, post to Slack, or query a live system. MCP servers are what give Skills (and any other agent) that external reach.
+
+### Why did MCP move to the Agentic AI Foundation instead of staying under Anthropic?
+
+Multi-vendor governance was the point. Once Google, Microsoft, AWS, Cloudflare, and Bloomberg were all shipping MCP integrations, a foundation structure signals the protocol will not bend to any single company's roadmap, which matters if you are building on it long term.
+
+### Is there a directory for Claude Skills the way MCPFind is a directory for MCP servers?
+
+Not yet at the same scale. Skills are newer and mostly distributed through individual repos and Anthropic's own examples, while MCP has years of registry infrastructure (MCPFind included) already built around it.
