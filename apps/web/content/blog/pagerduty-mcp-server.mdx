@@ -1,0 +1,96 @@
+---
+title: "PagerDuty MCP Server: AI Incident Response With Claude"
+description: "Set up PagerDuty's official MCP server to triage incidents and check on-call schedules in Claude. Covers local vs hosted setup and write-tool safety."
+excerpt: "PagerDuty's official MCP server exposes 70+ tools for incidents, on-call schedules, and escalation policies. This guide covers the local read-only-by-default server, the newer hosted OAuth endpoint, and how it slots into an AI on-call stack next to Grafana and Datadog."
+date: "2026-07-28"
+updatedAt: "2026-07-28"
+author: "Adam Bush"
+authorUrl: "https://www.linkedin.com/in/adam-bush/"
+authorSameAs:
+  - "https://www.linkedin.com/in/adam-bush/"
+tags:
+  - "mcp"
+  - "developer"
+  - "pagerduty"
+  - "monitoring"
+  - "devops"
+category: "monitoring"
+focusKeyword: "pagerduty mcp server"
+draft: false
+cornerstone: false
+topic_source: new_topic
+cluster: devops
+faqItems:
+  - question: "Does the PagerDuty MCP server require a paid PagerDuty plan?"
+    answer: "You need a PagerDuty account with API access, which comes with paid plans. The MCP server itself is free and open source under Apache-2.0. What you pay for is the underlying PagerDuty subscription, not the integration."
+  - question: "Can Claude create and resolve PagerDuty incidents automatically?"
+    answer: "Yes, but only once you enable write tools. It ships read-only by default, so Claude can list and inspect incidents right out of the box, though creating, acknowledging, or resolving one takes the --enable-write-tools flag."
+  - question: "What's the difference between PagerDuty's local and hosted MCP servers?"
+    answer: "The local server runs on your machine, defaults to read-only, and requires an explicit flag to unlock write actions. The hosted server at mcp.pagerduty.com/mcp needs no local install, authenticates over OAuth, and exposes read and write tools by default."
+  - question: "Does PagerDuty's MCP server include the IDE apps PagerDuty ships elsewhere?"
+    answer: "Yes. The server bundles five embedded React apps, including an Incident Command Center, On-Call Manager, and Service Dependency Graph, so an MCP client with UI support can render them directly instead of just returning text."
+---
+
+If your team gets paged at 2am and the first ten minutes vanish into figuring out who's on call and what someone already tried, PagerDuty's MCP server exists to close that gap. This is PagerDuty's own integration, not a community wrapper. It drops incidents, on-call schedules, and escalation policies straight into a Claude conversation instead of yet another dashboard tab. MCPFind's [monitoring category](/categories/monitoring) indexes 198 servers right now, PagerDuty's entry sitting among them next to Datadog, Grafana, and Sentry. New to MCP servers? The [what-is-mcp guide](/blog/what-is-mcp) walks through how a client like Claude connects to one. Below, I'll cover what PagerDuty's server actually exposes, how the local and hosted versions diverge, and where it lands in a wider on-call AI setup.
+
+## What Does the PagerDuty MCP Server Do?
+
+PagerDuty's [official MCP server](/servers/io-github-pagerduty-pagerduty-mcp) covers more than 70 tools. They span incidents, on-call schedules, escalation policies, services, teams, users, event orchestrations, analytics, status pages, and webhooks. That's a lot of surface for one integration, and it mirrors PagerDuty's own API rather than some trimmed-down subset carved out just for AI agents.
+
+Most of that surface never gets touched on a normal day. A typical session looks like Claude listing open incidents assigned to your team, pulling the on-call schedule for the next 48 hours, or checking whether an escalation policy really routes to the right person before you learn otherwise mid-outage. The server also ships five embedded React apps, among them an Incident Command Center and a Service Dependency Graph, so clients that support rendered UI get back more than plain text. It's licensed Apache-2.0 and sits at roughly 70 GitHub stars. Still early, given the incident volume PagerDuty itself handles.
+
+Now compare that against the rest of MCPFind's monitoring category, which averages under one star per server. A young project isn't strange here. What counts for an incident-response tool, far more than star totals, is whether PagerDuty maintains it directly. And this one is a first-party repo under the PagerDuty GitHub organization, not a fork someone hacked together over a weekend. Worth verifying for any monitoring server before you aim it at production data, because the category is packed with abandoned side projects parked right next to actively maintained vendor integrations.
+
+## How Do You Set Up the PagerDuty MCP Server With Claude?
+
+Setup begins with generating a PagerDuty API key scoped to what you actually need, then pointing Claude Desktop or Cursor at the local binary through your MCP client config. The server defaults to read-only. Nothing gets created, acknowledged, or resolved until you flip that on yourself.
+
+```json
+{
+  "mcpServers": {
+    "pagerduty": {
+      "command": "pagerduty-mcp-server",
+      "args": ["--enable-write-tools"],
+      "env": {
+        "PAGERDUTY_API_KEY": "your-api-key"
+      }
+    }
+  }
+}
+```
+
+Drop the `--enable-write-tools` flag for a pure query experience while you're still getting a feel for what Claude can see. Add it back once you trust the read output and genuinely want Claude acknowledging or escalating incidents for you. Restart your client after editing the config. Then ask it to list your open incidents as a first check that both the connection and the API key work.
+
+## What Is the Difference Between the Local and Hosted PagerDuty MCP Servers?
+
+The local server installs on your machine and defaults to read-only, demanding an explicit flag before any write action fires. The hosted server, reachable at mcp.pagerduty.com/mcp, needs no install whatsoever. You connect from Cursor or VS Code, authenticate through OAuth, and get read and write tools live by default instead of gated behind a flag.
+
+That default-write behavior on the hosted path deserves a pause before you wire it into a production PagerDuty account. It's convenient. Nothing to install, no API key to rotate. But it also means Claude can acknowledge or resolve an incident the instant you authorize the connection, not after you've decided you're ready for that. Want a slower rollout? Start with the local, read-only server, get comfortable with what it surfaces, and only move to hosted once write access is something you actually want switched on by default.
+
+## How Does PagerDuty Fit Into an AI On-Call Stack With Grafana and Datadog?
+
+PagerDuty usually sits at the tail end of an incident chain, not the front. Monitoring tools detect and diagnose; PagerDuty routes the page and tracks the response. Pair its MCP server with others in the same category and Claude can move across that whole chain inside one conversation, rather than three separate dashboards.
+
+Here's a concrete version. [Grafana](/blog/grafana-mcp-server) shows a metric spike in Prometheus, [Datadog's APM traces](/blog/datadog-mcp-server-observability) point at the slow downstream call behind it, and PagerDuty confirms whether an incident already fired for that service and who's on call right now. Claude can walk that sequence on its own if all three servers are connected, then draft the incident summary from what it found instead of you copying details between tabs by hand. This pairing isn't unique to PagerDuty, either. Several other monitoring vendors, Datadog and New Relic included, now ship their own remote-hosted MCP servers, so the "detect, diagnose, escalate" pattern is becoming a common way multiple servers get chained together during a live incident.
+
+None of this replaces the human decision to declare a major incident or pull in extra responders. What it strips out is the busywork wrapped around that decision: the minutes lost checking three tools before you even know whether the spike matters. Wire up PagerDuty alongside your monitoring stack and Claude can hand you a first draft of the situation the moment you ask, leaving the judgment call to whoever's actually on the hook for the response.
+
+## Frequently Asked Questions
+
+### Does the PagerDuty MCP server require a paid PagerDuty plan?
+
+You need a PagerDuty account with API access, which comes with paid plans. The MCP server itself is free and open source under Apache-2.0. What you pay for is the underlying PagerDuty subscription, not the integration.
+
+### Can Claude create and resolve PagerDuty incidents automatically?
+
+Yes, but only once you enable write tools. It ships read-only by default, so Claude can list and inspect incidents right out of the box, though creating, acknowledging, or resolving one takes the --enable-write-tools flag.
+
+### What's the difference between PagerDuty's local and hosted MCP servers?
+
+The local server runs on your machine, defaults to read-only, and requires an explicit flag to unlock write actions. The hosted server at mcp.pagerduty.com/mcp needs no local install, authenticates over OAuth, and exposes read and write tools by default.
+
+### Does PagerDuty's MCP server include the IDE apps PagerDuty ships elsewhere?
+
+Yes. The server bundles five embedded React apps, including an Incident Command Center, On-Call Manager, and Service Dependency Graph, so an MCP client with UI support can render them directly instead of just returning text.
+
+If you're already running Jira MCP or Linear MCP for engineering ticket flow, wiring in PagerDuty rounds out the loop from "something broke" to "here's the ticket to fix it." The [Jira MCP server guide](/blog/jira-mcp-server-setup-claude-cursor) and the [Linear MCP server guide](/blog/linear-mcp-server-project-management) cover that side of the workflow, and the [MCP server testing guide](/blog/testing-mcp-server-inspector-unit-tests-ci) is worth a look if you're building or extending any of these servers yourself rather than just consuming them.
