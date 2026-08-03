@@ -1,0 +1,101 @@
+---
+title: "ElevenLabs MCP Server: Voice Cloning and TTS via Claude"
+description: "Set up the ElevenLabs MCP server to add text-to-speech and voice cloning to Claude. Covers install, tools exposed, and how it compares to alternatives."
+excerpt: "The ElevenLabs MCP server puts text-to-speech, voice cloning, and transcription directly into Claude's toolset. This guide covers what the server exposes, how to install it, and where it fits next to MCPFind's media and ai-ml category servers."
+date: "2026-07-22"
+updatedAt: "2026-07-22"
+author: "Gus Marquez"
+authorUrl: "https://www.linkedin.com/in/gustavoamarquez"
+authorSameAs:
+  - "https://www.linkedin.com/in/gustavoamarquez"
+tags:
+  - "mcp"
+  - "developer"
+  - "ai-ml"
+  - "voice-ai"
+  - "elevenlabs"
+category: "media"
+focusKeyword: "elevenlabs mcp server"
+draft: false
+cornerstone: false
+topic_source: new_topic
+faqItems:
+  - question: "Does the ElevenLabs MCP server require a paid account?"
+    answer: "You need an ElevenLabs API key, and voice cloning and higher usage tiers require a paid plan. The free tier covers basic text-to-speech testing but hits character limits quickly for real workloads."
+  - question: "Can the ElevenLabs MCP server run alongside other audio tools in the same agent?"
+    answer: "Yes. It exposes its own named tools, so it does not conflict with a transcription-only server or a different TTS provider connected in parallel. Claude picks the right tool based on what the task calls for."
+  - question: "Does the ElevenLabs MCP server work with Cursor and Windsurf, or only Claude?"
+    answer: "It works with any MCP-compatible client, including Cursor, Windsurf, and the OpenAI Agents SDK, since the server speaks the standard protocol rather than a Claude-specific extension."
+  - question: "Is voice cloning through the MCP server subject to ElevenLabs' consent requirements?"
+    answer: "Yes. ElevenLabs enforces its own voice cloning consent and usage policies at the API level, and the MCP server does not bypass them. You still need explicit rights to any voice you clone."
+---
+
+Most MCP servers hook Claude up to data. The ElevenLabs MCP server hooks it up to a voice. Wire this one into Claude Desktop, Cursor, or any other MCP client, and text-to-speech, voice cloning, transcription, and a handful of audio-editing tools all go live at once. Compare that to the database and API integrations that fill out most of MCPFind's [media category](/categories/media), and you're looking at a different animal entirely. It cracks open workflows plain text can't reach: agent narration, spoken reports, voice-cloned assistants, automated dubbing.
+
+Below, we cover what the server actually exposes, how to install it, where the community alternatives come in when the official option falls short, and the real-world limits worth knowing before you build on top of it.
+
+## What Does the ElevenLabs MCP Server Let Claude Do?
+
+Text-to-speech, voice cloning, speech-to-text transcription, voice design, audio isolation, soundscape generation. The ElevenLabs MCP server hands all of those to Claude as callable tools. So Claude can narrate a written report, clone a reference voice off a short sample, transcribe a recorded meeting, or scrub background noise out of an existing clip, and it does all of that inside the same conversation that generated the text in the first place.
+
+Here is the split that actually matters: generation versus manipulation. Voice cloning and voice design build new audio from a description or a sample. Transcription and audio isolation work on audio you already have. Most workflows land on one side of that line, not both. That makes your first setup decision an easy one to name and an easy one to get wrong: which tools do you genuinely need turned on, versus which ones just pile up surface area you now have to review? Enabling everything by default is rarely right on a first pass. With more tools active, Claude has a larger menu to choose from, and the odds of a wrong pick go up accordingly.
+
+## How Do You Install and Configure the ElevenLabs MCP Server?
+
+Installation is the standard MCP dance. Drop the server into your client's config with an API key, then restart the client so it picks up the new tools. Depending on which distribution you pull, the server runs through `uvx` or `npx`, and it needs nothing more than a valid ElevenLabs API key to start doing work.
+
+```json
+{
+  "mcpServers": {
+    "elevenlabs": {
+      "command": "uvx",
+      "args": ["elevenlabs-mcp"],
+      "env": {
+        "ELEVENLABS_API_KEY": "your_api_key_here"
+      }
+    }
+  }
+}
+```
+
+After it connects, Claude Desktop or Cursor lists the new tools on its own. No separate registration step. Start with something dead simple like "read this paragraph back to me" before you touch voice cloning. Cloning burns API credits faster, so you want the basics confirmed before you start spending on it.
+
+One catch before you commit to an implementation. MCPFind's directory currently indexes three separate ElevenLabs MCP wrappers, each under a different maintainer, and none of them shows up as an official vendor listing in our registry data. For a fast-moving integration space that is normal enough. But it does mean the config snippet above might need a tweak depending on which package name you end up pulling. Look at the tool list a package exposes before you wire it into anything production-bound, because coverage of voice cloning, transcription, and audio isolation shifts from one implementation to the next even when they all wrap the same underlying API.
+
+## What Are the Tool-Level Limits Worth Knowing Before You Rely on It?
+
+Run this past quick testing and two things surface fast: character limits and voice cloning consent. Free-tier accounts blow through a low monthly character cap in a hurry, so anything beyond a test drive needs a paid plan. Voice cloning carries its own rule. You have to hold rights to the voice you are cloning, and ElevenLabs enforces that at the API level, so the MCP server just passes your request straight through. Confirm you hold those rights before you start building on top of it.
+
+Latency is the other one. Generating a few minutes of audio takes noticeably longer than a text response, so any agent chaining TTS calls back to back should expect the conversation to stall on each generation instead of streaming instantly. None of this is a quirk of the MCP wrapper. It's just how the underlying ElevenLabs API behaves. These are API-level constraints, and they show up the same way no matter how you reach the service.
+
+## How Does the ElevenLabs MCP Server Compare to Other Voice Options in the Directory?
+
+Voice generation is a thin slice of what's in there. MCPFind's [media category](/categories/media) currently indexes 517 servers, most of them leaning toward video, images, or file conversion rather than speech specifically. A few community-maintained ElevenLabs wrappers sit inside that set, right alongside the vendor's own tooling, and each one packages a slightly different slice of the underlying API. So check what a given listing actually exposes. Don't assume full API parity.
+
+Got a narrower need? Local transcription only, say. Then a dedicated speech-to-text server, minus the whole generation and cloning surface, probably beats pulling in the full feature set. If voice is just one piece of a bigger pipeline, the broader [ai-ml category](/categories/ai-ml) and its 2,100 indexed servers is where most of the surrounding model-serving and embedding tools for agent workflows actually live. Both the [best ai-ml servers for agent toolchains roundup](/blog/best-ai-ml-mcp-servers-agent-toolchains) and the broader [AI and machine learning MCP servers guide](/blog/best-mcp-servers-ai-machine-learning) walk through where voice tools sit next to the model-serving and orchestration options in that same category.
+
+## When Should You Add Voice Tools to an Agent Instead of Sticking with Text?
+
+Add voice when the output genuinely gets consumed differently than text would. Having the capability one config block away is a weak reason to reach for it on its own. A narrated summary for someone on their commute, read-aloud accessibility for a long document, a voice-cloned assistant carrying a specific brand persona, those earn their keep. A voice-generated Slack message nobody asked for does not.
+
+The teams that squeeze the most out of this start with one narrow use case, prove that latency and cost hold up at real volume, and only then widen the scope. Push narration, cloning, and transcription out all at once and you lose the thread on which tool is actually justifying its API spend.
+
+Setup itself is cheap. One API key, one config block, tools live. The hard part is judgment: does audio output actually serve the task better than text? That answer depends on the use case. How easy the integration was to stand up tells you nothing about it. If your voice-enabled agent also has to hold context across sessions, the [MCP memory servers guide](/blog/mcp-memory-servers-ai-agents) is worth a look. Brand new to MCP? Read the [plain-English overview](/blog/what-is-mcp) first, before you go wiring up specialized servers like this one.
+
+## Frequently Asked Questions
+
+### Does the ElevenLabs MCP server require a paid account?
+
+You need an ElevenLabs API key, and voice cloning and higher usage tiers require a paid plan. The free tier covers basic text-to-speech testing but hits character limits quickly for real workloads.
+
+### Can the ElevenLabs MCP server run alongside other audio tools in the same agent?
+
+Yes. It exposes its own named tools, so it does not conflict with a transcription-only server or a different TTS provider connected in parallel. Claude picks the right tool based on what the task calls for.
+
+### Does the ElevenLabs MCP server work with Cursor and Windsurf, or only Claude?
+
+It works with any MCP-compatible client, including Cursor, Windsurf, and the OpenAI Agents SDK, since the server speaks the standard protocol rather than a Claude-specific extension.
+
+### Is voice cloning through the MCP server subject to ElevenLabs' consent requirements?
+
+Yes. ElevenLabs enforces its own voice cloning consent and usage policies at the API level, and the MCP server does not bypass them. You still need explicit rights to any voice you clone.
