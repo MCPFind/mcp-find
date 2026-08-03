@@ -1,0 +1,87 @@
+---
+title: "Home Assistant MCP Server: 4 Options Compared for Claude"
+description: "No single official Home Assistant MCP server exists yet. Compare voska/hass-mcp, homeassistant-ai/ha-mcp, achetronic/hass-mcp, and ganhammar's custom component."
+excerpt: "Home Assistant has no vendor-official MCP server, so four community projects fill the gap, each with a different architecture. This guide compares voska/hass-mcp, homeassistant-ai/ha-mcp, achetronic/hass-mcp, and a custom-component option so you can pick the one that matches your setup."
+date: "2026-07-29"
+updatedAt: "2026-07-29"
+author: "Adam Bush"
+authorUrl: "https://www.linkedin.com/in/adam-bush/"
+authorSameAs:
+  - "https://www.linkedin.com/in/adam-bush/"
+tags:
+  - "mcp"
+  - "beginner"
+  - "home-assistant"
+  - "smart-home"
+  - "self-hosted"
+category: "other"
+focusKeyword: "home assistant mcp server"
+draft: false
+cornerstone: false
+topic_source: new_topic
+cluster: other
+faqItems:
+  - question: "Is there an official Home Assistant MCP server from Nabu Casa?"
+    answer: "No standalone Nabu Casa server exists for this. Home Assistant core ships built-in Model Context Protocol integrations that let Home Assistant act as an MCP target for other tools, but no single Nabu Casa-branded MCP server exists for connecting Claude or another AI agent to your smart home."
+  - question: "Which Home Assistant MCP server should beginners start with?"
+    answer: "voska/hass-mcp is usually the easiest starting point. It's Python, MIT licensed, runs as an external process, and has the most documentation of the community options, including Docker and uvx install paths."
+  - question: "Can an AI agent control smart home devices, not just check their status?"
+    answer: "Yes. All four servers covered here expose service calls, not only entity state reads. So Claude can flip on a light, adjust a thermostat, or fire off an automation, rather than only reporting the current state of one."
+  - question: "Do any of these Home Assistant MCP servers work remotely, not just on a local network?"
+    answer: "achetronic/hass-mcp supports HTTP transport with OAuth and JWT validation specifically for remote use, and homeassistant-ai/ha-mcp can be reached through Nabu Casa's cloud or a reverse proxy since it runs inside Home Assistant itself. voska/hass-mcp is built primarily for local and Docker-based setups."
+---
+
+Ask Claude to turn off the living room lights or check whether the garage door is closed, and none of it works until a Home Assistant MCP server is sitting between the two. Unlike most vendor integrations MCPFind covers, there's no single official server here. Home Assistant itself ships an MCP integration for exposing your instance to other tools, but wiring an AI agent up to actually control it? That's a job four separate community projects have taken on, each with its own architecture and its own tradeoffs. MCPFind's [other category](/categories/other) is where projects like this usually land when they don't fit a narrower bucket, and it's worth a browse if you're hunting for adjacent home-automation tooling. New to MCP as a concept? The [what-is-mcp guide](/blog/what-is-mcp) covers the basics before you pick a server. This guide compares the four real options so you're not guessing which one fits your setup.
+
+## Why Isn't There One Official Home Assistant MCP Server?
+
+Home Assistant is open source and famously modular. No single company owns the "official AI integration" the way PagerDuty or Stripe owns theirs. Home Assistant core does ship its own Model Context Protocol integrations, but those expose Home Assistant as a target for other MCP-aware tools. They aren't a ready-to-run server that plugs Claude into your smart home out of the box.
+
+The community moved in to fill that gap quickly. Four projects now chase the same basic goal, and they get there by very different routes. voska/hass-mcp runs as an external Python process, the easiest of the bunch to spin up. Then it splits. One project lives inside Home Assistant itself as an add-on, another is a custom component you install through HACS, and the fourth breaks from Python entirely, written in Go and built with production deployment in mind rather than a quick local hookup. None of the four covered here are indexed in MCPFind's directory with meaningful star counts yet, since enrichment for niche self-hosted tools like these tends to lag well behind their real GitHub activity. A related [community entry](/servers/io-github-jarahkon-hass-mcp-server) does already exist in MCPFind's own index, though it's early enough that its star count hasn't caught up to its actual usage either, which is the usual story for the smart-home tools scattered across the directory.
+
+## Which Home Assistant MCP Server Should You Actually Use?
+
+Here's how the four options break down by architecture, language, and how you'd reach them.
+
+| Server | Architecture | Language | Best For |
+|---|---|---|---|
+| [voska/hass-mcp](https://github.com/voska/hass-mcp) | External process | Python | Local setups, easiest to start with |
+| [homeassistant-ai/ha-mcp](https://github.com/homeassistant-ai/ha-mcp) | In-process HA add-on | Python | Nabu Casa cloud or reverse-proxy remote access |
+| [achetronic/hass-mcp](https://github.com/achetronic/hass-mcp) | External process | Go | Production deployments needing OAuth and Kubernetes |
+| [ganhammar/hass-mcp-server](https://github.com/ganhammar/hass-mcp-server) | HA custom component | Python | Teams already comfortable with HACS custom components |
+
+voska/hass-mcp sits at roughly 300 GitHub stars and ships under an MIT license, which makes it the most established of the four by community adoption. It exposes entity state, service calls, history and statistics, automation listings, and dashboard generation, and it installs through Docker or uvx. homeassistant-ai/ha-mcp goes the other way. It runs as an in-process add-on inside Home Assistant itself rather than a separate service, which requires Home Assistant 2026.6.0 or newer but simplifies remote access through Nabu Casa's existing cloud connection.
+
+## How Do the Go and Custom-Component Options Differ?
+
+achetronic/hass-mcp is the outlier here. It's written in Go instead of Python, and built explicitly for production use. It supports both stdio for local connections and HTTP with OAuth and JWT validation for remote ones, ships a Dockerfile and a Helm chart, and aims itself squarely at teams running Home Assistant behind real infrastructure rather than on a spare Raspberry Pi.
+
+ganhammar/hass-mcp-server isn't a standalone server at all. It's a Home Assistant custom component, installed the same way you'd add any HACS integration, exposing MCP over HTTP transport from inside your existing Home Assistant install. If your team already manages Home Assistant through custom components and HACS, that consistency might matter more to you than whether the underlying code is Python or Go. If it doesn't, one of the standalone servers is probably the simpler pick, since you're not tying the integration's lifecycle to Home Assistant's own update cycle.
+
+## What Can Claude Actually Do Once It's Connected to Home Assistant?
+
+All four servers expose service calls rather than read-only access, so the baseline capability is the same across the group. Claude can read entity state, call services to control devices, pull history and statistics, list existing automations, and in voska's case, generate dashboards from a description.
+
+So both "is the front door locked" and "turn off every light downstairs" run over that same connection, once you've scoped the entities and services you want exposed. It pays to start narrow here. Home Assistant setups often carry dozens or hundreds of entities, and handing an AI agent access to all of them at once, particularly anything tied to locks or garage doors, is a bigger blast radius than most people want on day one. Scope the integration to a handful of rooms or device types first, confirm the responses match what you expect, then widen it once you trust the setup.
+
+Long-term automations are where this really starts to pay off beyond one-off commands. Rather than writing a Home Assistant automation yourself for "dim the lights after sunset if someone's home," you can describe the behavior to Claude, have it read your existing entities and automations for context, and draft the automation logic for you to review before it goes live, and that review is where the real safety net lives. Treat anything Claude proposes as a draft, not a finished automation, especially early on while you're still confirming it understands your entity names and room layout correctly.
+
+## Frequently Asked Questions
+
+### Is there an official Home Assistant MCP server from Nabu Casa?
+
+No standalone Nabu Casa server exists for this. Home Assistant core ships built-in Model Context Protocol integrations that let Home Assistant act as an MCP target for other tools, but no single Nabu Casa-branded MCP server exists for connecting Claude or another AI agent to your smart home.
+
+### Which Home Assistant MCP server should beginners start with?
+
+voska/hass-mcp is usually the easiest starting point. It's Python, MIT licensed, runs as an external process, and has the most documentation of the community options, including Docker and uvx install paths.
+
+### Can an AI agent control smart home devices, not just check their status?
+
+Yes. All four servers covered here expose service calls, not only entity state reads. So Claude can flip on a light, adjust a thermostat, or fire off an automation, rather than only reporting the current state of one.
+
+### Do any of these Home Assistant MCP servers work remotely, not just on a local network?
+
+achetronic/hass-mcp supports HTTP transport with OAuth and JWT validation specifically for remote use, and homeassistant-ai/ha-mcp can be reached through Nabu Casa's cloud or a reverse proxy since it runs inside Home Assistant itself. voska/hass-mcp is built primarily for local and Docker-based setups.
+
+This is the first MCPFind post in this particular grouping of self-hosted, non-vendor smart-home tooling. If you're browsing more broadly for what else MCP can connect to, the [MCPFind blog index](/blog) covers everything from IDE setup guides to vendor deep-dives across every category in the directory.
