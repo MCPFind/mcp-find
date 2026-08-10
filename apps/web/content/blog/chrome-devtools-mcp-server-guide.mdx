@@ -1,0 +1,105 @@
+---
+title: "Chrome DevTools MCP Server: Full Tools List for 2026"
+description: "A breakdown of every tool category in Google's Chrome DevTools MCP server, plus setup steps and how it differs from Playwright MCP for AI coding agents."
+excerpt: "Google's Chrome DevTools MCP server gives AI coding agents live control over a real Chrome instance. Here is what the 59 tools actually do, how to install it, and when to reach for it instead of Playwright MCP."
+date: "2026-08-03"
+updatedAt: "2026-08-03"
+author: "Adam Bush"
+authorUrl: "https://www.linkedin.com/in/adam-bush/"
+authorSameAs:
+  - "https://www.linkedin.com/in/adam-bush/"
+tags:
+  - "mcp"
+  - "developer"
+  - "devtools"
+  - "browser-automation"
+category: "devtools"
+focusKeyword: "chrome devtools mcp tools list"
+topic_source: "new_topic"
+draft: false
+cornerstone: false
+faqItems:
+  - question: "Does the Chrome DevTools MCP server work with Firefox or Safari?"
+    answer: "No. It drives an actual Chrome (or Chromium-based) instance through the DevTools Protocol, so it is Chrome-specific by design. There is no Firefox or Safari equivalent from Google today."
+  - question: "Can I use the Chrome DevTools MCP server without installing anything locally?"
+    answer: "You still need Node.js and npm on your machine, since the server runs via npx. There is no hosted, zero-install version as of this writing, unlike some other official MCP servers."
+  - question: "How is the Chrome DevTools MCP server different from a browser extension?"
+    answer: "A browser extension runs inside the page and is limited by the extension sandbox. This server sits outside the browser and talks to it over the DevTools Protocol, so it can start pages, emulate devices, and pull performance traces an extension cannot."
+  - question: "Does the Chrome DevTools MCP server slow down my browser?"
+    answer: "Normal browsing is unaffected because the server only launches or attaches to a Chrome instance when an agent calls a tool that needs one. Performance tracing itself adds the same overhead any DevTools recording session would."
+---
+
+Ask an AI coding agent to "check why this page is slow" and you will usually watch it guess instead of look. That gap is what Chrome DevTools MCP closes. Google's [chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp) server hands an agent a real, running Chrome instance rather than a scraped HTML snapshot, and the agent drives it the same way you would with the DevTools panel open: clicking, typing, capturing a performance trace, reading the console. This post covers what the tools actually do, how to install the server, and where it sits next to browser-testing tools like Playwright MCP.
+
+## What Is the Chrome DevTools MCP Server?
+
+Chrome DevTools MCP is an official Google server that connects AI coding agents to a live Chrome browser over the DevTools Protocol. What you get is a control surface for performance tracing, network inspection, and live debugging.
+
+MCPFind's directory indexes it as [io-github-chromedevtools-chrome-devtools-mcp](/servers/io-github-chromedevtools-chrome-devtools-mcp), carrying 31,292 GitHub stars as of our last sync. That's one of the highest counts of any entry in MCPFind's [devtools category](/categories/devtools), which now covers 5,082 servers averaging 21.28 stars each. Do the math on that spread. Google maintains it under the ChromeDevTools org, and the adoption has followed.
+
+Most devtools entries in MCPFind's index sit at a handful of stars or fewer, so a five-figure count against a 21.28 category average is the sort of outlier you'd expect on a framework, not on a debugging utility that only talks to one browser. Some of that is Google. A repo under an official org collects attention an independent server never gets, and the number reflects distribution as much as code.
+
+## What Tools Does the Chrome DevTools MCP Server Include?
+
+The server ships 59 tools. They span input automation, navigation, performance tracing, console debugging, network inspection, memory analysis, and browser extension handling, which is a wide enough surface that you want a rough map of it before wiring the thing into an agent.
+
+Input handling is the obvious one: clicking, typing, form filling, drag-and-drop, file uploads. Navigation opens, closes, and switches between pages or tabs. On the performance side you start a trace, stop it, then pull specific insights out of the recording, which mirrors how you would work the Performance panel by hand. Networking is thinner, just listing requests and pulling detail on a single one. The debugging group is where most of the depth lives: console messages, screenshots, DOM snapshots, Lighthouse audits, and arbitrary JavaScript evaluation. Heap snapshots get their own tools for capture and inspection.
+
+That range is why agents use this server for root-cause work, not just clicking through a checkout flow.
+
+## How Do You Install and Run the Chrome DevTools MCP Server?
+
+Installation is one command, no separate build step required. The package is published to npm as `chrome-devtools-mcp`, and any MCP client that supports local stdio servers can launch it directly.
+
+```json
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["-y", "chrome-devtools-mcp@latest"]
+    }
+  }
+}
+```
+
+Drop that into your client's MCP config (Claude Code, Cursor, and Windsurf all use this same shape) and restart the client. You don't need a Chrome window open ahead of time. Per the project's own README, the server starts the browser automatically the first time an agent calls a tool that requires one, then reuses that instance for the rest of the session.
+
+The one hard requirement is a current, stable release of Chrome installed on the same machine, along with a supported Node.js LTS version. Nothing else gets provisioned. There's no key to hand over and no signup step standing between the install and the first tool call.
+
+Plenty of official servers in MCPFind's index still want a service account, an API token, or a paid tier before anything works, and this one asks for none of it. You install it, restart the client, and the agent already has a browser it can drive.
+
+## How Is Chrome DevTools MCP Different From the Playwright MCP Server?
+
+Both automate a real browser. The overlap ends about there: MCPFind has already covered [Playwright's browser-testing MCP server](/blog/playwright-mcp-server-browser-testing) in depth, and the split is that Playwright MCP is built for repeatable test scenarios across browsers, while Chrome DevTools MCP exists to debug one specific Chrome instance interactively.
+
+Playwright's strength is cross-browser test authoring: Chromium, Firefox, and WebKit, run in CI, asserting expected states. Chrome DevTools MCP deliberately never touches Firefox or WebKit, and what it gives up in coverage it spends on the performance and network tooling Playwright was never designed to expose, things like `performance_start_trace` or heap snapshot capture.
+
+In practice, teams end up using both. Playwright verifies the feature works. Chrome DevTools MCP explains why it's slow, or why a specific request keeps failing, once something already looks wrong. A failing Playwright run tells you the checkout broke. Finding out what broke it means starting a trace with `performance_start_trace` and then reading back the network calls that fired in the same window, which is work a test runner was never built to do.
+
+## Which AI Coding Tools Support the Chrome DevTools MCP Server?
+
+Any MCP client that runs local stdio servers can use it, which today covers most of the popular options: Claude Code, Claude Desktop, Cursor, Windsurf, Cline, and VS Code with GitHub Copilot's MCP support. There's no client-specific build. You configure it once per tool using the same npx command, and the tool list looks identical no matter which client is driving it.
+
+A server that behaves differently per client forces you to relearn its quirks every time you switch tools. Because this one is a thin, standard MCP wrapper around the DevTools Protocol, agents get the same 59 tools and the same behavior everywhere it runs.
+
+Which helps on teams that mix Cursor and Claude Code users. Nobody reconfigures a debugging workflow just because the person next to them prefers a different client.
+
+## Frequently Asked Questions
+
+### Does the Chrome DevTools MCP server work with Firefox or Safari?
+
+No. It drives an actual Chrome (or Chromium-based) instance through the DevTools Protocol, so it's Chrome-specific by design. There is no Firefox or Safari equivalent from Google today.
+
+### Can I use the Chrome DevTools MCP server without installing anything locally?
+
+You still need Node.js and npm on your machine, because the server runs through npx. No hosted, zero-install version exists as of this writing, unlike some other official MCP servers.
+
+### How is the Chrome DevTools MCP server different from a browser extension?
+
+An extension runs inside the page, boxed in by the extension sandbox. This server sits outside the browser entirely and talks to it over the DevTools Protocol, which is why it can start pages, emulate devices, and pull performance traces no extension can reach.
+
+### Does the Chrome DevTools MCP server slow down my browser?
+
+Not during normal browsing. The server only launches or attaches to a Chrome instance when an agent calls a tool that needs one, and tracing itself adds the same overhead any DevTools recording session would.
+
+Chrome DevTools MCP is one of thousands of servers in MCPFind's index. It's also a decent illustration of what "official" tends to mean here: fewer tools, more capability per tool, instead of dozens of narrow ones. New to MCP entirely? Our guide on [what MCP is](/blog/what-is-mcp) covers the protocol basics this server builds on, and the full [blog archive](/blog) has more guides on connecting specific tools to AI agents. This is the first devtools-cluster post on MCPFind. Future guides on tracing, network debugging, or agent-driven QA will link back here as the anchor.

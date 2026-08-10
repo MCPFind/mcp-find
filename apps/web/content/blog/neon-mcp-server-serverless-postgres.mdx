@@ -1,0 +1,111 @@
+---
+title: "Neon vs Supabase MCP Servers: Postgres Branching"
+description: "Neon's official MCP server turns database branching into an agent tool. Here's how it works, how to install it, and how it compares to Supabase's MCP server."
+excerpt: "Neon's MCP server lets AI agents create, compare, and discard Postgres branches on demand. This guide covers the branch tools, both install paths, and where Neon's approach differs from Supabase's MCP server."
+date: "2026-07-30"
+updatedAt: "2026-07-30"
+author: "Adam Bush"
+authorUrl: "https://www.linkedin.com/in/adam-bush/"
+authorSameAs:
+  - "https://www.linkedin.com/in/adam-bush/"
+tags:
+  - "mcp"
+  - "developer"
+  - "databases"
+  - "postgres"
+category: "databases"
+focusKeyword: "neon mcp vs supabase mcp"
+topic_source: "new_topic"
+draft: false
+cornerstone: false
+faqItems:
+  - question: "Can I use the Neon MCP server in production?"
+    answer: "Neon's own documentation flags the hosted endpoint at mcp.neon.tech as intended for development and testing, not production workloads. For anything production-facing, the local npx-based install with a scoped API key is the safer path."
+  - question: "Does the Neon MCP server require a paid Neon plan?"
+    answer: "No. Neon has a free tier that supports branching, and the MCP server works against any Neon account tier since it just calls Neon's own API under the hood."
+  - question: "What happens if an agent creates a branch and never deletes it?"
+    answer: "The branch persists and continues to count toward your project's branch limits and storage, the same as if you had created it manually in the Neon console. There is no automatic expiration built into the server itself."
+  - question: "Is the Neon MCP server open source?"
+    answer: "Yes. It is published on GitHub under Neon's own organization, distributed as an npm package, and available for anyone to inspect or self-host locally."
+---
+
+Database branching used to mean a spare staging environment somebody remembered to refresh once a month. Neon made it native. Its official MCP server hands that capability straight to an AI agent: spin up an isolated copy of your database, run a migration against it, compare the result, then throw it away when you are done, with no provisioning or teardown on your end. This guide covers what the branch tools actually do, the two ways to install the server, and how the whole approach stacks up against Supabase's MCP server.
+
+## What Does the Neon MCP Server Do?
+
+Neon's [mcp-server-neon](https://github.com/neondatabase/mcp-server-neon) exposes Neon's serverless Postgres platform to AI agents as a set of callable tools. Neon's own docs sort them into eight categories: project management, branch management, schema, SQL querying, managed auth, a data API, observability, and documentation lookup.
+
+Our own index has a hole here. As of this writing, Neon's server is not yet listed in [MCPFind's databases category](/categories/databases), which currently tracks 482 servers averaging 9.18 GitHub stars each. Postgres-branching workflows are thin across that category, and this repo is one of the gaps. It sits at 621 GitHub stars, comfortably above that average once it does get indexed.
+
+It also runs two ways, local or hosted, and each mode authenticates differently. That split matters more here than it does for most servers. Which mode you pick changes what an agent is allowed to do to a production branch without you in the loop.
+
+## How Does Database Branching Work as an MCP Tool?
+
+Branch management is where Neon's server earns its reputation. Per the project's own README, it exposes discrete tools including `create_branch`, `delete_branch`, `describe_branch`, `list_branch_computes`, `compare_database_schema`, and `reset_from_parent`.
+
+The whole loop fits in four calls. An agent calls `create_branch` to fork a full copy of your database in seconds, runs a migration or some risky query against it, uses `compare_database_schema` to see what actually changed, then calls `delete_branch` when it is done. `reset_from_parent` snaps a branch back to match its source. Handy for agents that need a clean slate between test runs without re-provisioning anything.
+
+Most of the Postgres servers MCPFind has covered elsewhere have no equivalent. Branching is Neon's specific answer to the question of how an agent tests a schema change safely, and it lives down in the protocol layer instead of getting improvised by the agent with manual backups.
+
+## How Do You Install and Run the Neon MCP Server?
+
+Two supported paths, and they authenticate differently. The local install runs via npx with a Neon API key:
+
+```json
+{
+  "mcpServers": {
+    "neon": {
+      "command": "npx",
+      "args": ["-y", "@neondatabase/mcp-server-neon", "start", "<YOUR_NEON_API_KEY>"]
+    }
+  }
+}
+```
+
+The hosted alternative points your client at `https://mcp.neon.tech/mcp` and supports OAuth by default, with an API key as a fallback. Neon's docs are explicit that the hosted option trades a small setup step for always-current features, but they also caveat it as intended for development and testing rather than production use. So if you are wiring this into a workflow that touches a real production branch, the local install with a scoped API key is the more conservative choice.
+
+Scoping matters too. Neon lets you generate project-specific keys instead of an account-wide one, so an agent that only needs branch access to one project does not also walk away with standing access to every other database in your account.
+
+## Which AI Coding Tools Support the Neon MCP Server?
+
+Both install modes work with any client that speaks standard MCP. The local npx path is the same stdio setup used by Claude Code, Cursor, Windsurf, and Cline, dropped into whichever config file your client expects.
+
+The hosted path at mcp.neon.tech needs a client that supports remote MCP servers with OAuth, and that list is still short. Claude.ai and Claude Desktop handle it natively. Cursor added remote server support more recently. If your client only speaks local stdio, npx is the only option regardless of which one you would otherwise prefer.
+
+Versions drift, too. Because the hosted endpoint updates independently of your local machine, a team standardizing on it will see new tools show up for everyone at the same time. Teams on the local install only get new tools when somebody bumps the npx package version.
+
+## How Does Neon's MCP Server Compare to Supabase's MCP Server?
+
+Supabase holds the top spot in MCPFind's databases category right now. [com-supabase-mcp](/servers/com-supabase-mcp) leads with 2,556 stars. Against a 9.18 category average, that number tracks Supabase's gravity as a platform more than the server itself. That popularity reflects what the server is built for: a broader Postgres-plus-platform surface covering auth, storage, and edge functions alongside the database itself.
+
+Neon's server is narrower on purpose. It is not trying to be a full backend platform. Branching is the headline feature, and the tool set follows that focus with project and branch management, schema comparison, and direct SQL querying, minus the auth and storage layers Supabase bundles in.
+
+The split shows up the first time you ask an agent to test a migration. On Neon the agent forks the database, runs the migration against the fork, diffs the schema, and drops the fork, without ever leaving the protocol. Point the same agent at Supabase and it is working against the live database, with you as the review step. That is the risk difference. It only surfaces on schema changes, and when one goes wrong Neon has broken a disposable copy while Supabase has broken the database your app is running on.
+
+## What Other Database MCP Servers Has MCPFind Covered?
+
+Neon is one entry in a much larger set of database-focused guides on MCPFind. We have covered [self-hosting Supabase outside its managed cloud API](/blog/self-hosted-supabase-mcp-server), [Redis for caching and real-time data](/blog/redis-mcp-server-caching-guide), [connecting MySQL step by step](/blog/mysql-mcp-server-setup-guide), [Airtable's database-adjacent workflows](/blog/airtable-mcp-server-database-workflows), and [MongoDB's NoSQL access patterns](/blog/mongodb-mcp-server-guide).
+
+Nearly every database MCP server in that group treats the database as a fixed target to query. Neon is the outlier. It treats the database itself as something an agent can reshape, branch, and discard mid-task, which is a meaningfully different workflow and worth knowing about even if your current stack runs on one of the other five.
+
+None of them expose branch-per-task tooling the way Neon does, which is exactly why the gap in MCPFind's own index is worth closing. If you are already on Neon, the branch tools are what a generic Postgres server pointed at your connection string cannot give you.
+
+## Frequently Asked Questions
+
+### Can I use the Neon MCP server in production?
+
+Neon's own documentation flags the hosted endpoint at mcp.neon.tech as intended for development and testing, not production workloads. For anything production-facing, the local npx-based install with a scoped API key is the safer path.
+
+### Does the Neon MCP server require a paid Neon plan?
+
+No. Neon's free tier supports branching, and the MCP server works against any account tier because it just calls Neon's own API under the hood.
+
+### What happens if an agent creates a branch and never deletes it?
+
+It persists. The branch keeps counting toward your project's branch limits and storage, exactly as if you had created it by hand in the Neon console, and nothing in the server expires branches automatically.
+
+### Is the Neon MCP server open source?
+
+Yes. It lives on GitHub under Neon's own organization, ships as an npm package, and anyone can inspect it or self-host it locally.
+
+Want the broader picture of how MCP servers work before wiring one into your agent? Start with [what MCP is](/blog/what-is-mcp), MCPFind's cornerstone guide to the protocol.
