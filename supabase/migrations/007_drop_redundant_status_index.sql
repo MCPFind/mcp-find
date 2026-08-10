@@ -1,0 +1,26 @@
+-- Migration: Drop idx_servers_registry_status, redundant after 006 (2026-08-10)
+--
+-- 006 added idx_servers_status_last_push (registry_status, github_last_push DESC
+-- NULLS LAST). registry_status is that index's leading column, which makes the
+-- older single-column idx_servers_registry_status a strict prefix of it: any query
+-- the old index could serve, the composite serves too. Keeping both cost 320 kB of
+-- storage and, more importantly, an extra index to maintain on every INSERT and
+-- non-HOT UPDATE against a table that takes ~22k upsert calls per sync cycle.
+--
+-- Verified on prod before dropping (2026-08-10), 24h after 006 went in:
+--   idx_servers_status_last_push  51 scans and climbing (live traffic had moved to it)
+--   idx_servers_registry_status   +7 scans in the same window (effectively abandoned)
+--
+-- Verified after dropping, that the planner still uses the composite for
+-- filter-only predicates with no ORDER BY (leading-column prefix):
+--   SELECT count(*) ... WHERE registry_status='active'
+--     -> Index Only Scan using idx_servers_status_last_push
+--   SELECT id ... WHERE registry_status='deprecated' LIMIT 5
+--     -> Index Scan using idx_servers_status_last_push, 7 buffers
+-- No sequential scan fallback in either case.
+--
+-- Applied to prod with DROP INDEX CONCURRENTLY. This file uses the plain form so it
+-- can run inside a normal migration transaction; IF EXISTS makes it a no-op against
+-- prod, where the index is already gone.
+
+DROP INDEX IF EXISTS idx_servers_registry_status;
