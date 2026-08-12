@@ -1,0 +1,115 @@
+---
+title: "Auth0 vs Okta MCP Servers: Identity Management Compared"
+description: "Auth0 and Okta both ship official MCP servers, but at different maturity stages. Compare star counts, GA status, and setup steps before you pick one."
+excerpt: "Auth0's MCP server is beta software with 112 stars; Okta's is GA with 53. Neither is a healthy listing in MCPFind's own directory yet. Here's what each one actually does, how mature it is, and how to connect it to Claude or Cursor."
+date: "2026-08-03"
+updatedAt: "2026-08-03"
+author: "Adam Bush"
+authorUrl: "https://www.linkedin.com/in/adam-bush/"
+authorSameAs:
+  - "https://www.linkedin.com/in/adam-bush/"
+tags:
+  - "mcp"
+  - "developer"
+  - "security"
+  - "identity-management"
+  - "oauth"
+category: "security"
+focusKeyword: "auth0 vs okta mcp server"
+draft: false
+cornerstone: false
+topic_source: "new_topic"
+faqItems:
+  - question: "Does MCPFind index the official Auth0 or Okta MCP servers yet?"
+    answer: "Not in a healthy state as of this writing. Auth0 has a single unofficial community listing with zero stars and no confirmed tools. Okta has no listing at all. Both vendors' real GitHub repos are active, so this is a directory coverage gap on our end, not a sign either server is abandoned."
+  - question: "What's the difference between the Auth0 MCP Server and Auth0's 'Auth for MCP' product?"
+    answer: "The Auth0 MCP Server is an admin tool that lets you manage your own Auth0 tenant through natural language. Auth for MCP is a separate Auth0 product where Auth0 acts as the OAuth 2.1 identity provider for someone else's MCP server. They solve different problems and are easy to mix up."
+  - question: "Is the Okta MCP Server open source?"
+    answer: "Yes. It's Apache 2.0 licensed and published at github.com/okta/okta-mcp-server, with Okta describing it as generally available self-hosted software."
+  - question: "Can I use both Auth0 and Okta MCP servers in the same AI agent workflow?"
+    answer: "Technically yes if your organization has both identity platforms, but most teams pick one as their system of record. Running both MCP servers just doubles the OAuth scopes an agent can request, which widens your attack surface without adding capability."
+  - question: "Do I need a paid Auth0 or Okta plan to use their MCP servers?"
+    answer: "Both servers authenticate against your existing tenant, so you need an active Auth0 or Okta account, but neither MCP server itself carries a separate license fee beyond your existing plan."
+---
+
+Identity platforms took their time getting to MCP. Then 2025 happened, and both Auth0 and Okta pushed out servers of their own. They are not two versions of the same product at the same stage of life. One ships with a beta warning sitting in its README. The other calls itself generally available. If you're wiring an identity provider into an AI agent, those two labels change how much you should trust each one. What follows: a comparison built on each project's real GitHub signals, what each server actually lets an agent touch, and a warning about a second Auth0 product people mistake for the MCP server constantly.
+
+## What Is the Difference Between the Auth0 MCP Server and the Okta MCP Server?
+
+Auth0's server carries 112 stars to Okta's 53, and both come straight from the vendor rather than a community fork. The Auth0 MCP Server (`auth0/auth0-mcp-server`) is MIT licensed and carries a "Beta Software Notice" right in its own README. Okta's (`okta/okta-mcp-server`) is Apache 2.0 licensed, and Okta's developer blog describes it as "Okta Self-Hosted MCP Server," generally available.
+
+| Server | License | Stars | Status | Last Push |
+|---|---|---|---|---|
+| Auth0 MCP Server | MIT | 112 | Beta | Active (within days) |
+| Okta MCP Server | Apache 2.0 | 53 | GA | Active (within days) |
+
+Both repos have had commits within days of each other recently, so nothing here is stalled. Star count is a weak maturity signal on its own for enterprise identity tooling. The labels the vendors put on their own work, GA against beta, tell you more. Worth flagging early: MCPFind's [security category](/categories/security) carries only a thin, unofficial Auth0 listing (`com-auth0-mcp`) and nothing for Okta. More below.
+
+## What Does Each MCP Server Actually Let an Agent Do?
+
+Tenant administration is the job for both of them, not end-user login flows. The Auth0 MCP Server reaches applications, APIs, actions (Auth0's custom code hooks), logs, and forms, so an agent can register a new API or pull up recent login logs from a chat prompt instead of you clicking through the dashboard. The Okta MCP Server covers a comparable admin surface: users, groups, applications, and policies, all scoped to whatever your API token permits.
+
+Neither one sits in the path of your actual authentication flow. Still, the API token you hand either server deserves the care you'd give an admin console password, not a read-only key, since an agent hooked up to either is editing the identity platform's configuration. Live user sessions stay untouched, and that's not the same as low risk. A compromised agent session could spin up a rogue application registration or widen a group's access policy.
+
+## Is Auth0's MCP Server the Same as "Auth for MCP"?
+
+They are two different products, and mixing them up is the most common mistake in this space. The Auth0 MCP Server is an admin tool: point it at your own Auth0 tenant, then manage applications, APIs, actions, and logs by talking to it. Auth for MCP is a different product entirely. It's Auth0 playing the role of OAuth 2.1 and OIDC identity provider *for* an MCP server that you or somebody else builds, issuing tokens and handling consent so that server's author never has to write auth from scratch.
+
+So if what you actually meant to search was "how do I add login to my own MCP server," you want Auth for MCP. Not the admin tool this post covers. Okta has no equivalent split, and its MCP server only handles tenant administration. Worth knowing before you open either vendor's docs, because both companies use the word "MCP" for products with entirely different jobs.
+
+## How Mature Is Each Server for Production Use?
+
+Each vendor is shipping real software here, but "GA" and "beta" carry different operational commitments, and it pays to be literal about them. Okta's GA label is a commitment: backward compatibility, support channels, the things teams expect from infrastructure they get paged about. Auth0's beta notice reads more like an instruction. Test in a non-production tenant. Expect breaking changes between releases.
+
+Open issue counts back the labels up, loosely. Okta's repo runs a heavier backlog relative to its size, which is what broader GA usage produces as more people hit more edge cases. Auth0's beta repo runs lighter. For enterprise tooling that gets adopted through procurement rather than public GitHub traffic, that pattern is a far more useful maturity read than star count.
+
+Neither server has a healthy listing in MCPFind's [security category](/categories/security). That category spans 900 indexed servers at a 0.09 average star count, which says plenty about how thinly adopted identity-specific MCP tooling still is. There is a thin, unofficial [Auth0 MCP listing](/servers/com-auth0-mcp) in the directory: zero recorded stars, no confirmed tool count, filed under a generic "other" category instead of security. Don't confuse it with the official repo linked above. Okta has no MCP listing at all yet, a coverage gap on MCPFind's end, not a signal about the server's real-world state.
+
+## How Do You Connect Auth0 or Okta MCP to Claude or Cursor?
+
+Both run as local stdio processes, and you set them up the way you'd set up any other MCP server. Install via npm or the vendor's CLI, then add an entry to your client's config file pointing at the command, plus whatever environment variables it needs (your tenant domain and an API token scoped to the actions you're willing to allow).
+
+```json
+{
+  "mcpServers": {
+    "auth0": {
+      "command": "npx",
+      "args": ["-y", "@auth0/auth0-mcp-server"]
+    }
+  }
+}
+```
+
+Okta follows the identical pattern with its own package name and its own environment variables for your org URL and API token. Scope that token narrowly. Both servers can create, modify, and delete real identity resources inside your tenant, so a wide-open token sitting in an agent's hands is a bigger deal here than in most other server categories.
+
+Restart your client once the config is saved, then ask the agent to list your existing applications before letting it write anything. That one read-only check surfaces a misconfigured token before it reaches production identity data. Budget extra setup time on the Okta side for token scoping, since its admin API supports far more granular permission sets than Auth0's, part of why its issue backlog runs heavier.
+
+## Which Should You Choose for Your AI Agent Stack?
+
+Start with whatever is already your system of record. Nobody should migrate an entire identity provider to get a better MCP server.
+
+On Auth0? Treat the server as the beta it says it is. Pilot against a staging tenant instead of production, keep a human in the loop on anything destructive, and hold that posture until Auth0 drops the label. On Okta? The GA status buys you more room to trust it inside a limited production workflow, though "GA" still means "review every write action before you loosen the agent's permissions."
+
+If you're weighing identity MCP options more broadly, the [MCP server security deep dive](/blog/mcp-server-security-deep-dive-permissions) covers permission scoping patterns that apply to both servers, and the guide to [1Password MCP setup](/blog/1password-mcp-server-secrets-management) makes a useful contrast, since a secrets manager handles this same class of risk differently than an identity platform does. There's also a breakdown of [MCP server authentication](/blog/mcp-server-authentication-oauth-api-keys) and the foundational [what is MCP](/blog/what-is-mcp) guide if the protocol is new to you.
+
+## Frequently Asked Questions
+
+### Does MCPFind index the official Auth0 or Okta MCP servers yet?
+
+Not in a healthy state, no. Auth0 gets a single unofficial community listing with zero stars and no confirmed tools. Okta gets nothing at all. Both vendors' real GitHub repos are active, so treat this as a directory coverage gap on MCPFind's end rather than a sign that either server has been abandoned.
+
+### What's the difference between the Auth0 MCP Server and Auth0's "Auth for MCP" product?
+
+The Auth0 MCP Server is an admin tool. You use it to manage your own Auth0 tenant through natural language. Auth for MCP is a separate Auth0 product where Auth0 acts as the OAuth 2.1 identity provider for someone else's MCP server. The two solve different problems, and the near-identical names keep tripping people up.
+
+### Is the Okta MCP Server open source?
+
+Yes. Apache 2.0 licensed, published at github.com/okta/okta-mcp-server, and described by Okta as generally available self-hosted software.
+
+### Can I use both Auth0 and Okta MCP servers in the same AI agent workflow?
+
+Technically yes, if your organization runs both identity platforms. Most teams pick one as their system of record, though. Running both MCP servers doubles the OAuth scopes an agent can request, and that widens your attack surface without buying you any new capability.
+
+### Do I need a paid Auth0 or Okta plan to use their MCP servers?
+
+Both servers authenticate against your existing tenant, so you do need an active Auth0 or Okta account. Neither MCP server carries a separate license fee on top of the plan you already have.
