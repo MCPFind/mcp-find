@@ -19,6 +19,6 @@ servers:
   - name: "SandBase"
     github_url: "https://github.com/sandbaseai/cli"
     package_name: "@sandbaseai/cli"
-    description: "Connect Claude Code, Codex, Cursor, Windsurf, and other MCP clients to 2,000+ AI models and APIs without managing separate provider API keys."
+    description: "Connect Claude Code, Codex, Cursor, Windsurf, and other MCP clients to 2,000+ AI models without managing separate provider API keys."
     package_type: "npm"
     category: "ai-ml"
