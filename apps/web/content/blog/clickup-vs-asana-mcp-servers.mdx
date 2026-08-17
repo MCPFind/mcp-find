@@ -1,0 +1,118 @@
+---
+title: "ClickUp vs Asana MCP Servers: Official Options Compared"
+description: "Both ClickUp and Asana shipped official MCP servers in 2026, changing a comparison that used to be community-server-only. Here's what each offers and how the old options changed too."
+excerpt: "The go-to community MCP servers for ClickUp and Asana just got company: both platforms now ship official, first-party servers. Here's how tool counts, auth, and rate limits compare, plus what happened to the community options everyone used before."
+date: "2026-08-06"
+updatedAt: "2026-08-06"
+author: "Adam Bush"
+authorUrl: "https://www.linkedin.com/in/adam-bush/"
+authorSameAs:
+  - "https://www.linkedin.com/in/adam-bush/"
+tags:
+  - "mcp"
+  - "developer"
+  - "productivity"
+  - "project-management"
+  - "clickup"
+category: "productivity"
+focusKeyword: "clickup vs asana mcp server"
+draft: false
+cornerstone: false
+topic_source: "new_topic"
+faqItems:
+  - question: "Is ClickUp's official MCP server free to use?"
+    answer: "Yes, it's available on every ClickUp plan including Free, but the free tier is capped at 50 API calls per 24 hours. Unlimited and higher plans get 300 calls per 24 hours, and ClickUp's paid Everything AI add-on raises that further."
+  - question: "Is Asana's official MCP server still in beta?"
+    answer: "No. The V1 beta endpoint (mcp.asana.com/sse) was deprecated and shut down on August 5, 2026. The current server at mcp.asana.com/v2/mcp is Asana's stated generally available release."
+  - question: "Why did the popular community ClickUp MCP server become paid?"
+    answer: "The maintainer of taazkareem/clickup-mcp-server rebuilt it as a new repository under a Sponsorware model, gating source access and builds behind a Polar.sh subscription. The project's README states this reflects the maintenance burden of running a widely used free tool solo."
+  - question: "Can I still use a free community MCP server for ClickUp or Asana?"
+    answer: "For Asana, yes: roychri/mcp-server-asana remains MIT licensed and free, though its last update is a few months old. For ClickUp, the formerly free taazkareem server now requires a paid subscription for source and builds, so ClickUp's own free official server is the more practical no-cost option today."
+  - question: "Do the official servers require an API key or OAuth?"
+    answer: "Both are OAuth-only. Neither ClickUp's nor Asana's official MCP server supports a static API key path, which is a deliberate security tradeoff over the token-based auth many community servers still use."
+---
+
+Six months ago this was a community-server-versus-community-server comparison. Two solo-maintained projects, both free, both a quick npm install. That's not the situation anymore, because both ClickUp and Asana shipped official first-party MCP servers in 2026. Meanwhile the two community projects everyone leaned on stopped resembling each other. Source for the ClickUp one now sits behind a paid subscription. The Asana project stayed free and MIT licensed, but its commit history went quiet a few months ago and hasn't picked back up. So if you saved a setup guide earlier this year, throw it out. Here's what's actually running today, and how to pick between official and community for your own stack.
+
+## What Changed: Do ClickUp and Asana Now Have Official MCP Servers?
+
+Yes. Both of them, and that's the single biggest change to this comparison.
+
+ClickUp's official server runs at `mcp.clickup.com`. It's in public beta right now, exposing roughly 40 tools across search, tasks, time tracking, chat, and docs, and it's available on every ClickUp plan including Free. Compare that to a year ago, when your only route into either platform from an AI agent was a third-party project somebody maintained on nights and weekends.
+
+Asana is further down the road. Version 2 lives at `mcp.asana.com/v2/mcp`, ships roughly 44 tools, and carries an explicit "generally available" designation from Asana itself. The V1 beta endpoint that came before it was deprecated and shut down on August 5, 2026. Any tutorial still pointing at that old V1 URL is already stale.
+
+One caveat on the directory side. Neither official server currently has a confirmed listing in MCPFind's [productivity category](/categories/productivity), so the data below sticks to what's genuinely indexed instead of guessing at a slug.
+
+## How Do the Official ClickUp and Asana MCP Servers Compare?
+
+On scope, they're close. ClickUp lands around 40 tools, Asana's V2 around 44. Both authenticate through OAuth, and only OAuth. No static API key path on either one, which is a stricter default than most community servers in this space bother with.
+
+| | ClickUp Official | Asana Official V2 |
+|---|---|---|
+| Status | Public beta | Generally available |
+| Tool count | ~40 | ~44 |
+| Auth | OAuth only | OAuth 2.0 bearer |
+| Free tier | Yes, 50 calls/24h | Yes |
+| Higher-tier limit | 300 calls/24h (Unlimited+) | Not separately rate-capped in docs |
+
+Rate limits are where they actually split, and ClickUp's are the sharper constraint. Fifty calls in 24 hours sounds like plenty until you watch an agent that lists tasks before every single write chew through the whole budget in one working session. Asana's docs don't advertise a comparable cap on V2. Before you build a production workflow on either one, go check the current numbers in the vendor docs yourself, because published limits get revised without much announcement.
+
+## What Happened to the Popular Community Servers?
+
+Their paths split, and not in a way that leaves you with two comparable free options.
+
+`taazkareem/clickup-mcp-server` was the de facto community standard for a long stretch. Its maintainer rebuilt the whole thing as a brand new repository under a Sponsorware model, which means source access and builds now sit behind a Polar.sh subscription starting at $9 a month. The new repo shows 50 stars. Its README points out that the old public repo had piled up over 460 before the pivot, so treat that visible star count as a bad proxy for how many people actually run this.
+
+`roychri/mcp-server-asana` never went near a paywall. It's MIT licensed, free, and still published to npm as `@roychri/mcp-server-asana`. The catch is the last commit, roughly three months old as of this writing. Nothing about it is broken and the docs hold up fine, but it isn't keeping pace with the official server Asana now ships itself.
+
+Watch for a name collision when you go searching the directory yourself. MCPFind carries a related but separate community Asana listing, [com-mcparmory-asana](/servers/com-mcparmory-asana), and that is not the roychri project. It shows no recorded GitHub stars in the current snapshot, so take the gap as a gap rather than an equivalence. The [devtools category](/categories/devtools) does index `io-github-taazkareem-clickup`, which matches the new paid ClickUp project.
+
+## How Do You Connect ClickUp or Asana MCP to Claude or Cursor?
+
+Both official servers are OAuth-only remote endpoints, so setup means registering a remote MCP connection rather than launching a local process. In Claude Desktop or Cursor, you paste the server URL and finish an OAuth consent flow in the browser the first time you connect.
+
+```json
+{
+  "mcpServers": {
+    "clickup": {
+      "url": "https://mcp.clickup.com",
+      "transport": "http"
+    }
+  }
+}
+```
+
+Asana's V2 endpoint works the same way at `mcp.asana.com/v2/mcp`. The community servers are a different animal. Both `taazkareem/clickup-mcp-server` and `roychri/mcp-server-asana` install as local npm packages and get configured with a personal access token in your client's stdio config, so know which flow you're signing up for before you commit to one.
+
+You'll notice the gap the first time you have to revoke access. Remote OAuth keeps your credentials with ClickUp or Asana, so a revoked token costs you one trip back to the browser, while the local stdio route leaves a long-lived token sitting in a config file on your own machine for you to rotate and protect. Unless you have a specific reason to hold that token yourself, take the remote server, because then you never have a token on disk to lose in the first place. Whichever you land on, know which one you're running before an agent asks for elevated access to your task board.
+
+## Which Should You Use: Official or Community?
+
+For ClickUp, default to the official server. The free community alternative stopped being free, and that settles it for most people. Reach for the paid community option only if you specifically need its wider tool surface, and it is wider: that project advertises over 100 tools against the official server's roughly 40. If you're already paying for ClickUp's Everything AI add-on to lift your rate limit, though, a second bill to a separate maintainer starts getting hard to justify.
+
+Asana leaves you with a real decision to make, since the free community server there never went behind a paywall. The official V2 has GA status and active support behind it. `roychri/mcp-server-asana` is free and still functional, just visibly quieter than it was a few months back. If your team is already set up around API tokens and has no appetite for OAuth, the community server is defensible. Everyone else should take the official one.
+
+For more project-management MCP options, there are guides to [monday.com](/blog/monday-mcp-server-ai-agents), [Confluence](/blog/confluence-mcp-server-setup), and [Google Maps](/blog/google-maps-mcp-server-location-guide) servers, plus [Todoist for task management](/blog/todoist-mcp-server-task-management) and a look at [DocuSign's open source versus official server tradeoff](/blog/docusign-mcp-server-agreement-workflows), which walks through a nearly identical official-versus-community call. Brand new to MCP? Start with [what is MCP](/blog/what-is-mcp).
+
+## Frequently Asked Questions
+
+### Is ClickUp's official MCP server free to use?
+
+Yes. It's on every ClickUp plan, Free included. The catch is the cap: 50 API calls per 24 hours on the free tier. Unlimited and higher plans get 300 calls per 24 hours, and ClickUp's paid Everything AI add-on raises that further.
+
+### Is Asana's official MCP server still in beta?
+
+No. The V1 beta endpoint (mcp.asana.com/sse) was deprecated and shut down on August 5, 2026. What's live now is mcp.asana.com/v2/mcp, which Asana states is its generally available release.
+
+### Why did the popular community ClickUp MCP server become paid?
+
+The maintainer rebuilt taazkareem/clickup-mcp-server as a new repository under a Sponsorware model, putting source access and builds behind a Polar.sh subscription. Per the project's README, that call comes down to the maintenance burden of running a widely used free tool solo.
+
+### Can I still use a free community MCP server for ClickUp or Asana?
+
+For Asana, yes. roychri/mcp-server-asana is still MIT licensed and free, though its last update is a few months old. ClickUp is the harder case: the formerly free taazkareem server now requires a paid subscription for source and builds, which makes ClickUp's own free official server the more practical no-cost option today.
+
+### Do the official servers require an API key or OAuth?
+
+Both are OAuth-only. Neither ClickUp's nor Asana's official MCP server supports a static API key path. That's a deliberate security tradeoff against the token-based auth plenty of community servers still use.

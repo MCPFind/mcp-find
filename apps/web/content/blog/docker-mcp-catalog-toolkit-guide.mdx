@@ -1,0 +1,108 @@
+---
+title: "Docker MCP Catalog vs MCP Directory: What's Different"
+description: "Docker's MCP Catalog curates roughly 220 signed, vetted servers inside Docker Desktop. MCPFind indexes over 20,000. Here's how the two discovery models actually differ."
+excerpt: "Docker's MCP Catalog and Toolkit take a curated, signed-image approach to MCP discovery, a sharp contrast to open directories that index everything published. We break down how the catalog works, who's in it, and when each model fits."
+date: "2026-08-04"
+updatedAt: "2026-08-04"
+author: "Gus Marquez"
+authorUrl: "https://www.linkedin.com/in/gustavoamarquez"
+authorSameAs:
+  - "https://www.linkedin.com/in/gustavoamarquez"
+tags:
+  - "mcp"
+  - "developer"
+  - "devtools"
+  - "docker"
+  - "server-discovery"
+category: "devtools"
+focusKeyword: "docker mcp catalog vs mcp directory"
+draft: false
+cornerstone: false
+topic_source: "new_topic"
+faqItems:
+  - question: "Is the Docker MCP Catalog free to use?"
+    answer: "Yes. Docker Desktop and the MCP Toolkit are free, though some catalog servers require your own API keys or paid accounts with the underlying service (Stripe, for example, still needs a Stripe account)."
+  - question: "How does Docker verify the servers in its catalog?"
+    answer: "Docker builds catalog images through Docker Build Cloud, which attaches build attestations and cryptographically signed software bills of materials (SBOMs) to each image, so you can verify what's actually inside a server container before running it."
+  - question: "Can I submit my own MCP server to Docker's catalog?"
+    answer: "Yes, through a pull request to the docker/mcp-registry repository on GitHub. Docker's stated turnaround for new submissions going live is roughly 24 hours after merge, though your build and Dockerfile need to pass Docker's review first, a heavier bar than most open directories require for a listing."
+  - question: "Does Docker's MCP Catalog replace the need for a directory like MCPFind?"
+    answer: "No. The two answer different questions. The catalog answers 'what's been vetted and packaged for Docker Desktop.' A directory answers 'does an MCP server exist for X at all,' across every server publishers have listed, vetted or not. Most teams end up checking a directory first to confirm something exists, then deciding whether the packaged catalog version or the raw server is the better fit for their setup."
+  - question: "Why do partner server counts vary across Docker's own pages?"
+    answer: "Docker's launch announcement cited 100+ servers, its live product page currently states roughly 220+, and its docs page separately mixes in a 200+ figure for tools available through E2B sandboxes. These appear to be different counts measured at different times or of different things, so treat any single number as a snapshot, not a fixed catalog size."
+---
+
+Most MCP discovery still runs on the early-2000s software directory model. Someone publishes a server, a site indexes it, and quality is whatever it happens to be. Docker went a different direction in 2025. Its MCP Catalog and Toolkit live inside Docker Desktop, cover a far smaller set of servers, and add build attestation, signed images, and one-click credential handling. We dug into how the catalog actually works, who's in it today, and where something curated like Docker's fits alongside an open directory like ours, which indexes over 20,000 MCP servers across 21 categories. Both are chasing the same problem. MCP has no canonical registry, just competing lists with different tradeoffs.
+
+## What Is the Docker MCP Catalog and Toolkit?
+
+The catalog itself is a curated set of MCP servers packaged as signed container images. You browse it inside Docker Desktop, or on Docker's own catalog site. The Toolkit is the runtime half, a gateway that launches those servers, holds OAuth tokens and API keys against your Docker Hub account, and wires them into clients like Claude, Cursor, VS Code, Windsurf, and Continue.dev in one click.
+
+The pitch is packaging, not indexing.
+
+Every server in the catalog ships as an image built through Docker Build Cloud, which attaches build attestations and cryptographically signed SBOMs. So you can check what's actually inside the container instead of taking a GitHub README at its word. That is a different product from a directory that lists whatever publishers submit and never touches the artifact.
+
+Docker Desktop puts the catalog right in the UI, and the Toolkit absorbs the plumbing most of us otherwise script by hand. Pulling the right image. Wiring up transport. Keeping credentials out of a plaintext client config. If your team already lives in Docker Desktop, that deletes a real setup step versus configuring stdio servers by hand.
+
+## How Many Servers Does Docker's Catalog Actually Curate?
+
+Roughly 220. But Docker's own pages disagree with each other, so pin the number down before you quote it.
+
+The 2025 launch announcement said "100+." The live product page today says "220+ (and counting)." A separate docs page throws in a "200+" figure that looks like it describes tools reachable through E2B sandbox integrations, not the catalog as a whole. Different counts, taken at different moments, possibly of different things. Treat any single one as a snapshot, ours included, and check Docker's live catalog page for the current figure.
+
+Named partners confirmed at launch and still listed today: Stripe, Elastic, Grafana Labs, Neo4j. Newer arrivals include Sema4.ai, E2B, and Webflow. We index real servers from several of those same vendors. [Stripe's MCP server](/servers/com-stripe-mcp) sits at 1,395 stars, one of the highest-starred entries in our [finance category](/categories/finance). We also carry Grafana's own [mcp-grafana server](/servers/io-github-grafana-mcp-grafana) and Neo4j's [Cypher query server](/servers/io-github-neo4j-contrib-mcp-neo4j-cypher), though GitHub star enrichment hasn't populated for either entry in our current snapshot, so we're not putting a count on those two.
+
+## What Do Signed Images and Build Attestations Actually Protect Against?
+
+Both target one specific risk, a container image that doesn't match its published source. A build attestation is a signed record of how the image got built, from which source commit, through which steps, which means you can verify the artifact you're running came out of Docker's pipeline rather than getting tampered with in transit or swapped at the registry.
+
+The signed SBOM (software bill of materials) does the other half. It lists every package and dependency baked into the image, and it matters for the same reason SBOMs matter everywhere else. A dependency three layers deep in a server's container picks up a CVE next month, you grep the SBOM, and you know in seconds whether you're exposed. No rebuilding the image yourself to find out.
+
+Neither protection stops a server's own code from doing something you didn't want, which is where the ceiling sits. What you get is a guarantee that the code running is the code that was actually reviewed and packaged. Credentials are the Toolkit's other job, handled by tying OAuth tokens and API keys to your Docker Hub account instead of scattering them across plaintext config files.
+
+## How Is a Curated Catalog Different From an Open Directory Like MCPFind?
+
+They answer different questions. Docker's catalog tells you what's been vetted, signed, and packaged for Docker Desktop as of today, which is a deliberately short list. Ask us instead whether an MCP server exists for X at all, and you're querying an index built broad on purpose, running from [databases](/categories/databases) through [security](/categories/security), currently over 20,000 servers deep.
+
+Neither model wins outright. A curated catalog buys a guarantee and pays for it in breadth, since everything you see already cleared Docker's build and signing pipeline. Go the other way and coverage becomes the point. If a server exists somewhere on GitHub or npm, odds are decent it's indexed, even if nobody has vetted it yet. We'd send you to the broad index for a narrow niche integration, and to Docker for the smaller pile already packaged and signed.
+
+## How Do You Discover and Install a Server From Docker's Catalog?
+
+Open Docker Desktop, hit the MCP Toolkit section, browse or search. Picking a server launches it as a signed container and prompts you for whatever credentials it needs, which the Toolkit then stores and injects rather than leaving them in a plaintext config file.
+
+```bash
+docker mcp catalog show
+docker mcp server enable stripe
+```
+
+Getting a new server listed means opening a pull request against `docker/mcp-registry` on GitHub. Docker's stated turnaround from merge to live listing is roughly 24 hours, which is quick for a review pipeline that builds and signs images along the way. That review step is exactly what a pure directory skips, and it's the tradeoff from the last section in concrete form: you trade speed and breadth for a build-and-sign gate.
+
+If you're publishing, expect your Dockerfile and build scripts to face the same review the listed servers went through. Not a metadata check. That bar sits higher than most open directories set, MCPFind included, where getting listed is closer to "prove the server is real" than "prove the build pipeline is secure."
+
+## Which Approach Should You Use to Find MCP Servers?
+
+Docker's catalog makes sense when you're already inside Docker Desktop, you want signed images, and the server you need happens to be one of the roughly 220 it carries. Reach for an open directory when the question is what exists at all, especially in the newer or narrower categories nobody has packaged yet. Plenty of teams run both. A directory for discovery and evaluation, Docker's toolkit for the subset they actually deploy behind its credential-management layer.
+
+For more on how server discovery models compare in general, we've written up [open-source versus commercial MCP servers](/blog/open-source-vs-commercial-mcp-servers-2026) and [remote versus local MCP servers](/blog/remote-vs-local-mcp-server). Weighing MCP against other agent tool patterns? Our [OpenAI Agents SDK vs MCP](/blog/openai-agents-sdk-vs-mcp) and [multi-agent workflow patterns](/blog/mcp-multi-agent-workflow-patterns) posts cover the neighboring ground, and our [Gemini CLI setup guide](/blog/mcp-servers-gemini-cli-setup-guide) walks through a third client-side discovery flow outside both Docker and MCPFind. New to the protocol itself? Start with [what is MCP](/blog/what-is-mcp).
+
+## Frequently Asked Questions
+
+### Is the Docker MCP Catalog free to use?
+
+Yes. Docker Desktop and the MCP Toolkit both cost nothing. Some catalog servers still need your own API keys, or a paid account with the underlying service. Stripe's catalog entry, for example, doesn't get you far without an active Stripe account.
+
+### How does Docker verify the servers in its catalog?
+
+Docker builds catalog images through Docker Build Cloud, which attaches build attestations and cryptographically signed software bills of materials (SBOMs) to each image. That's what lets you verify what's actually inside a server container before you run it.
+
+### Can I submit my own MCP server to Docker's catalog?
+
+Yes, by opening a pull request against the docker/mcp-registry repository on GitHub. Docker's stated turnaround for new submissions going live is roughly 24 hours after merge. Your build and Dockerfile have to pass Docker's review first, though, and that's a heavier bar than most open directories require for a listing.
+
+### Does Docker's MCP Catalog replace the need for a directory like MCPFind?
+
+No. The two answer different questions. The catalog answers "what's been vetted and packaged for Docker Desktop." A directory answers "does an MCP server exist for X at all," across every server publishers have listed, vetted or not. Most teams end up checking a directory first to confirm something exists, then deciding whether the packaged catalog version or the raw server is the better fit.
+
+### Why do partner server counts vary across Docker's own pages?
+
+Docker's launch announcement cited 100+ servers, its live product page currently states roughly 220+, and its docs page separately mixes in a 200+ figure for tools available through E2B sandboxes. These appear to be different counts measured at different times, or of different things, so treat any single number as a snapshot, not a fixed catalog size.
