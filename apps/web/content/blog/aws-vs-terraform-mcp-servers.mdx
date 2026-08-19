@@ -1,0 +1,106 @@
+---
+title: "AWS MCP Server vs Terraform MCP Server: Which to Use"
+description: "AWS's MCP servers and HashiCorp's official Terraform MCP server solve different problems for infrastructure agents. Here's when each one fits, and how AWS itself now routes IaC work to Terraform."
+excerpt: "AWS ships dozens of service-specific MCP servers for live resource management. HashiCorp ships one official server for Terraform's registry and workspace lifecycle. AWS even deprecated its own Terraform tool in favor of HashiCorp's, a real signal about how these two are meant to work together."
+date: "2026-08-13"
+updatedAt: "2026-08-13"
+author: "Adam Bush"
+authorUrl: "https://www.linkedin.com/in/adam-bush/"
+authorSameAs:
+  - "https://www.linkedin.com/in/adam-bush/"
+tags:
+  - "mcp"
+  - "developer"
+  - "cloud"
+  - "devops"
+  - "infrastructure-as-code"
+category: "cloud"
+focusKeyword: "aws mcp server vs terraform mcp server"
+topic_source: "new_topic"
+draft: false
+cornerstone: false
+faqItems:
+  - question: "Can I use AWS MCP servers and the Terraform MCP server in the same agent?"
+    answer: "Yes, and it's the intended pattern. Point Terraform's server at your IaC configs and HCP Terraform workspace, point AWS's servers at the live account those configs deploy into, and one agent can plan a change and then verify it landed."
+  - question: "Does HashiCorp's Terraform MCP server run `terraform apply` for me?"
+    answer: "It can, but only through HCP Terraform or Terraform Enterprise runs. It won't shell out to a local terraform binary. If you're running Terraform purely locally without HCP, you'll get more value out of the registry lookups than out of triggering applies."
+  - question: "Is AWS's MCP server collection official, or community-maintained?"
+    answer: "Official. AWS maintains it under the awslabs GitHub organization, which is separate from the many unofficial AWS wrapper servers individual developers have built that also live in MCPFind's directory."
+  - question: "Why did AWS deprecate its own Terraform MCP server?"
+    answer: "AWS's README for that project now points users to HashiCorp's official Terraform MCP server as the recommended replacement. That's a rare case of one vendor formally deferring to another's server for a shared workflow."
+---
+
+Build an agent that touches cloud infrastructure and you'll hit both an AWS MCP server and a Terraform MCP server pretty fast. Which one does what isn't obvious. They cover adjacent layers, and the boundary between them is easy to miss. AWS's servers reach into your account and work on live resources. HashiCorp's Terraform server handles the declarative configuration and the apply lifecycle that provisions those resources in the first place. Below: what each one actually covers, where the boundary falls, a config you can copy for running both at once, and a signal straight from AWS about how the two are meant to fit together.
+
+## What Does AWS's MCP Server Actually Do?
+
+There is no single monolithic AWS MCP server. What AWS maintains is a collection at `awslabs/mcp`, roughly 9,600 stars and Apache 2.0 licensed, made up of dozens of service-specific servers covering IAM, Lambda, EKS, DynamoDB, Bedrock, and more. There's also a managed AWS MCP Server in preview for direct, CloudTrail-audited API calls against your account.
+
+What ties them together is imperative, live-resource work. Ask an agent to check IAM policy attachments, list running Lambda functions, or inspect a DynamoDB table's current schema, and the relevant server fires real AWS API calls at your actual account state, right now. That's a fundamentally different thing from reading a config file and planning a future change. It's querying and acting on what already exists. Every one of those calls lands in CloudTrail exactly the way a console action would, so the audit trail an agent leaves behind looks identical to a human operator's.
+
+## What Does the Terraform MCP Server Cover Instead?
+
+HashiCorp's official server, `hashicorp/terraform-mcp-server`, hit general availability on June 11, 2026. It sits at roughly 1,500 stars under the MPL-2.0 license. The scope is registry lookups (providers, modules, and policies) plus HCP Terraform and Terraform Enterprise workspace operations: creating and updating workspaces, managing variables and tags, and triggering or inspecting runs.
+
+That's declarative, plan-then-apply work, running the opposite direction from AWS's live-resource servers. An agent using the Terraform server is reasoning about what your infrastructure *should* look like according to committed configuration, then working through HCP Terraform's run pipeline to get there, instead of asking what's running at this exact second. The `terraform plan` step that runs before an apply is exactly the kind of guardrail this server hands an agent. Nothing about it routes around that step.
+
+## Why Did AWS Deprecate Its Own Terraform MCP Server?
+
+AWS used to maintain its own `awslabs/terraform-mcp-server`, aimed at Terraform-on-AWS best practices and Checkov-based security checks. That project is now explicitly deprecated, and its README sends users straight to HashiCorp's official Terraform MCP server as the recommended replacement.
+
+AWS weighed maintaining its own Terraform tooling against pointing at HashiCorp's official server, and chose to defer. The deprecation notice says exactly that. Which puts the two products in one pipeline, as complementary layers. If you're architecting a multi-agent infrastructure workflow, that's the strongest evidence going that "Terraform server plans and applies, AWS servers verify and monitor the live result" is the intended division of labor and not a workaround.
+
+## How Do You Combine Them in One Agent Workflow?
+
+A working pattern looks like this: an agent uses the Terraform MCP server to look up a module in the registry, checks it against your organization's policy set, and kicks off an HCP Terraform run to provision new infrastructure. That run completes. Then the same agent (or a second one) switches over to an AWS MCP server, say the IAM or EKS-specific tool, confirms the resources actually exist with the expected configuration, and pulls the CloudTrail record as an audit artifact.
+
+That handoff mirrors how most platform teams already split responsibility between an IaC pipeline and a cloud console. The agentic version just automates both halves plus the handoff between them, which means a drift check that used to require a human opening two separate tools can now run as one continuous agent loop that plans, applies, verifies, and then reports back, with nobody manually context-switching between HCP Terraform's UI and the AWS console.
+
+MCPFind's [cloud category](/categories/cloud) currently indexes 404 servers averaging 24.2 stars, most of them narrow single-service wrappers. General CI/CD and infrastructure tooling in the adjacent [devtools category](/categories/devtools) fills out the rest of the picture for teams building a broader agentic pipeline. As infrastructure work goes today, this two-server pairing is one of the more complete setups available, alongside dedicated guides on [AWS's MCP server](/blog/aws-mcp-server-cloud-resource-guide), [Terraform's MCP server](/blog/terraform-mcp-server-iac-guide), [Cloudflare's Workers server](/blog/cloudflare-mcp-server-workers-guide), and [Azure's built-in server](/blog/azure-mcp-server).
+
+## How Do You Set Up Both Servers in One MCP Client?
+
+Both servers speak stdio and drop into the same config file most MCP clients already read. A minimal setup for Claude Desktop or Cursor:
+
+```json
+{
+  "mcpServers": {
+    "terraform": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "hashicorp/terraform-mcp-server"]
+    },
+    "aws-iam": {
+      "command": "uvx",
+      "args": ["awslabs.iam-mcp-server@latest"],
+      "env": {
+        "AWS_PROFILE": "your-profile-name",
+        "AWS_REGION": "us-east-1"
+      }
+    }
+  }
+}
+```
+
+The Terraform server ships as a Docker image and needs no AWS credentials at all, since it only talks to the public registry and HCP Terraform's API. The AWS server wants real credentials scoped to whatever service it wraps, IAM in this case. That's exactly why AWS ships one narrow server per service instead of one server carrying every permission bundled together, and the reasoning is blast radius. A compromised or misconfigured Terraform server can, at worst, misread public registry data. A compromised AWS server carries whatever IAM permissions its credentials were scoped to. So scope each AWS server's credentials as narrowly as the task actually requires, not broadly "just in case."
+
+Swap `aws-iam` for whatever service the agent actually needs to touch. If the workflow only ever verifies EKS cluster state, run `awslabs.eks-mcp-server` with an EKS-scoped IAM role instead of granting broad account access up front. Adding a second AWS service later means adding a second narrow server, not widening the first one's permissions.
+
+## Frequently Asked Questions
+
+### Can I use AWS MCP servers and the Terraform MCP server in the same agent?
+
+Yes, and it's the intended pattern. Point Terraform's server at your IaC configs and HCP Terraform workspace, point AWS's servers at the live account those configs deploy into, and one agent can plan a change and then verify it landed.
+
+### Does HashiCorp's Terraform MCP server run `terraform apply` for me?
+
+It can, but only through HCP Terraform or Terraform Enterprise runs. It won't shell out to a local terraform binary. If you're running Terraform purely locally without HCP, you'll get more value out of the registry lookups than out of triggering applies.
+
+### Is AWS's MCP server collection official, or community-maintained?
+
+Official. AWS maintains it under the awslabs GitHub organization, which is separate from the many unofficial AWS wrapper servers individual developers have built that also live in MCPFind's directory.
+
+### Why did AWS deprecate its own Terraform MCP server?
+
+AWS's README for that project now points users to HashiCorp's official Terraform MCP server as the recommended replacement. That's a rare case of one vendor formally deferring to another's server for a shared workflow.
+
+Neither of these servers exists in a vacuum. If MCP server discovery and installation is new to you, start with [MCPFind's plain-English guide to MCP](/blog/what-is-mcp) before picking specific infrastructure tooling. And if your stack runs past AWS, the same intent-versus-verification split holds up fine for Azure or Cloudflare deployments managed through Terraform. The pairing pattern isn't AWS-specific. It's just documented most clearly there right now.

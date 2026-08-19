@@ -1,0 +1,101 @@
+---
+title: "Perplexity MCP Server: The 4 Tools Explained (2026)"
+description: "Perplexity's official MCP server exposes four tools mapped to its Agent API presets. Here's what each one does, real stars and license, and why Perplexity's own CTO is wary of MCP internally."
+excerpt: "Perplexity ships one of the most widely used MCP servers in the ecosystem, yet its own CTO has said the company is moving away from MCP internally. Here's the real tool breakdown, and the tension nobody covering Perplexity's MCP server usually mentions."
+date: "2026-08-10"
+updatedAt: "2026-08-10"
+author: "Gus Marquez"
+authorUrl: "https://www.linkedin.com/in/gustavoamarquez"
+authorSameAs:
+  - "https://www.linkedin.com/in/gustavoamarquez"
+tags:
+  - "mcp"
+  - "developer"
+  - "search"
+  - "ai-ml"
+  - "perplexity"
+category: "search"
+focusKeyword: "perplexity mcp server"
+topic_source: "new_topic"
+draft: false
+cornerstone: false
+faqItems:
+  - question: "Is Perplexity's MCP server free to use?"
+    answer: "Connecting is free. The underlying Search API and Agent API calls it wraps run on Perplexity's standard API pricing, so you need an active API key with usage credits behind it. The MCP server itself doesn't add a separate fee."
+  - question: "Does Perplexity's MCP server require an enterprise plan?"
+    answer: "Any developer with a Perplexity API key can run the open source server locally or point a client at it. No enterprise tier required. Enterprise customers get the same four tools, just with organization-level billing and usage controls layered on top."
+  - question: "Can Perplexity's MCP server browse a specific URL I give it?"
+    answer: "Not directly. All four tools route through Perplexity's own retrieval and reasoning stack, so there's no way to hand it an arbitrary URL and have it go fetch that page. It's a research assistant, not a general-purpose scraper."
+  - question: "Is Perplexity's MCP server the same thing as the Perplexity Comet browser?"
+    answer: "Different products entirely. Comet is a consumer browser with an embedded assistant. The MCP server is a developer-facing integration meant to be wired into Claude, Cursor, or any other MCP client. They share a brand and not much else."
+---
+
+Wire an AI agent up to live web search and there's a decent chance you've already used Perplexity's MCP server without giving it much thought. It's one of the most widely deployed MCP servers out there, maintained directly by Perplexity. There's a wrinkle here, though, and it matters before you build on it. Perplexity's own leadership has publicly questioned MCP as an integration pattern, and the company keeps shipping and recommending its own MCP server anyway. So it's worth knowing exactly what that server does before you wire it into anything.
+
+## What Tools Does Perplexity's MCP Server Expose?
+
+Perplexity's official server lives at `perplexityai/modelcontextprotocol` on GitHub. It exposes four tools, no more: `perplexity_search`, `perplexity_ask`, `perplexity_research`, and `perplexity_reason`. Each is a thin wrapper around a different Perplexity API surface. They aren't four separate search engines.
+
+`perplexity_search` hits the raw Search API and returns ranked results with citations, the closest thing here to a traditional search call. The other three route through Perplexity's Agent API at different effort presets. Narrow by design. Rather than exposing dozens of granular parameters the way some search MCP servers do, Perplexity collapsed everything into four intent-based tools that an agent can reason about without first reading a long parameter list. The repo carries the MIT license and sits at roughly 2,500 stars on GitHub as of this writing, real adoption relative to most single-vendor MCP servers.
+
+## How Do Perplexity's MCP Tools Map to Its Agent API?
+
+The three non-search tools line up directly with Perplexity's three Agent API effort presets, and that mapping is the part most coverage skips. `perplexity_ask` calls the `fast` preset. Use it for quick factual lookups where latency matters more than depth. `perplexity_reason` calls `medium`, built for multi-step reasoning over a moderate amount of retrieved context.
+
+Then there's `perplexity_research`, which calls the `high` preset. Slowest of the three, most thorough, aimed at open-ended research questions that need broad source coverage before an answer gets synthesized. Picking the right tool is really just picking the right latency-versus-depth tradeoff for a given agent task. An agent asking "what's the current stock price of X" should reach for `perplexity_ask`, not `perplexity_research`. Get that mapping wrong and you end up with a search integration that feels either too slow or too shallow for the job, which is the most common way teams go sideways here.
+
+## Why Is Perplexity Backing Away From MCP Internally?
+
+At Perplexity's own "Ask 2026" developer conference in March, co-founder and CTO Denis Yarats said publicly that the company is moving its internal and enterprise-facing systems off MCP and back toward direct REST API calls and CLIs. His stated reasons: tool schemas reportedly eating up to 72% of available context before a user's actual message even arrived, real auth friction across multiple connected servers, and low utilization of most exposed tool surfaces in practice.
+
+Striking thing to hear from a company running one of the more popular public MCP servers around. Perplexity's developer docs still call the MCP server "the recommended" integration path today, with zero deprecation language anywhere, and the repo shows active commits. So the split is real but narrow. Perplexity is skeptical of MCP for its own internal, high-volume systems while continuing to ship and support it as the front door for outside developers. Don't read "the vendor built it" as "fully endorsed path, forever."
+
+## How Does Perplexity's MCP Server Compare to MCPFind's Search Category?
+
+MCPFind indexes 1,559 search-category MCP servers with an average of 18.31 stars. It's a category dominated by long-tail community projects rather than a handful of dominant vendors. Perplexity's official server is not yet indexed as an official listing in our own directory. What we do carry: several unofficial community wrappers around the Perplexity API, none with meaningful star counts, plus one entry whose own description notes it has moved to a different official location. We'd rather flag that gap honestly than point you at a stale or unofficial slug.
+
+For a sense of what a heavily-adopted [search category server](/categories/search) looks like at scale, MCPFind's [top-starred search server](/servers/ai-com-mcp-skills-search) currently sits at over 14,000 stars, roughly five times Perplexity's own repo. That's not a knock on Perplexity. General-purpose tooling and a single-vendor API wrapper serve different audiences. It's a useful reference point if you're weighing Perplexity against broader search infrastructure options already covered in MCPFind's [best MCP servers for web search](/blog/best-mcp-servers-for-web-search) roundup, which surveys a wider set of retrieval-focused servers rather than one vendor's four-tool API wrapper.
+
+Narrow research synthesis? Perplexity's server earns its place in that roundup. If your agent needs to crawl arbitrary sites, index internal documents, or hit a dozen different search providers behind one interface, you're better off pairing it with one of the broader options that roundup covers, or replacing it outright.
+
+## How Do You Configure Perplexity's MCP Server in Claude or Cursor?
+
+Setup takes one JSON block and a Perplexity API key. Add the server to your client's MCP config, point it at the published npm package, and pass your key as an environment variable:
+
+```json
+{
+  "mcpServers": {
+    "perplexity": {
+      "command": "npx",
+      "args": ["-y", "@perplexity-ai/mcp-server"],
+      "env": {
+        "PERPLEXITY_API_KEY": "your-api-key-here"
+      }
+    }
+  }
+}
+```
+
+Restart the client after saving and all four tools show up immediately. No separate OAuth flow, no manual scope approval screen. That's lower friction than most search MCP servers ask for, and it's part of why adoption climbed as fast as it did. The tradeoff is that this same simplicity is what Yarats flagged internally as a double-edged sword: easy for a developer to bolt on, but every additional server bolted on the same way adds its own schema weight to every request an agent sends, whether that particular turn needs it or not.
+
+## Frequently Asked Questions
+
+### Is Perplexity's MCP server free to use?
+
+Connecting is free. The underlying Search API and Agent API calls it wraps run on Perplexity's standard API pricing, so you need an active API key with usage credits behind it. The MCP server itself doesn't add a separate fee.
+
+### Does Perplexity's MCP server require an enterprise plan?
+
+Any developer with a Perplexity API key can run the open source server locally or point a client at it. No enterprise tier required. Enterprise customers get the same four tools, just with organization-level billing and usage controls layered on top.
+
+### Can Perplexity's MCP server browse a specific URL I give it?
+
+Not directly. All four tools route through Perplexity's own retrieval and reasoning stack, so there's no way to hand it an arbitrary URL and have it go fetch that page. It's a research assistant, not a general-purpose scraper.
+
+### Is Perplexity's MCP server the same thing as the Perplexity Comet browser?
+
+Different products entirely. Comet is a consumer browser with an embedded assistant. The MCP server is a developer-facing integration meant to be wired into Claude, Cursor, or any other MCP client. They share a brand and not much else.
+
+Four tools is a light schema footprint, and that's a real part of why this server is easy to justify adding. Stack a dozen servers on that same reasoning and you've rebuilt the exact 72% context problem Yarats was complaining about. Figure out where MCP earns its keep in your stack before you add the next one. [What MCP actually is](/blog/what-is-mcp) covers that ground.
+
+Perplexity also isn't the only vendor shipping an MCP server it has doubts about internally. MCPFind covered [Elasticsearch's own MCP server deprecation](/blog/elasticsearch-mcp-server-guide) earlier this month, a vendor that ran the same math on schema cost and utilization and pulled the server instead of doubling down.
