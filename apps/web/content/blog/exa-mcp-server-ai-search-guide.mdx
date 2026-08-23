@@ -1,0 +1,104 @@
+---
+title: "Exa MCP Server: AI-Native Search for Claude and Cursor"
+description: "Exa's MCP server ships as both a local open-source package and a hosted remote endpoint. Here's what its tools actually do, and how it compares to Perplexity's."
+excerpt: "Exa built its search index for AI agents from the start, and its MCP server reflects that: four tools, a local and a hosted deployment path, and a code-search tool most web-search servers don't ship. Here's the real breakdown, verified against Exa's own docs."
+date: "2026-08-17"
+updatedAt: "2026-08-17"
+author: "Gus Marquez"
+authorUrl: "https://www.linkedin.com/in/gustavoamarquez"
+authorSameAs:
+  - "https://www.linkedin.com/in/gustavoamarquez"
+tags:
+  - "mcp"
+  - "developer"
+  - "search"
+  - "ai-ml"
+category: "search"
+focusKeyword: "exa mcp server"
+topic_source: "new_topic"
+draft: false
+cornerstone: false
+faqItems:
+  - question: "Does the Exa MCP server require an API key?"
+    answer: "Yes, for the local package. You set an Exa API key as an environment variable, and Exa's free tier covers a limited number of monthly searches before billing kicks in. The hosted remote endpoint uses OAuth instead, which routes usage through your Exa account."
+  - question: "Can I use the Exa MCP server without installing anything?"
+    answer: "Not if you go hosted. Connect to the endpoint at mcp.exa.ai/mcp from any client that supports remote MCP servers over Streamable HTTP. No local npm install needed."
+  - question: "What's the difference between web_search_exa and web_search_advanced_exa?"
+    answer: "web_search_exa is the default, general-purpose search tool. web_search_advanced_exa is optional and adds filtering, so an agent can narrow by domain, date range, or content type instead of getting a flat result list."
+  - question: "Does Exa's MCP server work with Cursor and Windsurf, not just Claude?"
+    answer: "It does. The server speaks stdio locally and Streamable HTTP hosted, so any MCP-compatible client behaves the same way. Cursor, Windsurf, and Claude Code all included."
+---
+
+We checked Exa's MCP server against its own current README instead of trusting cached summaries. Worth doing. Two of the tool names floating around aggregator sites turned out to be stale. What's actually shipping is a search server built for AI consumption from the ground up, not a web-search API that bolted an MCP interface on later. The [official server](https://github.com/exa-labs/exa-mcp-server) comes in two forms, a local npm package and a hosted remote endpoint. Below: what the tools do today, how the two deployment paths differ, and where Exa lands next to Perplexity's MCP server, which we've already covered.
+
+## What Is the Exa MCP Server?
+
+Exa MCP is the official server for [Exa's](https://exa.ai) search API, maintained under the `exa-labs` GitHub org. Our directory indexes it as [ai-exa-exa](/servers/ai-exa-exa) at 4,083 GitHub stars as of the last sync. The live count on GitHub runs a little higher, which is normal sync lag on a repo moving this fast. License is MIT.
+
+That number sits well above the average for our [search category](/categories/search), where 1,631 servers average 17.5 stars each. Most of that category is thin community wrappers around a single API. Exa is one of the exceptions. Perplexity's is the other, and the two are worth putting side by side, since they chase the same "give my agent live web results" job from opposite ends.
+
+There are two deployment paths. Run the package locally over stdio with an Exa API key, or point a client at the hosted remote endpoint and authenticate with OAuth. Most MCP servers pick one. Exa ships both.
+
+The index underneath is built differently from a general-purpose crawler, too. A traditional search engine indexes pages. Exa trains its ranking on embeddings, so a query comes back ordered by semantic similarity to the query itself, not keyword overlap. Same mechanism as Exa's standalone product. In practice that means results read as more relevant for research-style questions and worse for exact-phrase lookups, which is a tradeoff you feel the first time you need a literal string.
+
+## What Tools Does the Exa MCP Server Expose?
+
+Four tools ship with the current release. We checked that list against the repo's own README, not a third-party cache, because one older fork still advertises a tool the canonical server dropped. Two are on by default. The other two are optional, and you have to enable them explicitly in your client config.
+
+`web_search_exa` is the default general search: query in, ranked results out, scored by Exa's own relevance model rather than raw keyword matching. `web_fetch_exa` is on by default too. It pulls full page content for a specific URL the agent already has, which is what you want when the search result alone doesn't carry enough context to answer the question.
+
+The optional pair handles narrower jobs. `web_search_advanced_exa` bolts filtering onto the default search, so an agent can pin results to a domain, a date range, or a content type and stop sifting through an unfiltered list. `agent_run` is a different animal. It fires off a multi-step research task inside Exa's own infrastructure and hands back a synthesized result. That's delegation, not a search call.
+
+## How Do You Install the Exa MCP Server?
+
+The local path runs through npx, same as most MCP servers that ship as npm packages.
+
+```json
+{
+  "mcpServers": {
+    "exa": {
+      "command": "npx",
+      "args": ["-y", "exa-mcp-server"],
+      "env": {
+        "EXA_API_KEY": "your-api-key-here"
+      }
+    }
+  }
+}
+```
+
+Grab the API key from your Exa dashboard first. Skip that and the server still starts, but every tool call fails. Exa's free tier includes a limited number of monthly search credits, enough to kick the tires before you decide whether to put a card down. One caveat on credits: `agent_run` burns through them faster than a single `web_search_exa` call, since each run triggers several searches internally.
+
+The hosted path skips the local install completely. Point any MCP client that supports remote Streamable HTTP servers at `mcp.exa.ai/mcp`. No env var to set, because the client walks you through an OAuth flow. Both paths expose the same four tools, so the decision comes down to one question: manage a key yourself, or hand auth off to OAuth?
+
+## How Does Exa MCP Compare to Perplexity's MCP Server?
+
+Both are official. Both are search-first. We've [already covered Perplexity's MCP server](/blog/perplexity-mcp-server-search-guide) in its own guide, so here's where the two actually diverge.
+
+Perplexity's server leans on its Sonar models to hand back a synthesized, cited answer. That's closer to asking a research assistant a question than running a raw search. Exa's defaults return ranked results and page content and leave synthesis to the calling agent, unless you reach for `agent_run` and get Exa's own multi-step research behavior. So the real question is where synthesis should live: inside your agent, or inside the server. Exa bets on the former.
+
+The dual local-or-hosted deployment is Exa's sharper edge. Perplexity's server runs as a single package. Exa gives you the choice, which matters if your infrastructure already leans one way on secrets management.
+
+Tool count tells the same story. Exa ships four, split between defaults and opt-ins. Perplexity maps its tools straight to its Agent API presets. Scraping-first MCP servers tend to sprawl into general browsing. These two don't. The surface stays small, search and research only, so an agent rarely fumbles into the wrong tool by accident.
+
+Pricing shapes the choice too, in a quieter way. Both run on credit-metered APIs behind the free tier, so a workload that calls search dozens of times per session will hit a paid plan on either server eventually. Neither MCP layer changes that math. What changes is how visible the cost is to the agent calling the tool, and neither server currently surfaces per-call cost the way some other API-backed MCP servers do.
+
+## Frequently Asked Questions
+
+### Does the Exa MCP server require an API key?
+
+Yes, for the local package. You set an Exa API key as an environment variable, and Exa's free tier covers a limited number of monthly searches before billing kicks in. The hosted remote endpoint uses OAuth instead, which routes usage through your Exa account.
+
+### Can I use the Exa MCP server without installing anything?
+
+Not if you go hosted. Connect to the endpoint at mcp.exa.ai/mcp from any client that supports remote MCP servers over Streamable HTTP. No local npm install needed.
+
+### What's the difference between web_search_exa and web_search_advanced_exa?
+
+web_search_exa is the default, general-purpose search tool. web_search_advanced_exa is optional and adds filtering, so an agent can narrow by domain, date range, or content type instead of getting a flat result list.
+
+### Does Exa's MCP server work with Cursor and Windsurf, not just Claude?
+
+It does. The server speaks stdio locally and Streamable HTTP hosted, so any MCP-compatible client behaves the same way. Cursor, Windsurf, and Claude Code all included.
+
+Exa is one of two well-starred official search servers in our index, and if you're picking between the two, the Perplexity comparison is worth running yourself. New to MCP entirely? Our guide on [what MCP is](/blog/what-is-mcp) covers the protocol basics both servers build on. And for a deprecated option in the same broad category, see how we covered [Elasticsearch's MCP server deprecation](/blog/elasticsearch-mcp-server-guide) and what replaced it.
