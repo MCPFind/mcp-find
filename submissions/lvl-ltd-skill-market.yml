@@ -1,0 +1,6 @@
+servers:
+  - name: "LVL LTD Skill Market"
+    github_url: "https://github.com/LVTD-LLC/skills"
+    package_name: "lvl-ltd-skill-market"
+    description: "x402 AI agent skill marketplace. Sealed packs, USDC on Base, public proof ledger. MCP/A2A live."
+    category: "ai-ml"
