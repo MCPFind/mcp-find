@@ -19,7 +19,7 @@ servers:
   - name: "Worklittle Jobs"
     github_url: "https://github.com/worklittle/jobs-mcp"
     package_name: "worklittle"
-    description: "Search jobs with visa, salary, and distance filters, then swipe to apply in your AI app. Connect a Worklittle account to save jobs."
+    description: "Swipe to apply for jobs in your AI app, and search over 4 million jobs with filters like visa status, distance, and salary, and connect your Worklittle account to save jobs you love."
     package_type: "npm"
     category: "search"
 
