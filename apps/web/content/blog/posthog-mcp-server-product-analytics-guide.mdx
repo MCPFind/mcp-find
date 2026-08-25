@@ -1,0 +1,98 @@
+---
+title: "PostHog MCP Server: Product Analytics for AI Agents"
+description: "PostHog's MCP server lets an AI agent query feature flags, session recordings, and warehouse SQL through natural language. Here's what it covers, and why it recently moved into PostHog's main repo."
+excerpt: "PostHog folded its MCP server into its main monorepo earlier this year, a consolidation move rather than a shutdown. This guide covers what the server actually exposes, how product analytics differs from the observability MCP servers MCPFind already covers, and what to check before connecting an agent to production analytics data."
+date: "2026-08-14"
+updatedAt: "2026-08-14"
+author: "Adam Bush"
+authorUrl: "https://www.linkedin.com/in/adam-bush/"
+authorSameAs:
+  - "https://www.linkedin.com/in/adam-bush/"
+tags:
+  - "mcp"
+  - "developer"
+  - "analytics"
+  - "product-analytics"
+  - "posthog"
+category: "analytics"
+focusKeyword: "posthog mcp server"
+topic_source: "new_topic"
+draft: false
+cornerstone: false
+faqItems:
+  - question: "Do I need a paid PostHog plan to use its MCP server?"
+    answer: "No. PostHog's generous free tier covers most of what the MCP server can query, feature flags and session recordings included. The piece most likely to run into usage-based billing is very high query volume against the data warehouse SQL tool on a busy project."
+  - question: "Can PostHog's MCP server modify feature flags, or only read them?"
+    answer: "Both. An agent can toggle a feature flag or update its rollout percentage through the same interface it uses to read flag state. Powerful, obviously, but it also means you want to scope API key permissions carefully before pointing an agent at a production project."
+  - question: "Is PostHog's MCP server the same thing as PostHog's own in-app AI features?"
+    answer: "No. PostHog ships AI-powered insights inside the product itself, and that's separate from the MCP server. The MCP server is the integration point for external AI clients like Claude or Cursor to query PostHog data. It's plumbing for the tools you already run, and it lives outside PostHog's own UI."
+  - question: "Does the MCP server work with self-hosted PostHog instances?"
+    answer: "Yes. It connects through PostHog's standard API, which self-hosted deployments expose the same way PostHog Cloud does. You point it at your instance's URL and a project API key, and the default cloud endpoint just drops out of the config."
+---
+
+MCP coverage for analytics has mostly landed on data warehouses and observability platforms so far. The "is the system healthy" side of the house. Product analytics asks something else entirely: what did users actually do, which feature flags were live for them, and why did one specific session end in a drop-off? PostHog is one of the more widely used tools for that job, and it ships an MCP server that lets an agent query all of it in plain language instead of hand-written SQL or a dashboard click-through. Here's what it covers, how to connect it without handing an agent more power than it needs, and one recent structural change worth knowing before you go looking for its repo on GitHub.
+
+## What Can PostHog's MCP Server Actually Query?
+
+The server covers three things, give or take: feature flags and their rollout rules, session recordings, and a natural-language interface to the underlying data warehouse. All the stuff you would otherwise go digging for by hand in the dashboard. An agent can ask "which feature flags are active for users on the enterprise plan" or "pull the last 10 session recordings where checkout failed," and what comes back is structured data it can actually work with.
+
+The warehouse tool is the deepest of the three. It turns a natural-language question into SQL that runs against PostHog's warehouse, so an agent can answer genuinely open-ended product questions that the dashboard's pre-built queries were never going to cover. Which is also why scoping matters. A natural-language-to-SQL tool pointed at a full production warehouse is only as safe as the API key permissions sitting behind it.
+
+## Where Did PostHog's MCP Server Repo Go?
+
+Go looking for `posthog/mcp` on GitHub expecting an active standalone repository and you'll find it archived as of mid-January. The code moved. The MCP server now lives inside PostHog's main `posthog/posthog` monorepo, under `services/mcp`, next to the rest of the product. PostHog's own documentation at posthog.com still actively describes and supports the MCP integration.
+
+Recognize the pattern, because GitHub is full of it. An archived repo is not automatically a dead project. Sometimes it's a company folding a satellite project back into its primary codebase so there's one thing to maintain instead of two. Before you write off any MCP server because its dedicated repo looks stale, check whether the vendor's current docs still reference it. PostHog's clearly do, and the whole integration reads like a first-class piece of the product that someone is still actively maintaining.
+
+## How Does Product Analytics Differ From MCPFind's Other Analytics Servers?
+
+MCPFind's analytics cluster already hits this space from a few angles: a [best MCP servers for data analytics and BI roundup](/blog/best-mcp-servers-data-analytics-bi), a guide on [connecting notebooks to live data for data scientists](/blog/mcp-for-data-scientists-notebooks), and a closer look at [Snowflake's enterprise data warehouse server](/blog/snowflake-mcp-server-enterprise-data). Each one answers a different question than PostHog does. Ask Snowflake and you get what the full historical dataset says. The notebook workflow is built for poking at a dataset interactively, one query at a time, watching what comes back before you decide what to run next. PostHog answers something narrower: what did this specific user or cohort actually do, and which product variant were they looking at while they did it.
+
+Which server an agent needs depends on the task in front of it. A support agent digging into why one customer's checkout failed wants session-recording and feature-flag context. Warehouse-wide SQL is the wrong shape of tool for that job. Finance agent building a quarterly revenue report? Snowflake, not session replays. Wiring several of these into one agent makes sense for a broad "analytics assistant" use case. Just know that each one covers a genuinely different question. Three tools, three answers, very little overlap between them.
+
+## How Thin Is MCPFind's Analytics Category Right Now?
+
+MCPFind currently indexes 425 servers under the analytics category, averaging just 0.12 stars. That's one of the thinnest categories in the entire directory relative to its server count. PostHog's official server isn't indexed as an official listing yet. We do carry [two unofficial community wrappers](/servers/io-github-friendlygeorge-posthog-mcp-server) around the PostHog API, both sitting at zero stars, which says more about the category's broader pattern than about PostHog specifically: analytics tooling here is overwhelmingly long-tail community projects with almost no adoption behind them, and no handful of dominant vendor servers has emerged to anchor it.
+
+Better to flag that gap honestly than link a stale slug that doesn't represent the real, actively maintained integration. For now, PostHog's own documentation is the most reliable path to its server. And if you're sizing up the broader [analytics category](/categories/analytics) for other tools worth connecting, the thinness is a useful data point on its own. Most of what's indexed there is unproven and lightly adopted. Treat it as a starting list to vet.
+
+## How Do You Connect PostHog's MCP Server to Claude or Cursor?
+
+You need two things: a project API key from PostHog's settings, and one config block. For a hosted client like Claude or Cursor, the setup looks like this:
+
+```json
+{
+  "mcpServers": {
+    "posthog": {
+      "command": "npx",
+      "args": ["-y", "@posthog/mcp"],
+      "env": {
+        "POSTHOG_API_KEY": "your-project-api-key",
+        "POSTHOG_HOST": "https://us.posthog.com"
+      }
+    }
+  }
+}
+```
+
+Swap `POSTHOG_HOST` for your own self-hosted instance's URL if that applies to your setup. Generate a scoped API key for this one. A personal admin key carries far more reach than the agent needs. And if your agent only needs to read session recordings and flags, PostHog's key permissions let you cut write access to the data warehouse SQL tool entirely. That one setting separates an agent that can look up why a session failed from an agent that can also rewrite which users see a live feature flag, and most support or debugging use cases genuinely only need the former.
+
+## Frequently Asked Questions
+
+### Do I need a paid PostHog plan to use its MCP server?
+
+No. PostHog's generous free tier covers most of what the MCP server can query, feature flags and session recordings included. The piece most likely to run into usage-based billing is very high query volume against the data warehouse SQL tool on a busy project.
+
+### Can PostHog's MCP server modify feature flags, or only read them?
+
+Both. An agent can toggle a feature flag or update its rollout percentage through the same interface it uses to read flag state. Powerful, obviously, but it also means you want to scope API key permissions carefully before pointing an agent at a production project.
+
+### Is PostHog's MCP server the same thing as PostHog's own in-app AI features?
+
+No. PostHog ships AI-powered insights inside the product itself, and that's separate from the MCP server. The MCP server is the integration point for external AI clients like Claude or Cursor to query PostHog data. It's plumbing for the tools you already run, and it lives outside PostHog's own UI.
+
+### Does the MCP server work with self-hosted PostHog instances?
+
+Yes. It connects through PostHog's standard API, which self-hosted deployments expose the same way PostHog Cloud does. You point it at your instance's URL and a project API key, and the default cloud endpoint just drops out of the config.
+
+Still fuzzy on MCP as a concept before you start picking specific analytics tooling? Start with [MCPFind's plain-English guide](/blog/what-is-mcp), then come back and decide whether PostHog, Snowflake, a data-scientist notebook workflow, or some mix of the three fits the questions your team actually needs answered. Most teams end up running more than one. "What happened in this session" and "what does the last six months of data show" are rarely questions the same tool answers well.
