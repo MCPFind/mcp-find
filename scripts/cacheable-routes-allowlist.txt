@@ -1,0 +1,33 @@
+# cacheable-routes-allowlist.txt
+#
+# The 15 routes criteria.md C-18 (sprint 2026-08-25-cache-and-indexing)
+# classifies as cacheable — none of them need force-dynamic. Used by
+# check-cache-invalidation.mjs Check B to scope the D-2 stale-force-dynamic
+# ratchet: only routes listed here are checked against
+# force-dynamic-baseline.txt. Routes outside this list (e.g.
+# apps/web/app/api/csp-report/route.ts, a POST report sink with no cacheable
+# response) are out of scope for this guard by design — force-dynamic there
+# is legitimate and not this guard's concern.
+#
+# Adding a NEW route here is fine on its own (T9 AC5) as long as that
+# commit does not also introduce force-dynamic on the same route — Check B
+# still enforces that combination as a violation via the
+# force-dynamic-baseline.txt subset+growth checks.
+#
+# One repo-root-relative path per line. Re-derived live against mcp-find
+# main 6818cb59f7ca936338c7fdea2eefd3553fdc853d, 2026-08-25.
+apps/web/app/sitemap.xml/route.ts
+apps/web/app/sitemap-servers-0.xml/route.ts
+apps/web/app/sitemap-servers-1.xml/route.ts
+apps/web/app/sitemap-servers-2.xml/route.ts
+apps/web/app/sitemap-servers-3.xml/route.ts
+apps/web/app/sitemap-servers-4.xml/route.ts
+apps/web/app/sitemap-servers-5.xml/route.ts
+apps/web/app/sitemap-servers-6.xml/route.ts
+apps/web/app/sitemap-servers-7.xml/route.ts
+apps/web/app/sitemap-servers-8.xml/route.ts
+apps/web/app/sitemap-servers-9.xml/route.ts
+apps/web/app/sitemap-static.xml/route.ts
+apps/web/app/llms.txt/route.ts
+apps/web/app/llms-full.txt/route.ts
+apps/web/app/blog/feed.xml/route.ts

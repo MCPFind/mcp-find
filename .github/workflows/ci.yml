@@ -15,6 +15,25 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history (not the default shallow clone) so
+          # check-cache-invalidation.mjs can diff
+          # scripts/force-dynamic-baseline.txt against its prior committed
+          # version (the D-2 ratchet growth check, task T9 / C-26) instead
+          # of silently skipping that check on a 1-commit-deep checkout.
+          fetch-depth: 0
+      # D-2 cache invalidation regression guard (task T9, decision-register
+      # D-2, criteria C-24a/C-24b/C-25/C-26). Runs before install/build so a
+      # violation fails fast without spending the rest of the CI budget.
+      # GUARD_BASE_REF pins the ratchet's "prior committed baseline" compare
+      # point to the PR's actual base commit on a pull_request event (so a
+      # multi-commit PR is compared against main, not against its own
+      # second-to-last commit); left unset on push, where the script's
+      # default (HEAD~1) is correct.
+      - name: D-2 cache invalidation regression guard
+        env:
+          GUARD_BASE_REF: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
+        run: bash scripts/check-cache-invalidation.sh
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:

@@ -1,0 +1,48 @@
+# force-dynamic-baseline.txt
+#
+# RATCHET, not an allowlist to add to freely. Created 2026-08-25 as part of
+# task T9 (D-2 CI regression guard). Lists the routes — drawn from
+# scripts/cacheable-routes-allowlist.txt (C-18's 15-route set) — that
+# CURRENTLY still carry `export const dynamic = 'force-dynamic'` as of
+# mcp-find HEAD 7235683ddffdbba340837ab4932b0eda6e52a709 (2026-08-25). This
+# is KNOWN Wave-2 debt: removing force-dynamic from these routes is task T7,
+# which is intentionally deferred by ruling D-1 until Wave 1 (T1-T3) is
+# verified in production. All 15 entries below are still legitimately
+# dynamic today for that reason — this file is NOT saying "these are fine
+# forever," it is saying "these are the ones T7 owns, don't let a 16th
+# route join them by accident."
+#
+# check-cache-invalidation.mjs Check B PASSES only when the LIVE set of
+# force-dynamic routes (scoped to the C-18 allowlist) is a SUBSET of this
+# file. Any route not listed here that acquires force-dynamic is a NEW
+# regression and fails the gate.
+#
+# This file is a ONE-WAY RATCHET: the guard separately enforces that it
+# cannot GROW relative to the last git-committed version (see
+# getPriorCommittedBaseline() in check-cache-invalidation.mjs) — an entry
+# cannot be added in the same commit as the force-dynamic change it would
+# excuse. Entries may only be REMOVED, as T7 fixes each route.
+#
+# Expected lifecycle: task T7 removes force-dynamic from these routes one
+# by one (or all at once), deleting the corresponding line(s) each time.
+# When the last line is removed, DELETE this file entirely — do not leave
+# an empty file in the tree. check-cache-invalidation.mjs treats a missing
+# baseline file as an empty baseline (readListFile returns [] for a
+# nonexistent path), so deleting it is safe and is what turns Check B into
+# an unconditional "zero force-dynamic among cacheable routes" gate,
+# exactly the fully-fixed-tree behavior criteria.md C-25 describes.
+apps/web/app/sitemap.xml/route.ts
+apps/web/app/sitemap-servers-0.xml/route.ts
+apps/web/app/sitemap-servers-1.xml/route.ts
+apps/web/app/sitemap-servers-2.xml/route.ts
+apps/web/app/sitemap-servers-3.xml/route.ts
+apps/web/app/sitemap-servers-4.xml/route.ts
+apps/web/app/sitemap-servers-5.xml/route.ts
+apps/web/app/sitemap-servers-6.xml/route.ts
+apps/web/app/sitemap-servers-7.xml/route.ts
+apps/web/app/sitemap-servers-8.xml/route.ts
+apps/web/app/sitemap-servers-9.xml/route.ts
+apps/web/app/sitemap-static.xml/route.ts
+apps/web/app/llms.txt/route.ts
+apps/web/app/llms-full.txt/route.ts
+apps/web/app/blog/feed.xml/route.ts
