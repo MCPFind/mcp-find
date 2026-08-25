@@ -1,0 +1,89 @@
+---
+title: "New Relic vs Datadog MCP Servers: Real Maturity Check"
+description: "New Relic and Datadog both ship MCP servers, but neither one lives primarily as a GitHub repo. Here's what each actually covers, and which is further along."
+excerpt: "Comparing New Relic and Datadog's MCP servers by GitHub stars doesn't work, because neither vendor treats its repo as the real product. Here's what each one actually exposes, verified against vendor docs and release announcements instead of star counts."
+date: "2026-08-21"
+updatedAt: "2026-08-21"
+author: "Gus Marquez"
+authorUrl: "https://www.linkedin.com/in/gustavoamarquez"
+authorSameAs:
+  - "https://www.linkedin.com/in/gustavoamarquez"
+tags:
+  - "mcp"
+  - "developer"
+  - "monitoring"
+  - "observability"
+category: "monitoring"
+focusKeyword: "new relic vs datadog mcp server"
+topic_source: "new_topic"
+draft: false
+cornerstone: false
+faqItems:
+  - question: "Does New Relic's MCP server have a public GitHub repo?"
+    answer: "Yes, at newrelic/mcp-server. Treat it as a signpost. The actual tool surface lives in the documentation at docs.newrelic.com, and the repo's code carries almost none of it."
+  - question: "Can I self-host Datadog's MCP server?"
+    answer: "Only in an unsupported form. Datadog's GA MCP server is remote-hosted, full stop. A separate datadog-labs/mcp-server repo does exist on GitHub, and Datadog's own org description explicitly disclaims it as experimental and unsupported."
+  - question: "Which MCP server has more tools, New Relic or Datadog?"
+    answer: "New Relic documents 36 tools as of its public preview. Datadog publishes its coverage differently, as one integrated surface spanning APM, logs, metrics, monitors, dashboards, and security signals, so there's no fixed tool count on the Datadog side to hold up against 36."
+  - question: "Is New Relic's MCP server still in preview?"
+    answer: "Yes. As of this writing it remains in public preview, which started in November 2025. Datadog's server reached general availability in March 2026, a later date but further along."
+---
+
+New Relic and Datadog both ship an MCP server, and for both of them GitHub is close to beside the point. We pulled up the repos and the docs for each. New Relic's repo is a near-empty stub pointing at documentation hosted elsewhere. Datadog's actual GitHub org has no MCP repo at all. Star counts can't settle this one. What's left to compare is release stage and documented tool coverage, and both servers have those.
+
+## What Do the New Relic and Datadog MCP Servers Actually Cover?
+
+Both hand an AI agent natural-language access to observability data, which means nobody writes NRQL by hand or hand-rolls a Datadog API query to get an answer out. Past that, coverage splits by vendor.
+
+New Relic's [tool reference](https://docs.newrelic.com/docs/agentic-ai/mcp/tool-reference/) documents 36 tools across the platform. They cover querying metrics and logs, alert status checks, APM trace inspection, and a solid chunk of work against New Relic's entity model. Datadog went a different direction. Its server launched as a managed remote service, and the [documentation](https://docs.datadoghq.com/bits_ai/mcp_server/) treats APM, logs, metrics, monitors, dashboards, and security signals as one connected surface. There's no single numbered tool count on that side. The number Datadog does publish is support across 15 MCP clients.
+
+MCPFind's [monitoring category](/categories/monitoring) runs 280 servers deep at an average of just 0.53 stars, one of the thinnest categories in our whole index. That thinness is context worth having. Most observability MCP servers in the wild are unofficial community wrappers around a single API endpoint, so two vendor-backed, actively maintained servers earn a real side-by-side here. Some of New Relic's dashboard and reporting tools also overlap with what we track separately under [analytics](/categories/analytics). Worth a look if metrics reporting matters more to your use case than raw incident response.
+
+## Is New Relic's MCP Server Ready for Production Use?
+
+New Relic hasn't claimed it is. Public preview since November 4, 2025, per the vendor's own [release announcement](https://docs.newrelic.com/whats-new/2025/11/whats-new-11-05-mcp-server/). Preview is vendor shorthand for a tool set and an interface that can still move before anything locks in.
+
+GitHub adds to the picture, though a star count alone would read it wrong. `newrelic/mcp-server` sits at 7 stars. No license file attached. The commit history spans about eight days from creation to last push, per the GitHub API. Read that as abandonment and you've read the wrong artifact. The product lives at docs.newrelic.com, where all 36 documented tools are written up, and the repo holds a landing page plus a pointer to the installer.
+
+## Is Datadog's MCP Server Further Along?
+
+Datadog's server hit general availability on March 9, 2026, per the company's own [announcement](https://www.globenewswire.com/news-release/2026/03/09/3251890/0/en/Datadog-Launches-MCP-Server-to-Provide-AI-Agents-with-Secure-Real-Time-Access-to-Unified-Observability-Data.html). New Relic's still carries a preview label. On release stage, that's a clear gap.
+
+The GitHub side gets stranger here than it was at New Relic. Search the real `DataDog` org for anything MCP-related and you get zero results. A separate `mcp-server` repo does exist under a related but distinct org, `datadog-labs`, sitting at 43 stars under MIT. That org's own description calls its repositories experimental and unsupported, and puts them outside Datadog's terms of service.
+
+The GA product Datadog actually markets is a remote-hosted managed service documented at docs.datadoghq.com, with fair-use rate limits and audit-trail integration built in. Nothing to clone means no public repo, so no star count exists to cite in the first place. Self-hosting a Datadog MCP server with real GitHub traction stays off the table today.
+
+We've already published [a dedicated Datadog MCP guide](/blog/datadog-mcp-server-observability) if you want a deeper look at what the server covers day to day.
+
+## Which One Should You Pick for On-Call Workflows?
+
+Already running Datadog? Its MCP server is the more finished option today. GA status and broader documented coverage put it ahead, and the managed hosting model means you run nothing yourself. New Relic customers get a real, vendor-supported preview, and they should expect the tool set and the behavior to keep shifting before it reaches GA.
+
+Don't let commit counts decide this one. Check each vendor's own release-stage label, preview versus GA, then read the actual tool documentation before wiring either server into a production incident-response flow. Release stage and documented coverage are where the real difference sits right now. GitHub metadata trails both, and that gap is unlikely to close soon given how differently the two vendors treat their public repos.
+
+Stack composition matters here too. Teams already pairing an observability platform with an error tracker like [Sentry](/blog/sentry-mcp-server-error-tracking) or an escalation tool like PagerDuty usually weigh how cleanly all three fit together for an agent working an incident end to end, and the observability vendor on its own carries less of that decision. A GA, well-documented server that plugs into an existing PagerDuty escalation flow beats a preview server with a longer tool list nobody has stress-tested yet.
+
+| Server | Release Stage | Tool Coverage | Hosting | GitHub Signal |
+|---|---|---|---|---|
+| New Relic MCP | Public preview (since Nov 2025) | 36 documented tools | Vendor-hosted, docs-driven | Thin repo, not the real product |
+| Datadog MCP | General availability (since Mar 2026) | APM, logs, metrics, monitors, dashboards, security | Remote-hosted managed service | No canonical repo; GitHub isn't the distribution channel |
+
+## Frequently Asked Questions
+
+### Does New Relic's MCP server have a public GitHub repo?
+
+Yes, at newrelic/mcp-server. Treat it as a signpost. The actual tool surface lives in the documentation at docs.newrelic.com, and the repo's code carries almost none of it.
+
+### Can I self-host Datadog's MCP server?
+
+Only in an unsupported form. Datadog's GA MCP server is remote-hosted, full stop. A separate datadog-labs/mcp-server repo does exist on GitHub, and Datadog's own org description explicitly disclaims it as experimental and unsupported.
+
+### Which MCP server has more tools, New Relic or Datadog?
+
+New Relic documents 36 tools as of its public preview. Datadog publishes its coverage differently, as one integrated surface spanning APM, logs, metrics, monitors, dashboards, and security signals. So there's no fixed tool count on the Datadog side to hold up against 36.
+
+### Is New Relic's MCP server still in preview?
+
+Yes. As of this writing it remains in public preview, which started in November 2025. Datadog's server reached general availability in March 2026. Later date, further along.
+
+Our index doesn't carry a confirmed official listing for either server yet. Vendor docs are the primary distribution channel for both, which leaves the usual starred GitHub repo out of the picture. Browse the [monitoring category](/categories/monitoring) directly for community alternatives in the meantime. For related on-call tooling, we've got guides on [PagerDuty](/blog/pagerduty-mcp-server), [Grafana](/blog/grafana-mcp-server), and [GitLab's](/blog/gitlab-mcp-server) MCP servers. New to the protocol all of these build on? Start with [what MCP is](/blog/what-is-mcp).
