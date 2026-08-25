@@ -1,0 +1,48 @@
+-- Migration: composite index for the default (stars) listing sort (2026-08-25)
+--
+-- Symptom (162 Vercel "Task timed out after 15 seconds" runtime errors on
+-- /servers/[slug] over 3 days ending 2026-08-25, 75 users affected;
+-- evidence/baseline-2026-08-25.md §5): the default /servers listing query
+-- (WHERE registry_status = 'active' ORDER BY github_stars DESC — the
+-- implicit default sort per apps/web/lib/filter-utils.ts's buildFilterUrl
+-- `sort !== "stars"` guard, and apps/web/lib/queries.ts::_listServers line
+-- ~24) has no index whose leading column is registry_status AND whose
+-- second column matches the ORDER BY. 006_perf_indexes.sql added
+-- idx_servers_status_last_push (registry_status, github_last_push DESC NULLS
+-- LAST) for the 'updated' sort only; the pre-existing idx_servers_github_stars
+-- (001_initial_schema.sql:79) is single-column (github_stars DESC, no
+-- registry_status), so a filtered+sorted query on the DEFAULT path has no
+-- single index that serves both the filter and the order together.
+--
+-- Local verification (2026-08-25, synthetic ~24k-row dataset seeded to
+-- approximate the real table — see this task's evidence, NOT a copy of
+-- prod data or prod's exact statistics/bloat/TOAST profile):
+--   Pre-fix, EXPLAIN ANALYZE of the default query at a deep page offset
+--   (OFFSET 20000) used idx_servers_github_stars via
+--   "Index Scan ... Filter: (registry_status = 'active')" — i.e. it walks
+--   the stars-ordered index and DISCARDS non-matching rows one at a time
+--   (2,245 "Rows Removed by Filter" observed), touching 22,246 buffers.
+--   Post-fix (this index applied), the planner switches to
+--   "Index Scan using idx_servers_status_stars ... Index Cond:
+--   (registry_status = 'active')" — registry_status is evaluated AS the
+--   index condition, not a post-scan filter — dropping to 19,968+37 buffers
+--   and eliminating "Rows Removed by Filter" entirely (0). Cost estimate
+--   fell from 4588 to 3389 at that same offset.
+--   NOTE (honesty, per this task's instructions): no external-merge Sort
+--   node was observed in EITHER the pre-fix or post-fix plan on this
+--   synthetic dataset for THIS specific query shape — Postgres' planner
+--   already had idx_servers_github_stars available to satisfy the ORDER BY
+--   without a Sort even pre-fix. The Filter-vs-Index-Cond / buffer-count
+--   improvement above is what this migration measurably fixes; an
+--   external-merge Sort claim is NOT asserted here because it was not
+--   observed. See this task's full EXPLAIN ANALYZE evidence in the task
+--   store notes for both plans in full.
+--
+-- CREATE INDEX CONCURRENTLY (not the plain form 006/007 used) per this
+-- task's explicit spec — CONCURRENTLY cannot run inside a transaction
+-- block, so — same as 006/007's real prod application — this statement
+-- must be run manually (e.g. Supabase SQL editor) rather than through an
+-- automated all-migrations-in-one-transaction runner. IF NOT EXISTS makes
+-- re-running it a no-op.
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_servers_status_stars
+  ON public.servers (registry_status, github_stars DESC);

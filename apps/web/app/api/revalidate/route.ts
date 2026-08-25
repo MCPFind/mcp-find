@@ -54,12 +54,68 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  // T1 fix (2026-08-25): this endpoint used to call revalidateTag('servers')
+  // unconditionally on every invocation — the ONLY tag every one of the 12
+  // unstable_cache call sites in lib/queries.ts shares — so the daily sync's
+  // "Bust Vercel cache" step (.github/workflows/sync.yml) purged EVERY
+  // cached server, capping the intended 7-day ISR window on /servers/[slug]
+  // (getServerBySlug, 604800s) at an effective ~24h ceiling regardless of
+  // which rows actually changed.
+  //
+  // New contract:
+  //   { slugs: string[] }  — the default, expected shape. Busts the
+  //     per-server `server-<slug>` tag (already present at
+  //     getServerBySlug's unstable_cache call) for each changed slug, plus
+  //     the narrow 'servers-listing' aggregate tag once for index/listing
+  //     surfaces (listServers, getServerCount, getTopServers, category
+  //     pages, etc.) — never the blanket 'servers' tag every cache entry
+  //     shares.
+  //   {}  or no body        — same as slugs: [] — busts ONLY the aggregate
+  //     'servers-listing' tag. This is what packages/sync's internal
+  //     Stage-4 triggerSiteRevalidation() call sends (no body) — its own
+  //     comment says its purpose is "refresh the cached server count," which
+  //     the aggregate-only tag covers correctly without also purging every
+  //     unrelated per-server cache.
+  //   { full: true }        — explicit, documented escape hatch for a full
+  //     blanket purge (the pre-fix behavior). Never the default; must be
+  //     requested on purpose (e.g. a schema/categorization change that
+  //     plausibly touches many rows at once, or manual ops recovery).
+  let payload: { slugs?: unknown; full?: unknown } = {};
   try {
-    revalidateTag('servers');
+    const bodyText = await request.text();
+    if (bodyText) {
+      const parsed: unknown = JSON.parse(bodyText);
+      if (parsed && typeof parsed === 'object') {
+        payload = parsed as { slugs?: unknown; full?: unknown };
+      }
+    }
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+
+  const full = payload.full === true;
+  // Cap defends against an oversized/malformed payload — well above any
+  // legitimate single day's real change volume from the sync pipeline.
+  const MAX_SLUGS = 5000;
+  const slugs = Array.isArray(payload.slugs)
+    ? payload.slugs.filter((s): s is string => typeof s === 'string' && s.length > 0).slice(0, MAX_SLUGS)
+    : [];
+
+  try {
+    if (full) {
+      // Documented full-purge fallback — explicit opt-in only, see comment
+      // above. Never reached by a default/empty-body call.
+      revalidateTag('servers');
+    } else {
+      for (const slug of slugs) {
+        revalidateTag(`server-${slug}`);
+      }
+      revalidateTag('servers-listing');
+    }
   } catch (err) {
     console.error('Revalidation failed:', err);
     return NextResponse.json({ error: 'Revalidation failed' }, { status: 500 });
   }
 
-  return NextResponse.json({ revalidated: true, now: Date.now() });
+  return NextResponse.json({ revalidated: true, full, slugCount: slugs.length, now: Date.now() });
 }

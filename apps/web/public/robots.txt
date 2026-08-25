@@ -1,5 +1,33 @@
 User-agent: *
 Allow: /
+# T3 fix (2026-08-25): /servers has no page-level cache key bound (see
+# lib/queries.ts::listServers's 12-param cacheKey) and this file previously
+# had zero Disallow lines, so a crawler varying sort/q/pkg/lang/page
+# combinations generated a proportionally unbounded number of distinct,
+# cold-cache renders. Non-canonical query permutations are disallowed below;
+# bare /servers and every /servers/<slug> detail page remain fully
+# crawlable, and default pagination (page param alone, no other filters) is
+# allowed to a bounded depth instead of the full ~1,016-page tail.
+Disallow: /servers?*q=
+Disallow: /servers?*sort=
+Disallow: /servers?*pkg=
+Disallow: /servers?*lang=
+Disallow: /servers?*tools=
+Disallow: /servers?*resources=
+Disallow: /servers?*prompts=
+Disallow: /servers?*official=
+Disallow: /servers?*featured=
+Disallow: /servers?*page=
+Allow: /servers?page=1$
+Allow: /servers?page=2$
+Allow: /servers?page=3$
+Allow: /servers?page=4$
+Allow: /servers?page=5$
+Allow: /servers?page=6$
+Allow: /servers?page=7$
+Allow: /servers?page=8$
+Allow: /servers?page=9$
+Allow: /servers?page=10$
 
 User-agent: GPTBot
 Allow: /

@@ -17,6 +17,22 @@ import { getQualityStatus } from "@/lib/quality-status";
 // render open until the platform's default 300s ceiling.
 export const maxDuration = 15;
 
+// T3 fix (2026-08-25): this page reads searchParams (below) but had no
+// revalidate export, so it rendered fresh on every single request — with
+// zero Vercel-level caching, a crawler walking every sort/filter/page
+// combination generated a proportionally unbounded number of cold,
+// uncached renders. A positive revalidate here lets Next.js cache the
+// rendered output per distinct searchParams combination for the window
+// below (Time-based Revalidation — works with pages that read dynamic
+// APIs like searchParams, not just fully static routes). 3600s (1h) is
+// intentionally SHORTER than the 21600s (6h) unstable_cache window on the
+// underlying listServers()/getServerCount() data in lib/queries.ts: the
+// page-render cache is a separate layer on top of that data cache, so
+// picking a shorter window here costs nothing extra upstream (the data
+// itself won't have changed within 1h regardless) while keeping the
+// visible page fresher than the data-layer ceiling would otherwise allow.
+export const revalidate = 3600;
+
 export async function generateMetadata(): Promise<Metadata> {
   let countStr = FALLBACK_SERVER_COUNT_DISPLAY;
   try {

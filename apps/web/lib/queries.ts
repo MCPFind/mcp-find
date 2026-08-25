@@ -19,6 +19,11 @@ const SERVER_LIST_COLUMNS = 'id,slug,canonical_slug,name,description,version,cat
 // pulling it on every detail-page fetch for nothing.
 const SERVER_DETAIL_COLUMNS = `${SERVER_LIST_COLUMNS},readme_content`;
 
+// Applies the WHERE-clause filters shared between the paginated listing
+// query below and the count-only query in _getFilteredCount — kept as one
+// literal filter block per function (small duplication, no generic/`any`
+// query-builder typing) so the two can never silently drift on which rows
+// count as "matching."
 async function _listServers(params: ServerListParams): Promise<ServerListResponse> {
   const page = Math.max(1, params.page || 1);
   const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, params.limit || DEFAULT_PAGE_SIZE));
@@ -26,9 +31,19 @@ async function _listServers(params: ServerListParams): Promise<ServerListRespons
   const sort = params.sort || 'stars';
   const status = params.status || 'active';
 
+  // T2 fix (2026-08-25): count:'exact' used to run unconditionally on this
+  // select, forcing Postgres to materialize every matching row (COUNT(*)
+  // OVER()) on EVERY paginated request regardless of page — confirmed via a
+  // local EXPLAIN ANALYZE showing a full Seq Scan touching all matching rows
+  // for the count alone (see supabase/migrations/008_status_stars_index.sql
+  // and the T2 evidence in the task-store notes). The count is now sourced
+  // from getFilteredCount() below instead: a SEPARATELY unstable_cache'd
+  // call keyed by the filter combo (not the page), so the expensive count
+  // query runs once per filter combo per cache window instead of once per
+  // page request.
   let query = supabase
     .from('servers')
-    .select(SERVER_LIST_COLUMNS, { count: 'exact' })
+    .select(SERVER_LIST_COLUMNS)
     .eq('registry_status', status);
 
   // Full-text search
@@ -72,17 +87,90 @@ async function _listServers(params: ServerListParams): Promise<ServerListRespons
   // the render open until the platform's function-duration ceiling.
   query = query.range(offset, offset + limit - 1).abortSignal(AbortSignal.timeout(8000));
 
-  const { data, count, error } = await query;
+  const [{ data, error }, total] = await Promise.all([
+    query,
+    getFilteredCount(params),
+  ]);
   if (error) throw new Error(`Query failed: ${error.message}`);
 
   return {
     servers: (data || []) as ServerListItem[],
-    total: count || 0,
+    total,
     page,
     limit,
-    totalPages: Math.ceil((count || 0) / limit),
+    totalPages: Math.ceil(total / limit),
   };
 }
+
+// Count-only query for the same filter combo _listServers applies above —
+// deliberately a SEPARATE unstable_cache entry keyed on the filter portion
+// of ServerListParams only (no page/limit/sort), so a crawler walking every
+// page of one filter combo pays the count('exact') cost once per cache
+// window instead of once per page. head:true skips returning row data
+// entirely — only the count is fetched.
+async function _getFilteredCount(params: ServerListParams): Promise<number> {
+  const status = params.status || 'active';
+
+  let query = supabase
+    .from('servers')
+    .select('*', { count: 'exact', head: true })
+    .eq('registry_status', status);
+
+  if (params.q) {
+    query = query.textSearch('search_vector', params.q, { type: 'websearch' });
+  }
+  if (params.category) {
+    query = query.eq('category', params.category);
+  }
+  if (params.packageTypes?.length) {
+    query = query.in('package_type', params.packageTypes);
+  }
+  if (params.languages?.length) {
+    query = query.in('github_language', params.languages);
+  }
+  if (params.hasTools) query = query.eq('has_tools', true);
+  if (params.hasResources) query = query.eq('has_resources', true);
+  if (params.hasPrompts) query = query.eq('has_prompts', true);
+  if (params.isOfficial) query = query.eq('is_official', true);
+  if (params.featured) query = query.eq('featured', true);
+
+  query = query.abortSignal(AbortSignal.timeout(8000));
+
+  const { count, error } = await query;
+  if (error) throw new Error(`Count query failed: ${error.message}`);
+  return count || 0;
+}
+
+const getFilteredCount = cache(
+  async (params: ServerListParams): Promise<number> => {
+    // Page/limit/sort intentionally excluded — the count is identical
+    // across every page and every sort order of the same filter combo.
+    const countCacheKey = [
+      params.category ?? '',
+      params.q ?? '',
+      (params.packageTypes ?? []).join(','),
+      (params.languages ?? []).join(','),
+      params.hasTools ? '1' : '',
+      params.hasResources ? '1' : '',
+      params.hasPrompts ? '1' : '',
+      params.isOfficial ? '1' : '',
+      params.featured ? '1' : '',
+      params.status ?? '',
+    ].join('\x00');
+    try {
+      return await unstable_cache(
+        () => _getFilteredCount(params),
+        ['filtered-count', countCacheKey],
+        // Narrow 'servers-listing' aggregate tag (T1) in addition to the
+        // blanket 'servers' tag — see app/api/revalidate/route.ts::POST.
+        { tags: ['servers', 'servers-listing'], revalidate: 21600 }
+      )();
+    } catch (err) {
+      console.error('getFilteredCount: upstream failed, returning 0', err);
+      return 0;
+    }
+  }
+);
 
 export const listServers = cache(
   async (params: ServerListParams): Promise<ServerListResponse> => {
@@ -107,7 +195,10 @@ export const listServers = cache(
         // 6h — was 1h. The directory changes slowly; a longer window means
         // repeat crawler hits on the same filter/sort/page combo reuse the
         // cached result instead of re-querying Supabase.
-        { tags: ['servers'], revalidate: 21600 }
+        // 'servers-listing' (T1, 2026-08-25) is the narrow aggregate tag
+        // /api/revalidate busts by default now — 'servers' stays as the
+        // blanket tag, only busted on an explicit full-purge opt-in.
+        { tags: ['servers', 'servers-listing'], revalidate: 21600 }
       )();
     } catch (err) {
       // Upstream failed or hit the 8s abort timeout — degrade to an empty
@@ -210,7 +301,7 @@ export const getServerCount = cache(
         return count || 0;
       },
       ['server-count'],
-      { tags: ['servers'], revalidate: 21600 }
+      { tags: ['servers', 'servers-listing'], revalidate: 21600 }
     )()
 );
 
@@ -227,7 +318,7 @@ export const getTopServers = cache(
         return (data || []) as ServerListItem[];
       },
       ['top-servers', String(limit)],
-      { tags: ['servers'], revalidate: 21600 }
+      { tags: ['servers', 'servers-listing'], revalidate: 21600 }
     )()
 );
 
@@ -272,7 +363,7 @@ export const getIndexableTopServers = cache(
         return results.slice(0, limit);
       },
       ['indexable-top-servers', String(limit)],
-      { tags: ['servers'], revalidate: 21600 }
+      { tags: ['servers', 'servers-listing'], revalidate: 21600 }
     )()
 );
 
@@ -407,7 +498,7 @@ export const getServersByCategory = cache(
         return (data || []) as ServerListItem[];
       },
       ['servers-by-category', category],
-      { tags: ['servers', `category-${category}`], revalidate: 21600 }
+      { tags: ['servers', 'servers-listing', `category-${category}`], revalidate: 21600 }
     )()
 );
 
@@ -447,7 +538,7 @@ export const getIndexableServersByCategory = cache(
         return results;
       },
       ['indexable-servers-by-category', category],
-      { tags: ['servers', `category-${category}`], revalidate: 21600 }
+      { tags: ['servers', 'servers-listing', `category-${category}`], revalidate: 21600 }
     )()
 );
 
@@ -468,7 +559,7 @@ export const getCategoryCount = cache(
         return count || 0;
       },
       ['category-count', category],
-      { tags: ['servers', `category-${category}`], revalidate: 21600 }
+      { tags: ['servers', 'servers-listing', `category-${category}`], revalidate: 21600 }
     )()
 );
 
@@ -491,7 +582,7 @@ export const getCategoryLastUpdated = cache(
         return result;
       },
       ['category-last-updated'],
-      { tags: ['servers'], revalidate: 21600 }
+      { tags: ['servers', 'servers-listing'], revalidate: 21600 }
     )()
 );
 
@@ -509,6 +600,6 @@ export const getLastSyncTime = cache(
         return data?.completed_at || null;
       },
       ['last-sync-time'],
-      { tags: ['servers'], revalidate: 21600 }
+      { tags: ['servers', 'servers-listing'], revalidate: 21600 }
     )()
 );
