@@ -16,6 +16,9 @@ export default defineConfig({
       "lib/**/*.test.ts",
       "components/**/*.test.ts",
       "components/**/*.test.tsx",
+      // task 12: opengraph-image satori render-tree regression test
+      "app/**/*.test.ts",
+      "app/**/*.test.tsx",
       // F8: smoke tests for scripts/ — runs check-broken-delta.mjs poisoning checks
       "../../scripts/__tests__/**/*.test.mjs",
     ],
