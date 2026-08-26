@@ -1,0 +1,82 @@
+---
+title: "Qdrant MCP Server Setup: Local Vector Search for AI Agents"
+description: "Set up Qdrant's MCP server for local vector search in Claude and Cursor. Covers install steps, auth modes, transport options, and what the directory indexes."
+excerpt: "A step-by-step guide to running Qdrant's official MCP server for local vector search, including how it compares to the other 602 database servers MCPFind tracks and what the directory listing gets wrong."
+date: "2026-08-17"
+updatedAt: "2026-08-17"
+author: "Gus Marquez"
+authorUrl: "https://www.linkedin.com/in/gustavoamarquez"
+authorSameAs:
+  - "https://www.linkedin.com/in/gustavoamarquez"
+tags:
+  - "mcp"
+  - "developer"
+  - "vector-search"
+  - "databases"
+category: "databases"
+focusKeyword: "qdrant mcp server setup"
+draft: false
+cornerstone: false
+topic_source: new_topic
+faqItems:
+  - question: "Does the Qdrant MCP server require a running Qdrant instance?"
+    answer: "Yes. The MCP server is a thin wrapper around the Qdrant client, not a database itself. You need a Qdrant instance running locally via Docker, or a Qdrant Cloud cluster, before the MCP server has anything to query."
+  - question: "Can the Qdrant MCP server write new vectors, or is it read-only?"
+    answer: "The official server exposes both a qdrant-store tool and a qdrant-find tool, so it can write and query. Some third-party wrappers ship read-only versions for safety, so check the tool list before assuming write access."
+  - question: "Does Qdrant's MCP server support hybrid search (vector plus keyword)?"
+    answer: "The core tool set is dense-vector search only. Hybrid search requires configuring a Qdrant collection with sparse vectors yourself; the MCP server passes through whatever the collection supports, it does not add hybrid logic on top."
+  - question: "Is there a hosted version, or do I have to self-host Qdrant?"
+    answer: "Qdrant Cloud offers a managed cluster with an API key, so you don't have to run Docker yourself. The same MCP server config works against either target, you just swap the URL and add an API key for the cloud path."
+---
+
+Any agent with persistent memory or a retrieval-augmented generation layer ends up needing a vector store. Qdrant is one of the more common open source picks, so we walked through what it actually takes to get its MCP server running, and along the way we found a spot where MCPFind's own directory listing doesn't match the real story. What follows covers local install, the two transport options, and what to check before you trust a directory's star count on this particular server. It assumes you're already comfortable running Docker and editing a Claude or Cursor config file. This is not a first-MCP-setup walkthrough.
+
+## How Do You Install the Qdrant MCP Server Locally?
+
+`uvx mcp-server-qdrant` if you already have `uv`. Otherwise `pip install mcp-server-qdrant`. Either way you need a Qdrant instance already running before any of it does anything, because the MCP server has nothing to talk to on its own.
+
+Fastest local path is `docker run -p 6333:6333 qdrant/qdrant`, which starts a Qdrant node on `localhost:6333` with no auth required. Once that's up, set `QDRANT_URL=http://localhost:6333` as an environment variable before you launch the MCP server. Pointing at Qdrant Cloud instead? Add `QDRANT_API_KEY` as well. The server also wants an embedding model config, since it turns your query text into vectors before it searches anything, and the default runs `sentence-transformers` under the hood. First run pulls that model down. Takes about a minute on a fresh machine. Every run after that is quick.
+
+## What Transport Does the Qdrant MCP Server Use, Stdio or HTTP?
+
+Default is stdio. That's the right call for Claude Desktop and most local Cursor setups, since both spawn the server as a subprocess. Add `--transport sse` when you want it standing up as a service other tools can reach over the network.
+
+With stdio, the server lives exactly as long as your editor or Claude Desktop session does, and it can't be shared across multiple clients at once. SSE gives up that simplicity in exchange for a persistent process you start separately and point several MCP clients at, which helps if your team shares one Qdrant instance and you'd rather not have every developer spinning up their own server. Stdio is the better fit for a solo developer running local RAG experiments, and SSE only earns its keep once you have concurrent clients hitting the same collection.
+
+## Does MCPFind's Directory Actually Index the Official Qdrant Server?
+
+Not cleanly. Worth knowing before you trust the star count. MCPFind's databases category holds 602 servers averaging 7.35 stars, and the Qdrant entry in that set is a third-party marketplace listing rather than a direct mirror of `qdrant/mcp-server-qdrant`. It shows 0 tracked stars.
+
+That's a data-quality gap. The official repository is actively maintained, has real community adoption, and it's the one Qdrant's own docs point to. What MCPFind's crawler grabbed was a wrapper listing published through a marketplace aggregator instead of the canonical GitHub project. So if you're ranking Qdrant against other database servers by star count on MCPFind, throw this listing out as a signal and go look at the GitHub repo yourself. Same thing we flagged with the Elasticsearch listing gap and the official-vs-unofficial confusion on X in earlier posts. A directory is only as good as what it crawls, and vector databases are a new enough category that the indexing still has holes.
+
+## How Does Qdrant Compare to Other Vector-Capable MCP Servers on MCPFind?
+
+Qdrant sits inside the broader databases category instead of a dedicated vector-search one, right alongside relational and document stores like Supabase, MongoDB, and MySQL. That's a signal all by itself. MCPFind hasn't split "vector store" out as its own bucket yet.
+
+Supabase leads the databases category at 2,556 stars for its official server. Most of that comes from bundling Postgres with `pgvector` support, so teams already on Supabase get vector search without standing up a second database. Starting from scratch with vectors as your only requirement, Qdrant is the more purpose-built option, and its indexing and filtering run faster on pure similarity search because it isn't carrying a pile of general-purpose relational features around. If Postgres is already in the stack, `pgvector` through the Supabase or Neon MCP servers saves you a whole second system. The call comes down to what you're already running. GitHub star counts here don't map cleanly to production readiness anyway, for the listing reason above.
+
+## How Do You Query Qdrant Through an Agent's Tool Calls?
+
+Two tools ship by default. `qdrant-store` writes a piece of text plus metadata, and `qdrant-find` runs semantic search against whatever is stored. No embedding code on your end. The server handles the text-to-vector conversion on both sides.
+
+A typical agent workflow goes like this. You tell Claude to remember a fact, the agent calls `qdrant-store` with the text and an optional collection name, and the server embeds it and writes it to Qdrant. Later the agent needs that context back, so it calls `qdrant-find` with a natural-language query, and Qdrant returns the closest matches by cosine similarity. Exact keyword matching never enters into it. That's what makes the thing genuinely useful for agent memory, because the agent never has to reproduce the exact phrasing it used earlier, only the general meaning. One thing to check before you lean on this in production: the default collection name is shared across calls unless you specify one, so if you've got multiple projects hitting the same Qdrant instance, namespace your collections explicitly or unrelated memory stores will start bleeding into each other.
+
+## Frequently Asked Questions
+
+### Does the Qdrant MCP server require a running Qdrant instance?
+
+Yes. The MCP server is a thin wrapper around the Qdrant client and stores nothing itself. You need a Qdrant instance running locally via Docker, or a Qdrant Cloud cluster, before the MCP server has anything to query.
+
+### Can the Qdrant MCP server write new vectors, or is it read-only?
+
+The official server exposes both a qdrant-store tool and a qdrant-find tool, so writes and queries are both covered. Some third-party wrappers ship read-only versions for safety. Check the tool list before you assume write access.
+
+### Does Qdrant's MCP server support hybrid search (vector plus keyword)?
+
+The core tool set does dense-vector search only. Hybrid means configuring a Qdrant collection with sparse vectors yourself. The MCP server passes through whatever the collection supports and adds no hybrid logic of its own.
+
+### Is there a hosted version, or do I have to self-host Qdrant?
+
+Qdrant Cloud offers a managed cluster with an API key, so running Docker yourself is optional. The same MCP server config works against either target. Swap the URL, add an API key for the cloud path, done.
+
+For more on where MCP servers fit into agent workflows, see MCPFind's [guide to what MCP is](/blog/what-is-mcp), or browse the full [databases category](/categories/databases) and compare Qdrant against the other 602 indexed servers. Still deciding on a database backend for agent memory? [MongoDB MCP vs Redis MCP](/blog/mongodb-vs-redis-mcp-server) walks through the document-store and cache-layer tradeoffs, and the [Supabase MCP server guide](/blog/supabase-mcp-server-deep-dive) covers the `pgvector` alternative mentioned above. [Neon's MCP server](/blog/neon-mcp-server-serverless-postgres) is worth a look too if serverless Postgres with vector support fits your stack better than a dedicated vector database.
