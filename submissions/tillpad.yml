@@ -1,0 +1,6 @@
+servers:
+  - name: "Tillpad"
+    github_url: "https://github.com/number1101/tillpad-mcp"
+    package_name: "com.cnrcode/tillpad"
+    description: "Bounded storage and search for agent jobs."
+    category: "filesystems"
