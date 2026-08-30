@@ -1,0 +1,90 @@
+---
+title: "Zendesk MCP Server vs Intercom MCP Server: Full Comparison"
+description: "Intercom ships an official, vendor-maintained MCP server. Zendesk's is entirely community-built. That gap changes which one you should actually trust."
+excerpt: "Intercom's engineering team maintains its own MCP server, six tools, hosted only, US workspaces only. Zendesk has no confirmed first-party equivalent, just a handful of community repos with different tool coverage and different auth models. Both can work well, but they're two very different kinds of bet."
+date: "2026-08-24"
+updatedAt: "2026-08-24"
+author: "Gus Marquez"
+authorUrl: "https://www.linkedin.com/in/gustavoamarquez"
+authorSameAs:
+  - "https://www.linkedin.com/in/gustavoamarquez"
+tags:
+  - "mcp"
+  - "developer"
+  - "communication"
+  - "customer-support"
+  - "helpdesk"
+category: "communication"
+cluster: "communication"
+focusKeyword: "zendesk mcp server vs intercom mcp server"
+topic_source: "new_topic"
+draft: false
+cornerstone: false
+faqItems:
+  - question: "Is there an official Zendesk MCP server maintained by Zendesk itself?"
+    answer: "Not one that exposes Zendesk ticket data to an outside agent, as far as we can tell right now. Zendesk has published material about an internal AI MCP client and a Marketplace app, and both of those describe Zendesk consuming MCP servers inside its own AI agent product. Pointing Claude or Cursor at a Zendesk workspace runs the other way. If a production decision hangs on this, ask Zendesk directly."
+  - question: "Can Intercom's MCP server create or update conversations, not just search them?"
+    answer: "No. All six confirmed tools (search, fetch, search_conversations, get_conversation, search_contacts, get_contact) read data and do nothing else. An agent that needs to reply to a customer or update a contact record is out of scope for Intercom's official server today."
+  - question: "Do Zendesk's community MCP servers support macros?"
+    answer: "Depends which repo you pick. mattcoatsworth/zendesk-mcp-server handles macros, views, triggers, and automations alongside tickets. reminia/zendesk-mcp-server stays on ticket CRUD and comments, with no macro management at all. Always read the tool list on the specific repo before you assume a capability is there."
+  - question: "Is Intercom's MCP server available outside the US?"
+    answer: "No. Intercom's official server connects to US-hosted workspaces only right now. Accounts running on the EU or Australia data residency option are out of its reach, at least as things stand today."
+---
+
+Intercom and Zendesk both run huge chunks of the customer support world, and both come up constantly once a team starts wiring agents into its helpdesk. Only one of them ships the server itself. Intercom's engineering org maintains `intercom/intercom-mcp-server` in house: six read-only functions, hosted, scoped tight on purpose. For Zendesk you're in community repo territory, where the two strongest options disagree with each other about what a Zendesk MCP server should even do. Sort that gap out first, well ahead of counting tools.
+
+| Server | Type | Stars | Auth | Best For |
+|---|---|---|---|---|
+| Intercom MCP Server | Official (vendor-maintained) | ~7 | OAuth (recommended) or Bearer token | Read-only conversation and contact lookup, US workspaces |
+| reminia/zendesk-mcp-server | Community | ~115 | OAuth 2.0 + PKCE | Modern auth, ticket CRUD, no macros |
+| mattcoatsworth/zendesk-mcp-server | Community | ~29 | API token | Broader coverage: macros, views, Talk, Chat |
+
+## Does Zendesk Have an Official MCP Server?
+
+Not one we could confirm exposes Zendesk data to outside agents. There's a Zendesk blog post referencing an "AI MCP client," and the Marketplace lists an "MCP Server App Integration." Read either one closely and what you're looking at is Zendesk's own AI agent product reaching out to consume external MCP servers, which runs in the opposite direction from what you'd need to point Claude or Cursor at a Zendesk workspace. We found no evidence of the second thing anywhere, so treat the first-party question as open.
+
+So you're in community territory. Several independent developers have built Zendesk MCP servers, none of them dominant, each with its own tool list and its own auth model. That can work fine, though the diligence work lands on your team, and no support contract sits behind any of it when something breaks at 2am.
+
+## What Tools Does Intercom's Official MCP Server Expose?
+
+Intercom publishes six tools under its own GitHub org at `intercom/intercom-mcp-server`: `search`, `fetch`, `search_conversations`, `get_conversation`, `search_contacts`, and `get_contact`. Read-only, all of them. Nothing in that list sends a reply, tags a conversation, or updates a contact record. This serves an agent that looks things up on behalf of a support rep. Anything that needs to write back to a ticket hits a wall on day one.
+
+Hosting is the vendor's, full stop. You connect to `https://mcp.intercom.com/mcp` over streamable HTTP, or to the legacy `/sse` endpoint, and you authenticate with OAuth or a bearer token. There's no local install to fall back on. And it only reaches US-hosted Intercom workspaces, so an account sitting on the EU or Australia data residency option is invisible to this server as of this writing.
+
+## Which Zendesk Community MCP Server Should You Use?
+
+Two of them are worth your time, and which one wins depends entirely on what you're building. `reminia/zendesk-mcp-server` sits around 115 stars, Apache 2.0, covering ticket retrieval, ticket creation and updates, comments, attachments, and a knowledge-base resource. Auth is OAuth 2.0 with PKCE. That's the more modern of the two approaches, and it carries more weight than it first appears: Zendesk is retiring legacy API tokens by April 2027, which puts anything built on a static token today on a migration clock.
+
+`mattcoatsworth/zendesk-mcp-server` covers noticeably more ground: tickets, users, organizations, agent groups, macros, views, triggers, automations, search, Help Center content, Talk stats, and Chat, all MIT licensed at around 29 stars. The tradeoff shows up in auth, which runs on a static API token assembled from your subdomain, email, and token value. That's the static token type already on a retirement clock. The broader tool coverage is real regardless. Open the tool lists on both repos, reminia's and mattcoatsworth's, and check them line by line against the workflows your support team runs every day. There's a third listing in MCPFind's directory too, [io-usefulapi-zendesk](/servers/io-usefulapi-zendesk), which handles tickets, users, organizations, macros, and satisfaction ratings if neither repo above lines up with your setup.
+
+## What Are the Limits of Intercom's MCP Server?
+
+Three limits matter here: read-only scope, US-only hosting, and a license field that came back empty when we checked the repo directly. PayPal, Stripe, and GitHub all state theirs plainly, so the blank stood out. Ask Intercom what the license actually is before you let anything past a quick internal prototype depend on this server.
+
+The short tool list reads as deliberate. Six tools is a small footprint, easy to reason about, and it barely dents an agent's context window next to a server exposing forty or fifty functions. Teams whose support workflow really is lookup and search will find that narrowness helps them.
+
+Plan for the version that adds write access, though. The day tools arrive that can reply to a customer on your behalf, the hosting restriction and the blank license field both get considerably more serious, and each one deserves another look before this goes out across a full support org. Today, with the tool set this limited, neither is a dealbreaker.
+
+## Where Do Zendesk and Intercom Sit in MCPFind's Communication Category?
+
+MCPFind's [communication category](/categories/communication) covers 420 servers. Intercom's official server isn't one of them yet. We went through a few adjacent categories to make sure it wasn't just filed under the wrong label on our end, came up empty there too, and would rather say so up front than send you to a slug that doesn't resolve.
+
+For setup detail on one product at a time, we've written up [Zendesk's MCP server options](/blog/zendesk-mcp-server) separately, and gone further into [Intercom's official server in more depth](/blog/intercom-mcp-server-support-search). A lot of support volume never leaves email, and the [Gmail and Outlook MCP setup guide](/blog/mcp-server-email-gmail-outlook-setup) covers that ground. Teams whose conversations start in chat long before they ever become tickets have the [Slack and Teams roundup](/blog/best-mcp-servers-communication-slack-teams) and the [Discord community bot guide](/blog/discord-mcp-server-community-bots), both sitting in this same communication cluster. And if MCP itself is new to you, start with [what MCP actually is](/blog/what-is-mcp).
+
+## Frequently Asked Questions
+
+### Is there an official Zendesk MCP server maintained by Zendesk itself?
+
+Not one that exposes Zendesk ticket data to an outside agent, as far as we can tell right now. Zendesk has published material about an internal AI MCP client and a Marketplace app, and both of those describe Zendesk consuming MCP servers inside its own AI agent product. Pointing Claude or Cursor at a Zendesk workspace runs the other way. If a production decision hangs on this, ask Zendesk directly.
+
+### Can Intercom's MCP server create or update conversations, not just search them?
+
+No. All six confirmed tools (search, fetch, search_conversations, get_conversation, search_contacts, get_contact) read data and do nothing else. An agent that needs to reply to a customer or update a contact record is out of scope for Intercom's official server today.
+
+### Do Zendesk's community MCP servers support macros?
+
+Depends which repo you pick. mattcoatsworth/zendesk-mcp-server handles macros, views, triggers, and automations alongside tickets. reminia/zendesk-mcp-server stays on ticket CRUD and comments, with no macro management at all. Always read the tool list on the specific repo before you assume a capability is there.
+
+### Is Intercom's MCP server available outside the US?
+
+No. Intercom's official server connects to US-hosted workspaces only right now. Accounts running on the EU or Australia data residency option are out of its reach, at least as things stand today.
