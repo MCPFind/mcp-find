@@ -4,6 +4,12 @@
 # Required fields: name, github_url, package_name, description
 # Optional fields: package_type (npm|pypi|docker), category
 servers:
+  - name: "SandBase Harness MCP Bridge"
+    github_url: "https://github.com/sandbaseai/sandbase-harness"
+    package_name: "ghcr.io/sandbaseai/sandbase-harness-mcp:0.3.8"
+    description: "Self-hosted MCP bridge for persistent agent sessions, sandboxed turns, approvals, artifacts, audit trails, and replay."
+    package_type: "docker"
+    category: "devtools"
   - name: "BuyWhere MCP Server"
     github_url: "https://github.com/BuyWhere/buywhere-mcp"
     package_name: "@buywhere/mcp-server"
