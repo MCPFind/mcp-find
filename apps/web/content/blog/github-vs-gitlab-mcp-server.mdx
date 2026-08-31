@@ -1,0 +1,91 @@
+---
+title: "GitHub MCP Server vs GitLab MCP Server: Full Comparison"
+description: "GitHub's MCP server is a standalone open source project with 32,000+ stars. GitLab built its version directly into the platform. Here's what that means for you."
+excerpt: "GitHub ships its MCP server as its own repo you can star, fork, and read. GitLab built its server straight into the product, so there's no separate codebase to point to at all. If you're picking a git host with your AI agent in mind, that difference changes more than you'd think."
+date: "2026-08-26"
+updatedAt: "2026-08-26"
+author: "Adam Bush"
+authorUrl: "https://www.linkedin.com/in/adam-bush/"
+authorSameAs:
+  - "https://www.linkedin.com/in/adam-bush/"
+tags:
+  - "mcp"
+  - "developer"
+  - "devtools"
+  - "github"
+  - "gitlab"
+category: "devtools"
+cluster: "devtools"
+focusKeyword: "github mcp server vs gitlab mcp server"
+topic_source: "new_topic"
+draft: false
+cornerstone: false
+faqItems:
+  - question: "Do you need a GitHub Copilot subscription to use GitHub's MCP server?"
+    answer: "It depends on what you're trying to do. The remote endpoint itself doesn't universally require a Copilot subscription, but some of the premium toolsets it exposes may need one. That specific line wasn't consistent across GitHub's own documentation as of this writing, so confirm it against your account type before assuming full access."
+  - question: "Is GitLab's MCP server available if you're on the free tier?"
+    answer: "GitLab's own documentation puts the MCP server on Free, Premium, and Ultimate, across both GitLab.com and self-managed instances. So yes, the free tier gets it. One caveat: a handful of advanced tools, like semantic code search, sit behind GitLab Duo instead of being open to every tier."
+  - question: "Can you self-host GitHub's MCP server the way you can self-host GitLab's?"
+    answer: "Yes, through the local Docker image built for GitHub Enterprise Server. It's a different install path than the hosted remote endpoint most GitHub.com users reach for, and it supports OAuth, personal access tokens, or a GitHub App for authentication."
+  - question: "Which one has a bigger developer community around it, GitHub's or GitLab's MCP server?"
+    answer: "GitHub's server is a standalone open source repo sitting around 32,600 GitHub stars. Nothing on GitLab's side is close. Their official version is built into the product itself, so there's no separate repo to star and no comparable count to point to."
+---
+
+Point an AI coding agent at your team's git host and both GitHub and GitLab will now let it read issues, open merge requests, and check pipeline status. Getting there is where they split. GitHub shipped a standalone open source MCP server that you install and configure yourself, star count and all. With GitLab there's nothing to clone, because the server ships inside the product. That difference shows up fast once you start wiring one up.
+
+| Server | Stars | Status | Hosting | Best For |
+|---|---|---|---|---|
+| GitHub MCP Server | ~32,600 | Stable, MIT license | Remote endpoint or local Docker | Teams already on GitHub.com or Copilot |
+| GitLab MCP Server | Built-in, no separate repo | Beta (as of GitLab 18.6+) | GitLab.com or self-managed | Teams on any GitLab tier, including Free |
+
+## What Does GitHub's MCP Server Let Your Agent Do?
+
+GitHub's server lives at `github/github-mcp-server`, and it groups everything into toolsets: repositories, issues, pull requests, actions, code security, code quality, discussions, gists, git, labels, notifications, organizations, projects, users, dependabot, secret protection, and security advisories. Basically the GitHub web UI, handed to your agent as callable tools. They don't all load at once, though. The default set is context, repos, issues, pull requests, and users, and you switch on the rest as you need them so your agent isn't wading through tool definitions it will never call.
+
+At roughly 32,600 stars it ranks among the most widely adopted MCP servers across the entire ecosystem. MIT licensed too. Because it's a real repo, you can go read what each toolset does before you turn it on.
+
+## What Does GitLab's MCP Server Let Your Agent Do?
+
+GitLab went the other way. There's no separate project to install. The server is part of GitLab itself, shipped first as an experimental feature in GitLab 18.3, promoted to Beta in 18.6, and updated through 18.11. Turn it on and your agent gets issues and work items, merge requests, CI pipelines, repository and code search, project management data, and security findings.
+
+Semantic code search deserves its own mention. It goes past basic keyword matching to understand what a snippet of code actually does, which is a step beyond anything on GitHub's current toolset list. Catch is, it sits behind GitLab Duo instead of being open on every plan, so check your subscription before you design a workflow around it.
+
+## Should You Use GitHub's Remote Endpoint or Its Local Docker Version?
+
+Most people just use the remote endpoint at `api.githubcopilot.com/mcp/` with OAuth or a personal access token. Nothing to install. No container, no local process, you point your client at the URL and you're running. Where it gets murky is whether every feature behind that endpoint requires an active Copilot subscription, and GitHub's own docs weren't fully consistent on that when we checked. Verify against your specific account before assuming full access.
+
+On GitHub Enterprise Server instead of GitHub.com? The local Docker image (`ghcr.io/github/github-mcp-server`) is the path built for you. It runs inside your own infrastructure, and it takes OAuth, personal access tokens, or a GitHub App, whichever matches how your org already handles auth.
+
+Security teams tend to prefer the local route no matter which GitHub product they're on. A container running on infrastructure you already own never leaves the network boundary you already control. Upkeep is the tradeoff. Someone has to pull image updates and manage the container's lifecycle, and that's work the hosted endpoint quietly absorbs for you in the background.
+
+## Is GitLab's MCP Server Available on the Free Tier?
+
+Yes. Saying that plainly matters, because an earlier claim floating around online suggested otherwise. GitLab's own documentation confirms the server ships on Free, Premium, and Ultimate, on GitLab.com and on self-managed instances alike. Authentication rides on GitLab's existing user permission system, so your agent sees exactly what the authenticated account is already allowed to see and nothing more. One more thing: as of GitLab 19.2, OAuth 2.0 Dynamic Client Registration moved down from Premium to Free, which makes setup easier whatever plan you're on.
+
+Community servers exist too, for anyone on a GitLab older than 18.3 or anyone who needs a feature the official server doesn't cover yet. One we found sits around 1,400 stars. That figure came from a single third-party listing rather than the repo itself, so double-check it against the repo before you quote it anywhere.
+
+## Where Do GitHub and GitLab Sit in MCPFind's Devtools Category?
+
+MCPFind's [devtools category](/categories/devtools) is the biggest in the directory: 6,464 servers, 16.73 stars on average. Both official servers are in there, GitHub's ([listing here](/servers/io-github-github-github-mcp-server)) and GitLab's ([listing here](/servers/com-gitlab-mcp)). There's a data quality caveat we'd rather hand you straight. Both currently show as unverified "official" status with low star counts in our own snapshot, which doesn't match the real activity either project sees on GitHub itself. A broader directory enrichment pass is underway, and we'd rather flag that than quote a number we don't trust.
+
+Want the step-by-step on GitHub's server? MCPFind has a [GitHub MCP server tutorial](/blog/github-mcp-server-claude-code-tutorial), and there's a [GitLab MCP server guide](/blog/gitlab-mcp-server) if that's the side you're on. [Chrome DevTools MCP](/blog/chrome-devtools-mcp-server-guide) pairs with either one when your agent needs browser-level debugging next to repo access. Two more in this same devtools cluster cover adjacent ground: the [MCP server debugging guide](/blog/debug-mcp-server-errors-claude) for when tools start throwing errors, and the [Docker MCP catalog](/blog/docker-mcp-catalog-toolkit-guide). Brand new to all of this? Start with [what MCP actually is](/blog/what-is-mcp).
+
+## Frequently Asked Questions
+
+### Do you need a GitHub Copilot subscription to use GitHub's MCP server?
+
+It depends on what you're trying to do. The remote endpoint itself doesn't universally require a Copilot subscription, but some of the premium toolsets it exposes may need one. That specific line wasn't consistent across GitHub's own documentation as of this writing, so confirm it against your account type before assuming full access.
+
+### Is GitLab's MCP server available if you're on the free tier?
+
+GitLab's own documentation puts the MCP server on Free, Premium, and Ultimate, across both GitLab.com and self-managed instances. So yes, the free tier gets it. One caveat: a handful of advanced tools, like semantic code search, sit behind GitLab Duo instead of being open to every tier.
+
+### Can you self-host GitHub's MCP server the way you can self-host GitLab's?
+
+Yes, through the local Docker image built for GitHub Enterprise Server. It's a different install path than the hosted remote endpoint most GitHub.com users reach for, and it supports OAuth, personal access tokens, or a GitHub App for authentication.
+
+### Which one has a bigger developer community around it, GitHub's or GitLab's MCP server?
+
+GitHub's server is a standalone open source repo sitting around 32,600 GitHub stars. Nothing on GitLab's side is close. Their official version is built into the product itself, so there's no separate repo to star and no comparable count to point to.
+
+Two things here are still unsettled. GitLab's server sits at Beta as of 18.6 and kept picking up changes through 18.11, so its tool list isn't final yet. GitHub's docs, meanwhile, still don't give a straight answer on which parts of the remote endpoint need an active Copilot subscription, and that's the one thing you'd want confirmed in writing before you build a team workflow on top of it.
