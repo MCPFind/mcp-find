@@ -4,6 +4,12 @@
 # Required fields: name, github_url, package_name, description
 # Optional fields: package_type (npm|pypi|docker), category
 servers:
+  - name: "WaveXisMCP"
+    github_url: "https://github.com/MathiasPaulenko/wavexis-mcp"
+    package_name: "wavexis-mcp"
+    description: "Browser automation MCP server with 220 tools across 13 capability tiers. CDP + BiDi, stealth mode, Lighthouse audits, no Node.js, no Chromium download."
+    package_type: "pypi"
+    category: "devtools"
   - name: "BuyWhere MCP Server"
     github_url: "https://github.com/BuyWhere/buywhere-mcp"
     package_name: "@buywhere/mcp-server"
