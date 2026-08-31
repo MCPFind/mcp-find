@@ -1,0 +1,92 @@
+---
+title: "PayPal MCP Server vs Stripe MCP Server: Full Comparison"
+description: "PayPal ships two separate MCP packages with different client support. Stripe ships just one, with both local and hosted modes. Here's the real comparison."
+excerpt: "PayPal splits its MCP support across two different repos, one naming OpenAI and one naming Claude. Stripe ships a single server that names all three major model providers plus a hosted OAuth mode. That split shapes which one fits your stack before you write a line of config."
+date: "2026-08-28"
+updatedAt: "2026-08-28"
+author: "Gus Marquez"
+authorUrl: "https://www.linkedin.com/in/gustavoamarquez"
+authorSameAs:
+  - "https://www.linkedin.com/in/gustavoamarquez"
+tags:
+  - "mcp"
+  - "developer"
+  - "finance"
+  - "payments"
+  - "stripe"
+category: "finance"
+cluster: "finance"
+focusKeyword: "paypal mcp server vs stripe mcp server"
+topic_source: "new_topic"
+draft: false
+cornerstone: false
+faqItems:
+  - question: "Does PayPal's MCP server work with Claude Desktop?"
+    answer: "Yes, but only through the paypal/paypal-mcp-server package. That one lists Claude Desktop, Cline, Cursor, and GitHub Copilot as supported clients. PayPal's other repo, agent-toolkit, is the OpenAI Agent SDK build, so check which of the two you're installing before you assume Claude works."
+  - question: "Can Stripe's MCP server run without a locally stored API key?"
+    answer: "Yes. Stripe's hosted mode at mcp.stripe.com authenticates over OAuth, so there's no static secret key sitting in your client config. Local mode still works and is simpler for a single-developer setup, but hosted is the better call if you don't want a live secret key on disk."
+  - question: "Which MCP server has more GitHub stars, PayPal's or Stripe's?"
+    answer: "Stripe's agent-toolkit repo sits at roughly 1,800 stars. PayPal spreads its footprint over two repos, agent-toolkit at around 189 stars and the dedicated paypal-mcp-server at around 12, so even added together it isn't close. Stars aren't a feature comparison, but the gap does reflect how much longer Stripe's tooling has been in wide use."
+  - question: "Do PayPal and Stripe's MCP servers require a live merchant account?"
+    answer: "Both need an active account with API credentials. Neither needs that account to be live and processing transactions to get started, though. Sandbox or test-mode credentials work on both sides, so you can wire up the MCP server and run tool calls against fake payment data before anything touches a real charge."
+---
+
+PayPal and Stripe both ship MCP servers now, and on paper they cover the same ground: payments, invoices, subscriptions, disputes. Dig past the feature list and they diverge fast. Stripe put everything into one server that names OpenAI, Claude, and Gemini in the same README. PayPal split its support across two separate repos with different client lists, which is easy to miss if you search "PayPal MCP" and install whatever comes back first. We read both codebases to sort out which does what.
+
+| Server | Repo / Stars | Auth Model | Deployment | Best For |
+|---|---|---|---|---|
+| PayPal agent-toolkit | ~189 stars, Apache-2.0 | OAuth2 client credentials | Local (npm package) | OpenAI Agent SDK, LangChain, Vercel AI SDK workflows |
+| PayPal MCP Server | ~12 stars, Apache-2.0 | OAuth2 client credentials | Local (npm package) | Claude Desktop, Cline, Cursor, Copilot |
+| Stripe agent-toolkit | ~1,800 stars, MIT | API key (local) or OAuth (hosted) | Local (npx) or hosted (mcp.stripe.com) | Any of OpenAI, Claude, or Gemini, single package |
+
+## What Tools Does PayPal's MCP Server Expose?
+
+Seven groups, going by the agent-toolkit documentation. Invoices take the biggest chunk at roughly 14 tools covering creation, sending, and status checks, then payments (5), disputes (3), shipment tracking (3), catalog (3), subscriptions (7), and reporting or insights (2). That's a wide spread for a payments API, wide enough that what you get lands closer to a back-office toolkit than a thin wrapper over charge endpoints.
+
+Here's where people get burned. That tool list lives in `paypal/agent-toolkit`, which is built around OpenAI's Agent SDK, LangChain, and the Vercel AI SDK. Claude Desktop, Cline, Cursor, and GitHub Copilot support sits in a second repo entirely, `paypal/paypal-mcp-server`. One company, two packages, and the right one depends on which agent framework you're already running. Each repo's README lists the clients it actually covers.
+
+## What Tools Does Stripe's MCP Server Expose?
+
+Stripe puts all of it in `stripe/agent-toolkit`: payments and billing, subscriptions, invoicing, refunds, customers, disputes. Comparable coverage to PayPal's, shipped from one package instead of two. The repo lists native SDK support for OpenAI, Anthropic's Claude, and Google's Gemini, with the Vercel AI SDK layered on top of that, and there's no client-specific fork to hunt down.
+
+The single-package setup has a practical consequence. Swap a team off OpenAI's Agent SDK and onto Claude and nothing about the install changes: same package, same tool definitions, a different model provider sitting underneath. PayPal's split works fine once you know which repo you want, though it does add a decision at install time that Stripe's single package doesn't have.
+
+## How Do PayPal and Stripe Handle Authentication Differently?
+
+Both PayPal packages use an OAuth2 client-credentials flow. Client ID and Secret go in, an access token comes back, and both repos' setup docs describe it the same way. Nothing surprising there, and nothing that separates the two packages either.
+
+Stripe gives you an actual choice. Local mode runs `npx @stripe/mcp` with a restricted API key you generate in the Stripe dashboard and paste into your client config. Hosted mode points the client at `https://mcp.stripe.com` and authenticates over OAuth, so no static secret ends up on disk. One caveat on the PayPal side: the exact scope options for its OAuth flow, and whether a simpler API-key-only path exists, came out of repo documentation rather than PayPal's own developer docs site, which returned a 404 while we were researching this, so none of it is confirmed against a primary source.
+
+## Should You Use Stripe's Local or Hosted MCP Mode?
+
+For one developer poking at tool calls against a sandbox account, local mode is the obvious start. It's one `npx` command, and the API key you scope to it dies the moment you revoke it in the Stripe dashboard, which covers you if something looks off. Hosted mode starts earning its keep as soon as a second person or an automated job hits the server, because OAuth tokens get scoped, rotated, and revoked per user without anyone touching a shared secret that three teammates already keep local copies of.
+
+PayPal has no equivalent split. Both packages run locally, and either way you're managing a Client ID and Secret pair yourself. There is no hosted option to move to later.
+
+Think about that if you expect more than one person on this integration. When a contractor rolls off, a hosted OAuth endpoint lets you kill the token and move on, with no config files to hunt down and edit. Local-only means every credential lives wherever somebody last pasted it, which is fine for a small team and turns into a real liability once the project has more than two or three people on it.
+
+## Where Do These Servers Sit in MCPFind's Finance Category?
+
+MCPFind's [finance category](/categories/finance) indexes 158 servers, average 8.99 stars. Stripe's own listing, [com-stripe-mcp](/servers/com-stripe-mcp), sits at the top of that pile with 1,395 stars, the highest-starred entry in the category by a wide margin. PayPal's official packages aren't indexed here yet. The split between `agent-toolkit` and `paypal-mcp-server` is part of why, since there's no single obvious entry to list.
+
+Want more on Stripe alone? MCPFind's [Stripe setup guide](/blog/stripe-mcp-server-guide) walks the local installation flow in more depth than this comparison does. Teams doing accounting work instead of raw payments processing should look at the [Digits MCP server for accounting firms](/blog/digits-mcp-server-accounting-firms) and the broader [finance and banking roundup](/blog/best-mcp-servers-finance-banking), both filed under the same finance category. For bank account data rather than card payments, the [Plaid bank account guide](/blog/bank-account-mcp-server-plaid-guide) and the [BankSync review](/blog/banksync-mcp-server-review) cover that adjacent ground. Brand new to all of this? Start with [what MCP actually is](/blog/what-is-mcp).
+
+## Frequently Asked Questions
+
+### Does PayPal's MCP server work with Claude Desktop?
+
+Yes, but only through the `paypal/paypal-mcp-server` package. That one lists Claude Desktop, Cline, Cursor, and GitHub Copilot as supported clients. PayPal's other repo, agent-toolkit, is the OpenAI Agent SDK build, so check which of the two you're installing before you assume Claude works.
+
+### Can Stripe's MCP server run without a locally stored API key?
+
+Yes. Stripe's hosted mode at mcp.stripe.com authenticates over OAuth, so there's no static secret key sitting in your client config. Local mode still works and is simpler for a single-developer setup, but hosted is the better call if you don't want a live secret key on disk.
+
+### Which MCP server has more GitHub stars, PayPal's or Stripe's?
+
+Stripe's agent-toolkit repo sits at roughly 1,800 stars. PayPal spreads its footprint over two repos, agent-toolkit at around 189 stars and the dedicated paypal-mcp-server at around 12, so even added together it isn't close. Stars aren't a feature comparison, but the gap does reflect how much longer Stripe's tooling has been in wide use.
+
+### Do PayPal and Stripe's MCP servers require a live merchant account?
+
+Both need an active account with API credentials. Neither needs that account to be live and processing transactions to get started, though. Sandbox or test-mode credentials work on both sides, so you can wire up the MCP server and run tool calls against fake payment data before anything touches a real charge.
+
+Let the agent framework you're already running drive the pick. Running OpenAI's Agent SDK or LangChain? PayPal's agent-toolkit fits. On Claude Desktop or Cursor, grab paypal-mcp-server instead. And if you'd rather skip PayPal's decision tree altogether, Stripe hands you one package that works across all three major providers with no fork to chase.
