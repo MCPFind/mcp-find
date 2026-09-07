@@ -6,10 +6,57 @@
  * runSyncPipeline RETURNS an exit code rather than calling process.exit();
  * index.ts is the one place that turns that code into a process exit.
  */
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { syncFromRegistry } from './registry-sync';
+import { syncCommunitySubmissions } from './community-sync';
 import { enrichWithGitHub } from './github-enrichment';
 import { categorizeServers } from './categorizer';
+
+/** The columns every terminal sync_log UPDATE carries. */
+interface SyncLogUpdate {
+  status: string;
+  completed_at: string;
+  servers_synced: number;
+  servers_enriched: number;
+  errors: string[];
+}
+
+/**
+ * Write the terminal sync_log row, including the community count when the
+ * column exists.
+ *
+ * `servers_community` arrives in migration 011. Until that migration is
+ * applied, including the column would make PostgREST reject the whole UPDATE —
+ * and losing the terminal row is far worse than losing one counter, because a
+ * run stuck at status 'running' is invisible to every watchdog that reads
+ * status. So the write degrades: full payload first, and on refusal a retry
+ * without the new column plus a loud warning naming the migration. Same shape
+ * as the backfill_canonical_slug guard in registry-sync.ts.
+ */
+async function writeSyncLog(
+  supabase: SupabaseClient<any, any, any>, // eslint-disable-line @typescript-eslint/no-explicit-any
+  logId: number,
+  payload: SyncLogUpdate,
+  communitySynced: number
+): Promise<void> {
+  const { error } = await supabase
+    .from('sync_log')
+    .update({ ...payload, servers_community: communitySynced })
+    .eq('id', logId);
+
+  if (!error) return;
+
+  console.warn(
+    `[Sync Pipeline] sync_log UPDATE including servers_community failed (${error.message}); ` +
+      `retrying without it. Apply migration 011_sync_log_community_count.sql to record the ` +
+      `community count — ${communitySynced} community row(s) this run are otherwise only in the log above.`
+  );
+
+  const { error: fallbackError } = await supabase.from('sync_log').update(payload).eq('id', logId);
+  if (fallbackError) {
+    console.error(`[Sync Pipeline] sync_log UPDATE failed outright: ${fallbackError.message}`);
+  }
+}
 
 /** POST to the site's /api/revalidate endpoint so the cached server count
  *  refreshes immediately after a sync. Non-fatal — a failure here should never
@@ -93,6 +140,7 @@ export async function runSyncPipeline(): Promise<number> {
   // Now that enrichment failures are loud and expected, partial runs are the
   // normal case, so they have to be legible.
   let synced = 0;
+  let communitySynced = 0;
   let enriched = 0;
   let categorized = 0;
 
@@ -109,6 +157,24 @@ export async function runSyncPipeline(): Promise<number> {
       },
     });
     console.log(`[Stage 1] Synced ${synced} servers`);
+
+    // Stage 1b: Community submissions.
+    //
+    // Runs after the registry so the registry-wins arbitration inside the
+    // stage is deciding against rows this run has already written, not against
+    // yesterday's snapshot. Runs before categorization so a newly ingested
+    // community server gets a category on the same night it lands rather than
+    // waiting 24 hours.
+    console.log('[Stage 1b] Ingesting community submissions...');
+    const community = await syncCommunitySubmissions(supabase);
+    communitySynced = community.ingested;
+    errors.push(...community.errors);
+    if (community.fatal) stageFailed = true;
+    console.log(
+      `[Stage 1b] Ingested ${communitySynced} community server(s) ` +
+        `(${community.registryOwned} deferred to the registry, ` +
+        `${community.skipped.length} not written, fatal=${community.fatal})`
+    );
 
     // Stage 2: GitHub Enrichment
     if (githubToken) {
@@ -137,20 +203,23 @@ export async function runSyncPipeline(): Promise<number> {
     // 'completed' is a claim about the whole pipeline, so a failed stage has
     // to be able to withhold it. Otherwise `errors` is decorative: the row
     // says completed, every watchdog reads status, and nobody reads errors.
-    await supabase
-      .from('sync_log')
-      .update({
+    await writeSyncLog(
+      supabase,
+      log.id,
+      {
         status: stageFailed ? 'failed' : 'completed',
         completed_at: new Date().toISOString(),
         servers_synced: synced,
         servers_enriched: enriched,
         errors,
-      })
-      .eq('id', log.id);
+      },
+      communitySynced
+    );
 
     if (stageFailed) {
       console.error(
-        `[Sync Pipeline] FAILED — ${synced} synced, ${enriched} enriched, ${categorized} categorized; ` +
+        `[Sync Pipeline] FAILED — ${synced} synced, ${communitySynced} community, ` +
+          `${enriched} enriched, ${categorized} categorized; ` +
           `${errors.length} error(s): ${errors.join(' | ')}`
       );
       // Non-zero exit so the scheduler and watchdog see a failure rather than
@@ -158,7 +227,10 @@ export async function runSyncPipeline(): Promise<number> {
       return 1;
     }
 
-    console.log(`[Sync Pipeline] Complete — ${synced} synced, ${enriched} enriched, ${categorized} categorized`);
+    console.log(
+      `[Sync Pipeline] Complete — ${synced} synced, ${communitySynced} community, ` +
+        `${enriched} enriched, ${categorized} categorized`
+    );
 
     // Stage 4: Trigger site revalidation so cached counts refresh immediately.
     // Runs after sync_log is committed so caches are refreshed against confirmed data.
@@ -171,20 +243,22 @@ export async function runSyncPipeline(): Promise<number> {
 
     // Same counters as the success path. A run that died is still a run that
     // did something, and sync_log is the only place that record exists.
-    await supabase
-      .from('sync_log')
-      .update({
+    await writeSyncLog(
+      supabase,
+      log.id,
+      {
         status: 'failed',
         completed_at: new Date().toISOString(),
         servers_synced: synced,
         servers_enriched: enriched,
         errors,
-      })
-      .eq('id', log.id);
+      },
+      communitySynced
+    );
 
     console.error(
-      `[Sync Pipeline] Partial run recorded — ${synced} synced, ${enriched} enriched, ` +
-        `${categorized} categorized before the failure.`
+      `[Sync Pipeline] Partial run recorded — ${synced} synced, ${communitySynced} community, ` +
+        `${enriched} enriched, ${categorized} categorized before the failure.`
     );
 
     return 1;

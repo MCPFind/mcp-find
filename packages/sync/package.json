@@ -16,7 +16,8 @@
   },
   "dependencies": {
     "@mcpfind/shared": "workspace:*",
-    "@supabase/supabase-js": "^2.100.0"
+    "@supabase/supabase-js": "^2.100.0",
+    "yaml": "2.8.3"
   },
   "devDependencies": {
     "@types/node": "^22.19.15",

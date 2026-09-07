@@ -29,10 +29,17 @@ interface SyncLogUpdate {
   completed_at?: string;
   servers_synced?: number;
   servers_enriched?: number;
+  servers_community?: number;
   errors?: string[];
 }
 
 const updates: SyncLogUpdate[] = [];
+
+/**
+ * When set, the double refuses any UPDATE carrying this column, the way
+ * PostgREST does before its migration is applied. Reset per test.
+ */
+let rejectUnknownColumn: string | null = null;
 
 /** Minimal Supabase double: records every sync_log UPDATE payload. */
 function makeSupabase() {
@@ -44,6 +51,13 @@ function makeSupabase() {
         }),
       }),
       update: (payload: SyncLogUpdate) => {
+        if (rejectUnknownColumn && rejectUnknownColumn in payload) {
+          return {
+            eq: async () => ({
+              error: { message: `Could not find the '${rejectUnknownColumn}' column of 'sync_log'` },
+            }),
+          };
+        }
         updates.push(payload);
         return { eq: async () => ({ error: null }) };
       },
@@ -56,11 +70,15 @@ vi.mock('@supabase/supabase-js', () => ({
 }));
 
 const syncFromRegistry = vi.fn();
+const syncCommunitySubmissions = vi.fn();
 const enrichWithGitHub = vi.fn();
 const categorizeServers = vi.fn();
 
 vi.mock('./registry-sync', () => ({
   syncFromRegistry: (...args: unknown[]) => syncFromRegistry(...args),
+}));
+vi.mock('./community-sync', () => ({
+  syncCommunitySubmissions: (...args: unknown[]) => syncCommunitySubmissions(...args),
 }));
 vi.mock('./github-enrichment', () => ({
   enrichWithGitHub: (...args: unknown[]) => enrichWithGitHub(...args),
@@ -73,9 +91,20 @@ const ORIGINAL_ENV = { ...process.env };
 
 beforeEach(() => {
   updates.length = 0;
+  rejectUnknownColumn = null;
   syncFromRegistry.mockReset();
+  syncCommunitySubmissions.mockReset();
   enrichWithGitHub.mockReset();
   categorizeServers.mockReset();
+  // Neutral default: the community stage found nothing to do. Tests that care
+  // about it override this.
+  syncCommunitySubmissions.mockResolvedValue({
+    ingested: 0,
+    registryOwned: 0,
+    skipped: [],
+    errors: [],
+    fatal: false,
+  });
   process.env.SUPABASE_URL = 'https://example.supabase.co';
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-double';
   process.env.GH_ENRICHMENT_TOKEN = 'gh-token-double';
@@ -181,5 +210,102 @@ describe('sync_log — a failed run reports the work it actually did', () => {
     expect(update.status).toBe('completed');
     expect(update.servers_synced).toBe(17282);
     expect(update.servers_enriched).toBe(42);
+  });
+});
+
+/**
+ * The community ingest stage.
+ *
+ * Merging a submission PR wrote nothing at all until this stage existed, so
+ * the counter it produces is the only evidence the directory has that a merged
+ * submission actually landed. It has to reach sync_log on every terminal path,
+ * and a submission that failed to land has to cost the run its 'completed'.
+ */
+describe('sync_log — community ingest', () => {
+  function healthyRegistryRun() {
+    syncFromRegistry.mockResolvedValue(17282);
+    enrichWithGitHub.mockResolvedValue({ enriched: 42, unchanged: 9, errors: [], fatal: false });
+    categorizeServers.mockResolvedValue(120);
+  }
+
+  it('records the community count separately from servers_synced', async () => {
+    healthyRegistryRun();
+    syncCommunitySubmissions.mockResolvedValue({
+      ingested: 3,
+      registryOwned: 1,
+      skipped: [],
+      errors: [],
+      fatal: false,
+    });
+
+    const { runSyncPipeline } = await import('./pipeline');
+    expect(await runSyncPipeline()).toBe(0);
+
+    const update = terminalUpdate();
+    expect(update.servers_community).toBe(3);
+    // Folding community rows into servers_synced would make a run that
+    // ingested a submission indistinguishable from one that ingested none.
+    expect(update.servers_synced).toBe(17282);
+  });
+
+  it('fails the run when a merged submission did not land', async () => {
+    healthyRegistryRun();
+    syncCommunitySubmissions.mockResolvedValue({
+      ingested: 0,
+      registryOwned: 0,
+      skipped: [{ id: 'community:acme/mcp', slug: 'acme-mcp', reason: 'slug already claimed' }],
+      errors: ['community submission not written: id="community:acme/mcp" slug="acme-mcp"'],
+      fatal: true,
+    });
+
+    const { runSyncPipeline } = await import('./pipeline');
+    expect(await runSyncPipeline()).toBe(1);
+
+    const update = terminalUpdate();
+    expect(update.status).toBe('failed');
+    expect(update.errors?.join('\n')).toContain('community:acme/mcp');
+  });
+
+  it('records the community count on the failure path too', async () => {
+    syncFromRegistry.mockResolvedValue(17282);
+    syncCommunitySubmissions.mockResolvedValue({
+      ingested: 2,
+      registryOwned: 0,
+      skipped: [],
+      errors: [],
+      fatal: false,
+    });
+    enrichWithGitHub.mockResolvedValue({ enriched: 0, unchanged: 0, errors: [], fatal: false });
+    categorizeServers.mockRejectedValue(new Error('categorize exploded'));
+
+    const { runSyncPipeline } = await import('./pipeline');
+    expect(await runSyncPipeline()).toBe(1);
+
+    const update = terminalUpdate();
+    expect(update.status).toBe('failed');
+    expect(update.servers_community).toBe(2);
+  });
+
+  it('still writes the terminal row when servers_community does not exist yet', async () => {
+    // Migration 011 is not applied. Losing one counter is survivable; losing
+    // the terminal row is not, because a run stuck at 'running' is invisible
+    // to every watchdog that reads status.
+    healthyRegistryRun();
+    syncCommunitySubmissions.mockResolvedValue({
+      ingested: 3,
+      registryOwned: 0,
+      skipped: [],
+      errors: [],
+      fatal: false,
+    });
+    rejectUnknownColumn = 'servers_community';
+
+    const { runSyncPipeline } = await import('./pipeline');
+    expect(await runSyncPipeline()).toBe(0);
+
+    const update = terminalUpdate();
+    expect(update.status).toBe('completed');
+    expect(update.servers_synced).toBe(17282);
+    expect(update).not.toHaveProperty('servers_community');
   });
 });
