@@ -9,10 +9,23 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Read-only token, workflow-wide. Nothing here needs to write to the repo,
+# and this workflow runs untrusted fork PR code (this repo takes community
+# submissions), so it stays on the plain `pull_request` trigger — which
+# gives a fork's run a read-only token and no access to repo secrets.
+# The privileged fork-PR trigger variant is deliberately not used here:
+# it would run against the base repo with a writable token.
+permissions:
+  contents: read
+
 jobs:
-  ci:
+  # D-2 cache invalidation regression guard (task T9, decision-register
+  # D-2, criteria C-24a/C-24b/C-25/C-26). Gates the rest of CI so a
+  # violation fails fast without spending the remaining CI budget.
+  guard:
+    name: D-2 cache invalidation guard
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
         with:
@@ -22,25 +35,83 @@ jobs:
           # version (the D-2 ratchet growth check, task T9 / C-26) instead
           # of silently skipping that check on a 1-commit-deep checkout.
           fetch-depth: 0
-      # D-2 cache invalidation regression guard (task T9, decision-register
-      # D-2, criteria C-24a/C-24b/C-25/C-26). Runs before install/build so a
-      # violation fails fast without spending the rest of the CI budget.
       # GUARD_BASE_REF pins the ratchet's "prior committed baseline" compare
       # point to the PR's actual base commit on a pull_request event (so a
       # multi-commit PR is compared against main, not against its own
       # second-to-last commit); left unset on push, where the script's
       # default (HEAD~1) is correct.
-      - name: D-2 cache invalidation regression guard
+      - name: Run D-2 cache invalidation regression guard
         env:
           GUARD_BASE_REF: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
         run: bash scripts/check-cache-invalidation.sh
+
+  # Split out from the build so a red check names what actually broke:
+  # "Type check" and "Unit tests" are separate check runs, and a failure
+  # is identifiable from the PR checks list without opening the logs.
+  type-check:
+    name: Type check (turbo, 5 tasks)
+    needs: [guard]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @mcpfind/shared build
-      - run: pnpm --filter @mcpfind/web test
-      - run: pnpm type-check
-      - run: pnpm build
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      # @mcpfind/shared is consumed from its built dist/, so it must be
+      # compiled before anything type-checks against it.
+      - name: Build @mcpfind/shared
+        run: pnpm --filter @mcpfind/shared build
+      - name: Type check
+        run: pnpm type-check
+
+  test:
+    name: Unit tests (vitest, 21 files / 348 tests)
+    needs: [guard]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build @mcpfind/shared
+        run: pnpm --filter @mcpfind/shared build
+      # The whole suite is driven from apps/web — apps/web/vitest.config.ts
+      # is what picks up packages/sync/**/*.test.ts and scripts/__tests__/
+      # as well as the web app's own tests. There is no `turbo test` task.
+      #
+      # The github-actions reporter emits ::error:: annotations, so a
+      # failing test shows up at the top of the check and inline on the
+      # changed file instead of only in the raw step log. The default
+      # reporter is kept alongside it so the log stays readable.
+      - name: Run test suite
+        run: pnpm --filter @mcpfind/web test --reporter=default --reporter=github-actions
+
+  build:
+    name: Next.js build
+    # Gated on the cheap checks so a broken PR does not burn a full build.
+    needs: [type-check, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build @mcpfind/shared
+        run: pnpm --filter @mcpfind/shared build
+      - name: Build
+        run: pnpm build
