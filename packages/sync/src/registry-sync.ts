@@ -78,8 +78,25 @@ function packageRegistryUrl(pkg: RegistryPackage | null): string | null {
   return pkg.registryBaseUrl || pkg.registry_url || null;
 }
 
+export interface RegistrySyncOptions {
+  /**
+   * Called after every batch with the running total of rows written so far.
+   *
+   * The return value alone is not enough: it only exists if this function
+   * runs to completion. When registry pagination throws partway through — a
+   * 5xx on page N, the likely shape of the 2026-09-05 failure — the caller
+   * has no number at all, and sync_log records servers_synced: 0 for a run
+   * that wrote thousands of rows. This callback is how a partial run stays
+   * legible.
+   */
+  onProgress?: (totalSynced: number) => void;
+}
+
 // Main sync function - paginate through registry
-export async function syncFromRegistry(supabase: SupabaseClient<any, any, any>): Promise<number> { // eslint-disable-line @typescript-eslint/no-explicit-any
+export async function syncFromRegistry(
+  supabase: SupabaseClient<any, any, any>, // eslint-disable-line @typescript-eslint/no-explicit-any
+  options: RegistrySyncOptions = {}
+): Promise<number> {
   let cursor: string | undefined;
   let totalSynced = 0;
 
@@ -171,6 +188,8 @@ export async function syncFromRegistry(supabase: SupabaseClient<any, any, any>):
       if (error) console.error(`Batch upsert failed:`, error.message);
       else totalSynced += deduped.length;
     }
+
+    options.onProgress?.(totalSynced);
 
     console.log(`Synced batch: ${items.length} servers (total: ${totalSynced})`);
   } while (cursor);
