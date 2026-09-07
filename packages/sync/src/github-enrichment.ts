@@ -1,7 +1,87 @@
+import { createHash } from 'node:crypto';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { GITHUB_API_BASE, GITHUB_RATE_DELAY_MS } from '@mcpfind/shared';
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * Outcome of one enrichment stage. Returned rather than logged so the caller
+ * can put real failures into `sync_log.errors` — see `fatal` below.
+ */
+export interface EnrichmentResult {
+  /** Rows whose rendered content actually changed and were re-stamped. */
+  enriched: number;
+  /** Rows fetched successfully whose rendered content was byte-identical. */
+  unchanged: number;
+  errors: string[];
+  /**
+   * True when the run stopped for a reason that invalidates the whole stage
+   * (bad credentials, or a failure rate so high the results are meaningless).
+   * The caller MUST NOT close sync_log as 'completed' when this is set.
+   */
+  fatal: boolean;
+}
+
+/** Fields whose value the server detail page actually renders. */
+interface RenderedContent {
+  github_stars?: number | null;
+  github_last_push?: string | null;
+  github_license?: string | null;
+  github_language?: string | null;
+  readme_content?: string | null;
+}
+
+/**
+ * Postgres and the GitHub API spell the same instant differently
+ * ('2026-03-25T00:00:00+00:00' vs '2026-03-25T00:00:00Z'). Comparing the raw
+ * strings would report a change on every single pass and quietly defeat the
+ * whole content gate, so normalise before hashing.
+ */
+function normalizeTimestamp(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const ms = new Date(value).getTime();
+  return Number.isNaN(ms) ? value : new Date(ms).toISOString();
+}
+
+/**
+ * Hash of the fields that actually render on the page.
+ *
+ * This is the gate on `updated_at`. Before it existed, every enrichment pass
+ * wrote `updated_at = now()` on every row it touched whether or not anything
+ * had changed — so `updated_at`, and therefore every sitemap `lastmod`,
+ * tracked the job schedule instead of reality.
+ *
+ * That matters most at the moment the 401'd token is finally rotated: without
+ * this gate the first successful run would flip all 452 indexable URLs to the
+ * same fresh date simultaneously, with zero real content change. A synchronous
+ * mass-fabrication like that is a worse signal to a crawler than the honest
+ * five-month freeze it would replace.
+ *
+ * Volatile counters (forks, open issues, contributors) are deliberately NOT
+ * hashed. They are still written; they just don't constitute a content change
+ * worth telling a crawler about.
+ */
+function renderedContentHash(fields: RenderedContent): string {
+  return createHash('sha256')
+    .update(
+      JSON.stringify([
+        fields.github_stars ?? 0,
+        normalizeTimestamp(fields.github_last_push),
+        fields.github_license ?? null,
+        fields.github_language ?? null,
+        fields.readme_content ?? null,
+      ])
+    )
+    .digest('hex');
+}
+
+/**
+ * Share of attempted repos that may fail before the stage is called a
+ * failure. A per-repo 404 is routine; two thirds of the run failing is an
+ * outage wearing a routine costume — which is precisely how a 401 on every
+ * call passed for a successful sync for five months.
+ */
+const MAX_FAILURE_RATE = 0.5;
 
 function parseGithubUrl(url: string): { owner: string; repo: string } | null {
   const match = url.match(/github\.com\/([^/]+)\/([^/]+)/);
@@ -69,7 +149,7 @@ export async function enrichWithGitHub(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: SupabaseClient<any, any, any>,
   githubToken: string
-): Promise<number> {
+): Promise<EnrichmentResult> {
   const limit = enrichmentLimit();
   const useCheckedAt = await hasCheckedAtColumn(supabase);
   const cursorColumn = useCheckedAt ? 'github_checked_at' : 'updated_at';
@@ -92,8 +172,9 @@ export async function enrichWithGitHub(
     .limit(limit);
 
   if (error || !rawServers) {
-    console.error('Failed to fetch servers for enrichment:', error?.message);
-    return 0;
+    const msg = `Enrichment candidate query failed: ${error?.message ?? 'no rows returned'}`;
+    console.error(msg);
+    return { enriched: 0, unchanged: 0, errors: [msg], fatal: true };
   }
 
   const servers = rawServers as Array<{ id: string; github_url: string }>;
@@ -101,6 +182,10 @@ export async function enrichWithGitHub(
     `[Enrichment] Claimed ${servers.length} candidates (limit ${limit}, ordered by ${cursorColumn} ASC)`
   );
   let enriched = 0;
+  let unchanged = 0;
+  let attempted = 0;
+  let failed = 0;
+  const errors: string[] = [];
   const headers = {
     Authorization: `Bearer ${githubToken}`,
     Accept: 'application/vnd.github.v3+json',
@@ -109,6 +194,8 @@ export async function enrichWithGitHub(
   for (const server of servers) {
     const parsed = parseGithubUrl(server.github_url);
     if (!parsed) continue;
+
+    attempted++;
 
     try {
       // Fetch repo metadata with retry on rate limit
@@ -131,11 +218,31 @@ export async function enrichWithGitHub(
         }
       }
       if (!repoRes || repoRes.status === 403) {
+        failed++;
         console.warn(`Skipping ${parsed.owner}/${parsed.repo} after ${MAX_RETRIES} rate-limit retries`);
         continue;
       }
 
+      // THE defect behind everything else. A 401 is never a property of one
+      // repo — it is the credential, and it will be 401 for every remaining
+      // call. This branch used to be a console.warn + continue that pushed
+      // nothing to `errors`, so the stage reported enriched=0 and the sync
+      // still closed as 'completed'. It did that on every run from
+      // 2026-03-26 onward and nothing anywhere went red for five months.
+      // Stop the run, and make the caller unable to call it a success.
+      if (repoRes.status === 401) {
+        const msg =
+          `GitHub authentication failed (HTTP 401) on ${parsed.owner}/${parsed.repo}. ` +
+          'The enrichment token is invalid, expired, or revoked — every remaining call would fail ' +
+          `identically, so the run is aborting after ${attempted} of ${servers.length} candidates. ` +
+          'Rotate the enrichment token.';
+        console.error(`[Enrichment] ${msg}`);
+        errors.push(msg);
+        return { enriched, unchanged, errors, fatal: true };
+      }
+
       if (!repoRes.ok) {
+        failed++;
         console.warn(`GitHub API ${repoRes.status} for ${parsed.owner}/${parsed.repo}`);
         await sleep(GITHUB_RATE_DELAY_MS);
         continue;
@@ -143,19 +250,30 @@ export async function enrichWithGitHub(
 
       const repo = await repoRes.json();
 
-      // Fetch README
+      // Fetch README.
+      //
+      // `readmeFetchOk` distinguishes "this repo has no README" (a real fact,
+      // worth storing as null) from "we failed to ask" (not a fact at all).
+      // Without that distinction a transient fetch failure would both wipe a
+      // good stored README and register as a content change, bumping
+      // updated_at — a fabricated freshness signal produced by a network blip.
       let readmeContent: string | null = null;
+      let readmeFetchOk = false;
       try {
         const readmeRes = await fetch(
           `${GITHUB_API_BASE}/repos/${parsed.owner}/${parsed.repo}/readme`,
           { headers: { ...headers, Accept: 'application/vnd.github.raw' } }
         );
         if (readmeRes.ok) {
+          readmeFetchOk = true;
           readmeContent = await readmeRes.text();
           // Truncate very long READMEs
           if (readmeContent.length > 50000) {
             readmeContent = readmeContent.slice(0, 50000);
           }
+        } else if (readmeRes.status === 404) {
+          // Definitively no README.
+          readmeFetchOk = true;
         }
       } catch {
         // README fetch failed, continue without it
@@ -183,33 +301,78 @@ export async function enrichWithGitHub(
         // Contributor count failed, use 0
       }
 
+      // Read back only this one row's rendered fields — one small row at a
+      // time rather than pulling every candidate's readme_content up front,
+      // which would put tens of MB of blobs in memory per run.
+      const { data: storedRow } = await supabase
+        .from('servers')
+        .select('github_stars, github_last_push, github_license, github_language, readme_content')
+        .eq('id', server.id)
+        .maybeSingle();
+      const stored = (storedRow ?? null) as RenderedContent | null;
+
+      // If we never got a definitive answer about the README, carry the stored
+      // one forward instead of overwriting it with a fetch failure.
+      const nextReadme = readmeFetchOk ? readmeContent : stored?.readme_content ?? null;
+
+      const nextFields = {
+        github_stars: repo.stargazers_count || 0,
+        github_forks: repo.forks_count || 0,
+        github_open_issues: repo.open_issues_count || 0,
+        github_last_push: repo.pushed_at || null,
+        github_license: repo.license?.spdx_id || null,
+        github_language: repo.language || null,
+        github_contributors: contributorCount,
+        github_archived: repo.archived || false,
+        readme_content: nextReadme,
+      };
+
+      // The gate. updated_at moves only when the rendered content actually
+      // differs; a row we merely looked at is marked as visited, not as
+      // modified.
+      const changed = !stored || renderedContentHash(stored) !== renderedContentHash(nextFields);
+
+      const now = new Date().toISOString();
+      const payload: Record<string, unknown> = { ...nextFields };
+      if (useCheckedAt) payload.github_checked_at = now;
+      if (changed) payload.updated_at = now;
+
       const { error: updateError } = await supabase
         .from('servers')
-        .update({
-          github_stars: repo.stargazers_count || 0,
-          github_forks: repo.forks_count || 0,
-          github_open_issues: repo.open_issues_count || 0,
-          github_last_push: repo.pushed_at || null,
-          github_license: repo.license?.spdx_id || null,
-          github_language: repo.language || null,
-          github_contributors: contributorCount,
-          github_archived: repo.archived || false,
-          readme_content: readmeContent,
-          updated_at: new Date().toISOString(),
-        })
+        .update(payload)
         .eq('id', server.id);
 
       if (updateError) {
+        failed++;
         console.error(`Failed to update ${server.id}:`, updateError.message);
-      } else {
+      } else if (changed) {
         enriched++;
+      } else {
+        unchanged++;
       }
     } catch (err) {
+      failed++;
       console.error(`Error enriching ${server.id}:`, err);
     }
 
     await sleep(GITHUB_RATE_DELAY_MS);
   }
 
-  return enriched;
+  console.log(
+    `[Enrichment] ${attempted} attempted — ${enriched} changed, ${unchanged} unchanged, ${failed} failed`
+  );
+
+  // A high failure rate is an outage, not a tail of odd repos. Surface it so
+  // the caller cannot record the run as a clean success.
+  if (attempted > 0 && failed / attempted > MAX_FAILURE_RATE) {
+    const msg =
+      `GitHub enrichment failed on ${failed} of ${attempted} repos ` +
+      `(${Math.round((failed / attempted) * 100)}%), above the ${Math.round(MAX_FAILURE_RATE * 100)}% ceiling. ` +
+      'Treating the stage as failed rather than reporting a partial run as complete.';
+    console.error(`[Enrichment] ${msg}`);
+    errors.push(msg);
+    return { enriched, unchanged, errors, fatal: true };
+  }
+
+  return { enriched, unchanged, errors, fatal: false };
 }
