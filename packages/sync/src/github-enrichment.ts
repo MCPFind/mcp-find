@@ -9,17 +9,87 @@ function parseGithubUrl(url: string): { owner: string; repo: string } | null {
   return { owner: match[1]!, repo: match[2]!.replace(/\.git$/, '') };
 }
 
+/**
+ * How many candidates a single run may claim.
+ *
+ * This used to be absent, and that was the bug. PostgREST applies its own
+ * max-rows cap to an unbounded select — 1,000 here — and with no ORDER BY it
+ * hands back whatever 1,000 physical rows the planner reaches first. Out of
+ * ~20,506 candidates that is a fixed, arbitrary slice that never rotates: the
+ * same 1,000 rows every run, forever, while the remaining ~19,500 are never
+ * enriched at all. The high-star indexable head — the rows whose pages we
+ * actually want indexed — sat outside that slice.
+ *
+ * The cap is now explicit rather than inherited from server config, so
+ * changing it is a code change with a diff, not a silent truncation.
+ */
+const DEFAULT_ENRICHMENT_LIMIT = 1000;
+
+const ENRICHMENT_LIMIT_VAR = 'GH_ENRICHMENT_LIMIT';
+
+function enrichmentLimit(): number {
+  const raw = process.env[ENRICHMENT_LIMIT_VAR];
+  const parsed = raw ? Number(raw) : NaN;
+  if (raw && !Number.isFinite(parsed)) {
+    console.warn(`[Enrichment] Ignoring non-numeric ${ENRICHMENT_LIMIT_VAR}="${raw}"`);
+  }
+  return Number.isFinite(parsed) && parsed > 0
+    ? Math.floor(parsed)
+    : DEFAULT_ENRICHMENT_LIMIT;
+}
+
+/**
+ * Probes for the `github_checked_at` column (migration 009).
+ *
+ * That column is the rotation cursor: it records when we last LOOKED at a
+ * repo, which is a different fact from `updated_at`, which records when the
+ * repo last CHANGED. Conflating the two makes a resumable run impossible —
+ * a repo whose content is unchanged must still be marked as visited, or
+ * ordering by staleness returns the same rows on every future run.
+ *
+ * Tolerated as absent so this file is safe to deploy before the migration is
+ * applied (the same pattern as the canonical_slug backfill in
+ * registry-sync.ts). Without it the run still works, it just cannot rotate
+ * past the stalest `updated_at` window.
+ */
+async function hasCheckedAtColumn(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: SupabaseClient<any, any, any>
+): Promise<boolean> {
+  const { error } = await supabase.from('servers').select('github_checked_at').limit(1);
+  if (!error) return true;
+  console.warn(
+    `[Enrichment] github_checked_at unavailable (${error.message}) — ordering by updated_at instead. ` +
+      'Apply supabase/migrations/009_github_enrichment_cursor.sql to enable run rotation.'
+  );
+  return false;
+}
+
 export async function enrichWithGitHub(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: SupabaseClient<any, any, any>,
   githubToken: string
 ): Promise<number> {
+  const limit = enrichmentLimit();
+  const useCheckedAt = await hasCheckedAtColumn(supabase);
+  const cursorColumn = useCheckedAt ? 'github_checked_at' : 'updated_at';
+
   // Fix 3: Only enrich servers not updated in the last 24 hours (staleness filter)
+  //
+  // The ORDER BY is explicit and load-bearing, not cosmetic. Ordering by the
+  // cursor column ascending with nulls first means each run claims the
+  // longest-unvisited candidates, so consecutive runs walk the whole
+  // candidate set instead of re-processing one arbitrary slice. `id` is a
+  // deterministic tiebreak, so rows sharing a cursor value have a stable
+  // order and cannot be skipped or repeated across runs.
   const { data: rawServers, error } = await supabase
     .from('servers')
     .select('id, github_url')
     .not('github_url', 'is', null)
-    .or('updated_at.lt.' + new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() + ',github_stars.eq.0');
+    .or('updated_at.lt.' + new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() + ',github_stars.eq.0')
+    .order(cursorColumn, { ascending: true, nullsFirst: true })
+    .order('id', { ascending: true })
+    .limit(limit);
 
   if (error || !rawServers) {
     console.error('Failed to fetch servers for enrichment:', error?.message);
@@ -27,6 +97,9 @@ export async function enrichWithGitHub(
   }
 
   const servers = rawServers as Array<{ id: string; github_url: string }>;
+  console.log(
+    `[Enrichment] Claimed ${servers.length} candidates (limit ${limit}, ordered by ${cursorColumn} ASC)`
+  );
   let enriched = 0;
   const headers = {
     Authorization: `Bearer ${githubToken}`,
