@@ -1,0 +1,83 @@
+---
+title: "MongoDB MCP vs Redis MCP: Which Fits Agent Memory?"
+description: "Compare MongoDB's and Redis's official MCP servers for AI agent memory and data access. Covers auth, transport, tool count, and when each makes sense."
+excerpt: "MongoDB and Redis both ship official MCP servers, but they solve different problems for AI agents. Here's a data-backed comparison of auth models, tool coverage, and which one fits agent memory versus persistent storage."
+date: "2026-08-21"
+updatedAt: "2026-08-21"
+author: "Gus Marquez"
+authorUrl: "https://www.linkedin.com/in/gustavoamarquez"
+authorSameAs:
+  - "https://www.linkedin.com/in/gustavoamarquez"
+tags:
+  - "mcp"
+  - "developer"
+  - "databases"
+  - "comparison"
+category: "databases"
+focusKeyword: "mongodb mcp vs redis mcp"
+draft: false
+cornerstone: false
+topic_source: new_topic
+faqItems:
+  - question: "Can I run both MongoDB MCP and Redis MCP servers at the same time?"
+    answer: "Yes, they're independent servers with no overlap in tool names, so both can run alongside each other in the same Claude Desktop or Cursor config without conflict."
+  - question: "Does either server support vector search for embeddings?"
+    answer: "MongoDB Atlas supports vector search through Atlas Search indexes, and the MongoDB MCP server can query them. Redis has a vector search module too, but the mainstream Redis MCP servers in MCPFind's directory focus on standard key-value commands, not vector operations."
+  - question: "Which one is faster for an agent to query at runtime?"
+    answer: "Redis, by a wide margin, since it's an in-memory store built for sub-millisecond lookups. MongoDB is fast for indexed document queries but is disk-backed and not designed to compete with Redis on raw read latency."
+---
+
+Agents that need to remember things across a conversation, or that need to read live application state, usually end up reaching for MongoDB or Redis as the backing store. They solve different problems. But the "which database MCP server should I use" question keeps coming up, so we pulled apart what MCPFind's directory actually knows about both. This one's written for developers. You should already know how to set up an MCP server in Claude Desktop or Cursor, because we're not covering that ground again here.
+
+## What's the Core Difference Between MongoDB MCP and Redis MCP?
+
+MongoDB MCP hands an agent a document database. One record can carry nested fields, an array of tags, and an index on `user_id` that makes filtering across a hundred thousand of them cheap. Redis is a different animal. An agent wired to Redis MCP spends most of its time issuing things like `SET session:8471 "..."` and `GET session:8471` straight against memory, with no schema underneath any of it.
+
+Everything else follows from that split. MongoDB's `@mongodb-js/mongodb-mcp-server` package is maintained directly by MongoDB, and it lets an agent run aggregations, insert documents, and query collections roughly the way you'd use a database client. Redis MCP servers map natural-language requests onto Redis commands like `GET`, `SET`, and `INFO`. No tables. Nothing schema-shaped to reason about. Where that difference shows up: an agent pulling every support ticket tagged `billing` from last quarter is running a filter against an indexed Mongo collection, and what comes back is a result set rather than a single value. Most production agent stacks that need both capabilities end up running both servers side by side instead of picking a winner.
+
+## How Do MongoDB MCP and Redis MCP Compare on Auth and Transport?
+
+Both default to connection-string auth. MongoDB uses an Atlas connection URI, Redis uses a `redis://` or `rediss://` URL for TLS. Neither one requires OAuth for local or self-hosted setups.
+
+| Server | Auth | Transport | Structure | Best for |
+|---|---|---|---|---|
+| MongoDB MCP | Connection string (Atlas URI) | stdio, Docker option | Document / collections | Structured records, agent-searchable data |
+| Redis MCP | Connection string (redis:// or rediss://) | stdio | Key-value, no schema | Cache reads, session state, rate limits |
+
+Both run over stdio by default, which lines up with how Claude Desktop and Cursor spawn MCP servers as subprocesses. Redis handles TLS by swapping the URL scheme to `rediss://`. MongoDB's Atlas URI already handles TLS by default, since Atlas requires it. Because neither server needs a separate OAuth flow, setup stays down to editing one config block and restarting your client. Compare that to some of the SaaS-integration MCP servers in other categories, where OAuth redirects add real setup friction.
+
+## What Does MCPFind's Directory Actually Show for Each Server?
+
+MCPFind's databases category currently indexes 602 servers averaging 7.35 stars, with Supabase way out front at 2,556. The specific MongoDB and Redis entries in the live directory each carry 0 tracked stars as of this snapshot. That badly understates their real-world adoption.
+
+Call it a known data-quality gap on our side. MongoDB's official package has real community traction that MCPFind's crawler isn't reflecting yet, and the Redis listings have the same problem. Several of them exist in the directory, including community forks from Upstash and independent maintainers, with star counts that simply haven't synced. So if you're treating MCPFind's star counts as a proxy for which server to trust, go cross-check the GitHub repo directly for these two before you lean on the in-directory number. We'd rather flag the gap than let a stale count imply either project is less established than it really is.
+
+## When Should You Use MongoDB Instead of Redis for Agent Memory?
+
+Take a code-review agent that has to pull every prior review comment touching a file before it critiques a new diff. "Find all comments on this path in the last 90 days" is a filtered query against a collection that keeps growing, which is exactly the work MongoDB's query planner and indexes exist to do.
+
+A lock check is a different shape of problem. The agent only needs to know whether another worker already claimed this PR, and that answer lives behind a single key that Redis returns in well under a millisecond. Plenty of teams run both, with Redis sitting as a fast cache layer in front of MongoDB for frequently accessed records, and they give the agent access to both servers so it picks the right tool per task. Traditional application architecture has been pairing these two the same way for years, and MCP extends that same pattern out to agent tool calls.
+
+## What Do Real Agent Stacks Actually Use Each One For?
+
+In practice, teams running both put Redis in front as a fast lookup layer and MongoDB behind it as the system of record. The agent checks Redis first for anything latency-sensitive. When it needs a fuller query, it falls through to MongoDB.
+
+A concrete example: a customer support agent might keep the current session's conversation summary and any rate-limit counters in Redis, since those need instant reads on every single turn. That same agent calls MongoDB when a user asks something that requires looking across historical records, like "what did I order last month," where no single key holds the answer. Neither server tries very hard to do the other's job, which is exactly why the split holds up under load.
+
+If you're setting up agent memory from scratch and aren't sure which to reach for first, start with Redis and add MongoDB the day you need to search across what the agent has been writing down. Query patterns are hard to predict before you have real traffic. Guessing upfront at which combination you'll eventually need is mostly wasted effort.
+
+## Frequently Asked Questions
+
+### Can I run both MongoDB MCP and Redis MCP servers at the same time?
+
+Yes. They're independent servers with no overlap in tool names, so both can sit in the same Claude Desktop or Cursor config without conflict.
+
+### Does either server support vector search for embeddings?
+
+MongoDB Atlas supports vector search through Atlas Search indexes, and the MongoDB MCP server can query them. Redis has a vector search module too. But the mainstream Redis MCP servers in MCPFind's directory stick to standard key-value commands and skip vector operations.
+
+### Which one is faster for an agent to query at runtime?
+
+Redis, by a wide margin. It's an in-memory store built for sub-millisecond lookups. MongoDB is plenty fast for indexed document queries, though it's disk-backed and was never designed to compete with Redis on raw read latency.
+
+For a broader look at MCP fundamentals, see MCPFind's [plain-English guide to what MCP is](/blog/what-is-mcp). Read the full [MongoDB MCP server guide](/blog/mongodb-mcp-server-guide) and [Redis MCP server guide](/blog/redis-mcp-server-caching-guide) for setup details on each, or browse the [databases category](/categories/databases) to see all 602 indexed options. Building a vector-search use case instead of document or key-value storage? The [Qdrant MCP server setup guide](/blog/qdrant-mcp-server-vector-search-setup) covers that adjacent case.
