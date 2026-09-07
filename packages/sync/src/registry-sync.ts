@@ -78,6 +78,64 @@ function packageRegistryUrl(pkg: RegistryPackage | null): string | null {
   return pkg.registryBaseUrl || pkg.registry_url || null;
 }
 
+/** A record staged for upsert. Structural, so it stays in step with the
+ *  literal built in syncFromRegistry without repeating its 20 fields. */
+interface StagedRecord {
+  id: string;
+  slug: string;
+}
+
+/** A row that reached the database and was refused, or never got to try. */
+interface SkippedRow {
+  id: string;
+  slug: string;
+  reason: string;
+}
+
+/**
+ * Upserts a batch, and on failure bisects it instead of losing it.
+ *
+ * `servers.slug` is UNIQUE. An upsert with onConflict 'id' resolves conflicts
+ * on the primary key only, so a row whose slug is already held by a DIFFERENT
+ * id is an INSERT that violates servers_slug_key -- and Postgres aborts the
+ * ENTIRE statement, so one bad row costs all ~100 rows in the batch. That is
+ * how the last run lost 5 batches, roughly 500 rows, against a single
+ * console.error.
+ *
+ * Slug collisions inside a run are prevented upstream (see the slug dedupe in
+ * syncFromRegistry), but a slug can also be held by a row that is not in this
+ * run at all -- a server the registry has since delisted. That collision is
+ * invisible from the batch, so the batch has to survive meeting one.
+ *
+ * Bisecting costs O(k log n) extra requests for k failing rows, and only when
+ * something actually fails. Every row that genuinely cannot be written is
+ * named, with its slug and the database's own message.
+ */
+async function upsertBatchWithBisect(
+  supabase: SupabaseClient<any, any, any>, // eslint-disable-line @typescript-eslint/no-explicit-any
+  rows: StagedRecord[],
+  skipped: SkippedRow[]
+): Promise<number> {
+  if (rows.length === 0) return 0;
+
+  const { error } = await supabase.from('servers').upsert(rows, { onConflict: 'id' });
+  if (!error) return rows.length;
+
+  if (rows.length === 1) {
+    const row = rows[0]!;
+    skipped.push({ id: row.id, slug: row.slug, reason: error.message });
+    console.error(
+      `[Registry Sync] SKIPPED row id="${row.id}" slug="${row.slug}" — ${error.message}`
+    );
+    return 0;
+  }
+
+  const mid = Math.floor(rows.length / 2);
+  const left = await upsertBatchWithBisect(supabase, rows.slice(0, mid), skipped);
+  const right = await upsertBatchWithBisect(supabase, rows.slice(mid), skipped);
+  return left + right;
+}
+
 export interface RegistrySyncOptions {
   /**
    * Called after every batch with the running total of rows written so far.
@@ -99,6 +157,12 @@ export async function syncFromRegistry(
 ): Promise<number> {
   let cursor: string | undefined;
   let totalSynced = 0;
+
+  // slug -> the id that owns it for this run. `servers.slug` is UNIQUE, so
+  // two distinct registry ids that slugify identically cannot both have a
+  // row, and letting both into an upsert kills the whole statement.
+  const slugOwner = new Map<string, string>();
+  const skipped: SkippedRow[] = [];
 
   do {
     const url = new URL(`${REGISTRY_API_BASE}${REGISTRY_SERVERS_ENDPOINT}`);
@@ -179,14 +243,55 @@ export async function syncFromRegistry(
       records.reduce((acc, r) => { acc[r.id] = r; return acc; }, {} as Record<string, typeof records[0]>)
     );
 
-    if (deduped.length > 0) {
+    // Deduplicate on SLUG as well, run-wide.
+    //
+    // generateSlug() lowercases; the registry's names are case-sensitive.
+    // Measured against the live registry over 13,261 distinct names, three
+    // pairs collapse onto one slug — io.github.ClockNext/mcp and
+    // io.github.Clocknext/mcp, io.github.LocalSynapse/{LocalSynapse,localsynapse}-mcp,
+    // io.github.Zuga-luga/{Zugabot,zugabot} — and each pair arrives inside a
+    // SINGLE page, because the registry orders by name and case variants sort
+    // adjacently. Deduping on id alone let both members through, the upsert
+    // tried to INSERT two rows with one slug, and Postgres discarded the batch.
+    //
+    // Sorted by id first so the winner is a property of the data, not of the
+    // order the registry happened to return it in: the lexicographically
+    // smallest id keeps the slug. Across batches the earlier batch keeps it,
+    // which is stable because registry pagination is name-ordered.
+    //
+    // The loser is not given a suffixed slug of its own. These pairs are one
+    // project published twice under a typoed name, and minting a second,
+    // near-identical page is precisely the thin-content problem isIndexable()
+    // exists to undo. It is skipped, and it is named in the log.
+    const admitted: typeof deduped = [];
+    for (const record of [...deduped].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))) {
+      const owner = slugOwner.get(record.slug);
+      if (owner === undefined || owner === record.id) {
+        slugOwner.set(record.slug, record.id);
+        admitted.push(record);
+        continue;
+      }
+      skipped.push({
+        id: record.id,
+        slug: record.slug,
+        reason: `slug already claimed by id "${owner}" in this run (case-insensitive slug collision)`,
+      });
+      console.error(
+        `[Registry Sync] SKIPPED row id="${record.id}" slug="${record.slug}" — ` +
+          `that slug is already held by id "${owner}". Both names slugify identically; ` +
+          `only one can exist because servers.slug is UNIQUE.`
+      );
+    }
+
+    if (admitted.length > 0) {
       // canonical_slug is NOT in the upsert payload — it is never touched here.
       // Invariant: once a server has a canonical_slug it is immutable.
       // New rows will have canonical_slug = NULL after this upsert; the backfill
       // below sets it from slug immediately after all batches complete.
-      const { error } = await supabase.from('servers').upsert(deduped, { onConflict: 'id' });
-      if (error) console.error(`Batch upsert failed:`, error.message);
-      else totalSynced += deduped.length;
+      //
+      // totalSynced counts rows that were actually written, so a partial batch
+      // reports as a partial batch rather than as zero or as a full one.
+      totalSynced += await upsertBatchWithBisect(supabase, admitted, skipped);
     }
 
     options.onProgress?.(totalSynced);
@@ -202,6 +307,17 @@ export async function syncFromRegistry(
     // Non-fatal: the column may not exist yet (pre-migration environment).
     // The next sync after migration 005 is applied will complete the backfill.
     console.warn('canonical_slug backfill skipped (migration may not be applied yet):', backfillError.message);
+  }
+
+  if (skipped.length > 0) {
+    console.error(
+      `[Registry Sync] ${skipped.length} row(s) were NOT written and are listed above. ` +
+        `A skipped row is a server missing from the catalogue until its cause is fixed; ` +
+        `it is reported here rather than disappearing into a batch-level error.`
+    );
+    for (const row of skipped) {
+      console.error(`[Registry Sync]   skipped id="${row.id}" slug="${row.slug}": ${row.reason}`);
+    }
   }
 
   return totalSynced;
