@@ -53,6 +53,7 @@ const GOOD_SERVER = {
   slug: 'good-server',
   canonical_slug: 'good-server',
   updated_at: '2026-07-01T00:00:00Z',
+  registry_updated_at: null,
   registry_status: 'active',
   github_archived: false,
   readme_content: 'A comprehensive README describing setup and usage. '.repeat(10),
@@ -68,6 +69,7 @@ const THIN_SERVER = {
   slug: 'thin-server',
   canonical_slug: 'thin-server',
   updated_at: '2026-07-01T00:00:00Z',
+  registry_updated_at: null,
   registry_status: 'active',
   github_archived: false,
   readme_content: null,
@@ -105,8 +107,46 @@ describe('getServersSitemapPage — applies isIndexable() gate', () => {
     expect(rows[0]).toEqual({
       slug: 'good-server',
       canonical_slug: 'good-server',
-      updated_at: '2026-07-01T00:00:00Z',
+      lastmod: '2026-07-01T00:00:00Z',
     });
+  });
+
+  it('resolves lastmod to GREATEST(updated_at, registry_updated_at)', async () => {
+    // registry_updated_at is the newer of the two here — it is a real upstream
+    // change stamp for fields the page renders, so it must win.
+    const queryMock = makeSupabaseQueryMock({
+      data: [{ ...GOOD_SERVER, registry_updated_at: '2026-09-05T00:00:00Z' }],
+    });
+    vi.doMock('./supabase', () => ({ supabase: queryMock }));
+
+    const { getServersSitemapPage } = await import('./queries');
+    const rows = await getServersSitemapPage(0, 1000);
+
+    expect(rows[0]?.lastmod).toBe('2026-09-05T00:00:00Z');
+  });
+
+  it('keeps updated_at when it is newer than registry_updated_at', async () => {
+    const queryMock = makeSupabaseQueryMock({
+      data: [{ ...GOOD_SERVER, registry_updated_at: '2026-01-01T00:00:00Z' }],
+    });
+    vi.doMock('./supabase', () => ({ supabase: queryMock }));
+
+    const { getServersSitemapPage } = await import('./queries');
+    const rows = await getServersSitemapPage(0, 1000);
+
+    expect(rows[0]?.lastmod).toBe('2026-07-01T00:00:00Z');
+  });
+
+  it('reports lastmod null — never a substituted date — when the row has no timestamp', async () => {
+    const queryMock = makeSupabaseQueryMock({
+      data: [{ ...GOOD_SERVER, updated_at: null, registry_updated_at: null }],
+    });
+    vi.doMock('./supabase', () => ({ supabase: queryMock }));
+
+    const { getServersSitemapPage } = await import('./queries');
+    const rows = await getServersSitemapPage(0, 1000);
+
+    expect(rows[0]?.lastmod).toBeNull();
   });
 
   it('returns an empty array when all rows are thin', async () => {
@@ -133,7 +173,7 @@ describe('getServersSitemapPage — applies isIndexable() gate', () => {
     const { getServersSitemapPage } = await import('./queries');
     const page0 = await getServersSitemapPage(0, 1000);
     expect(page0).toEqual([
-      { slug: 'good-server', canonical_slug: 'good-server', updated_at: '2026-07-01T00:00:00Z' },
+      { slug: 'good-server', canonical_slug: 'good-server', lastmod: '2026-07-01T00:00:00Z' },
     ]);
 
     // A shard starting past the single indexable row must be empty (there's

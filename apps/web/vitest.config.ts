@@ -21,6 +21,11 @@ export default defineConfig({
       "app/**/*.test.tsx",
       // F8: smoke tests for scripts/ — runs check-broken-delta.mjs poisoning checks
       "../../scripts/__tests__/**/*.test.mjs",
+      // The sync package has no runner of its own. Its registry field mapping
+      // and its enrichment write gate are both load-bearing for what the web
+      // app renders and for what the sitemap reports, so they are covered
+      // from here rather than left untested.
+      "../../packages/sync/src/**/*.test.ts",
     ],
     coverage: {
       provider: "v8",

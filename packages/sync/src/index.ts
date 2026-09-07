@@ -60,6 +60,18 @@ async function runSyncPipeline() {
   console.log(`[Sync Pipeline] Started (log id: ${log.id})`);
   const errors: string[] = [];
 
+  // Set when a stage fails in a way that invalidates its output. The run
+  // still finishes the independent stages below it, but it may NOT be
+  // recorded as 'completed'.
+  //
+  // This flag is the whole reason the enrichment stage now returns a result
+  // object instead of a bare count. From 2026-03-26 the GitHub token 401'd
+  // on every single call; enrichment logged a warning per repo, returned 0,
+  // and this function closed sync_log as 'completed' with an empty errors
+  // array. Five months of total enrichment failure looked identical to five
+  // months of healthy runs from every dashboard and watchdog we have.
+  let stageFailed = false;
+
   try {
     // Stage 1: Registry Sync
     console.log('[Stage 1] Syncing from registry...');
@@ -70,11 +82,17 @@ async function runSyncPipeline() {
     let enriched = 0;
     if (githubToken) {
       console.log('[Stage 2] Enriching with GitHub data...');
-      enriched = await enrichWithGitHub(supabase, githubToken);
-      console.log(`[Stage 2] Enriched ${enriched} servers`);
+      const result = await enrichWithGitHub(supabase, githubToken);
+      enriched = result.enriched;
+      errors.push(...result.errors);
+      if (result.fatal) stageFailed = true;
+      console.log(
+        `[Stage 2] Enriched ${enriched} servers (${result.unchanged} unchanged, fatal=${result.fatal})`
+      );
     } else {
-      console.warn('[Stage 2] Skipped — no GH_ENRICHMENT_TOKEN set');
-      errors.push('GitHub enrichment skipped: no GH_ENRICHMENT_TOKEN');
+      console.warn('[Stage 2] Skipped — no enrichment token configured');
+      errors.push('GitHub enrichment skipped: no enrichment token configured');
+      stageFailed = true;
     }
 
     // Stage 3: Categorization
@@ -82,18 +100,32 @@ async function runSyncPipeline() {
     const categorized = await categorizeServers(supabase);
     console.log(`[Stage 3] Categorized ${categorized} servers`);
 
-    // Update sync log first — mark completed before refreshing caches so we
-    // never push a revalidation against an unconfirmed sync state.
+    // Update sync log first — mark the terminal status before refreshing
+    // caches so we never push a revalidation against an unconfirmed state.
+    //
+    // 'completed' is a claim about the whole pipeline, so a failed stage has
+    // to be able to withhold it. Otherwise `errors` is decorative: the row
+    // says completed, every watchdog reads status, and nobody reads errors.
     await supabase
       .from('sync_log')
       .update({
-        status: 'completed',
+        status: stageFailed ? 'failed' : 'completed',
         completed_at: new Date().toISOString(),
         servers_synced: synced,
         servers_enriched: enriched,
         errors,
       })
       .eq('id', log.id);
+
+    if (stageFailed) {
+      console.error(
+        `[Sync Pipeline] FAILED — ${synced} synced, ${enriched} enriched, ${categorized} categorized; ` +
+          `${errors.length} error(s): ${errors.join(' | ')}`
+      );
+      // Non-zero exit so the scheduler and watchdog see a failure rather than
+      // a silent green run.
+      process.exit(1);
+    }
 
     console.log(`[Sync Pipeline] Complete — ${synced} synced, ${enriched} enriched, ${categorized} categorized`);
 

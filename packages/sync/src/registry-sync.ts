@@ -39,12 +39,43 @@ interface RegistryItem {
   };
 }
 
+// Registry v0.1 `Package` shape. The field names below are the ones the live
+// API at registry.modelcontextprotocol.io/v0.1/servers actually emits —
+// `identifier` and `registryType`, NOT the snake_case `name`/`registry_url`
+// this file read until 2026-09. Reading the wrong names left package_name
+// NULL on every row and pushed package_type onto a name-heuristic fallback
+// that garbage-populated ~13k rows. Both are inputs to isIndexable(), so the
+// whole catalogue lost a quality signal.
+//
+// The legacy snake_case names are kept as optional fallbacks so a mixed or
+// rolled-back upstream response still parses; they are read only when the
+// v0.1 name is absent.
 interface RegistryPackage {
+  /** v0.1: package identifier, e.g. "@acme/mcp-server" or "acme-mcp". */
+  identifier?: string;
+  /** v0.1: one of npm | pypi | oci | nuget | mcpb. */
+  registryType?: string;
+  /** v0.1: base URL of the package registry. */
+  registryBaseUrl?: string;
+  version?: string;
+
+  // Legacy / defensive fallbacks — not emitted by v0.1.
   name?: string;
   registry_url?: string;
   source_url?: string;
-  version?: string;
   repository?: string;
+}
+
+/** Package identifier, preferring the v0.1 field over the legacy one. */
+function packageIdentifier(pkg: RegistryPackage | null): string | null {
+  if (!pkg) return null;
+  return pkg.identifier || pkg.name || null;
+}
+
+/** Package registry base URL, preferring the v0.1 field over the legacy one. */
+function packageRegistryUrl(pkg: RegistryPackage | null): string | null {
+  if (!pkg) return null;
+  return pkg.registryBaseUrl || pkg.registry_url || null;
 }
 
 // Main sync function - paginate through registry
@@ -78,9 +109,9 @@ export async function syncFromRegistry(supabase: SupabaseClient<any, any, any>):
 
       // Extract package info from the packages array (may not exist in v0.1)
       const pkg = server.packages?.[0] || null;
-      const packageName = pkg?.name || null;
+      const packageName = packageIdentifier(pkg);
       const packageType = detectPackageType(pkg);
-      const packageUrl = pkg?.registry_url || null;
+      const packageUrl = packageRegistryUrl(pkg);
 
       // Extract capabilities
       const capabilities = server.capabilities || {};
@@ -157,19 +188,39 @@ export async function syncFromRegistry(supabase: SupabaseClient<any, any, any>):
   return totalSynced;
 }
 
+/**
+ * Maps a registry package to our `package_type` enum.
+ *
+ * Order of authority:
+ *   1. v0.1 `registryType` — the field the registry actually declares.
+ *   2. The registry base URL, for legacy/rolled-back responses that carry a
+ *      URL but no registryType.
+ *   3. 'other' — a package exists, we just can't classify it.
+ *
+ * The old NAME-heuristic tier is deliberately gone. It classified anything
+ * containing a "/" as 'docker' and anything starting with "@" as 'npm',
+ * which is how ~13k rows acquired a package_type that describes nothing.
+ * package_type feeds isIndexable(); inventing one is worse than null.
+ */
 function detectPackageType(pkg: RegistryPackage | null): 'npm' | 'pypi' | 'docker' | 'other' | null {
   if (!pkg) return null;
-  const url = pkg.registry_url || '';
-  const name = pkg.name || '';
-  // Check registry URL first (most reliable)
+
+  // 1. Declared registry type (v0.1).
+  switch (pkg.registryType?.toLowerCase()) {
+    case 'npm': return 'npm';
+    case 'pypi': return 'pypi';
+    case 'oci': return 'docker';
+    case 'nuget':
+    case 'mcpb': return 'other';
+  }
+
+  // 2. Registry base URL, when no type is declared.
+  const url = packageRegistryUrl(pkg) || '';
   if (url.includes('npmjs.com') || url.includes('npm')) return 'npm';
   if (url.includes('pypi.org')) return 'pypi';
   if (url.includes('docker') || url.includes('ghcr.io') || url.includes('gcr.io')) return 'docker';
-  // Fallback to name heuristics
-  if (name.startsWith('@') || name.includes('npm')) return 'npm';
-  if (name.includes('pypi') || name.includes('pip')) return 'pypi';
-  // Only match docker if name contains docker-specific patterns (not just /)
-  if (name.includes('docker') || (name.includes('/') && !name.startsWith('@'))) return 'docker';
+
+  // 3. A package is present but unclassifiable. No name guessing.
   return 'other';
 }
 
