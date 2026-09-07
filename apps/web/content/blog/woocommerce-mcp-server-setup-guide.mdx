@@ -1,0 +1,111 @@
+---
+title: "WooCommerce MCP Server: Manage Your Store With Claude"
+description: "Connect Claude to your WooCommerce store using an MCP server. Check orders, update inventory, and answer sales questions without opening wp-admin."
+excerpt: "WooCommerce runs a huge share of the web's online stores, but until recently there was no simple way to hand that store data to an AI agent. This guide covers what a WooCommerce MCP server can do, which options exist in the MCPFind directory, and how store owners can get one running."
+date: "2026-08-25"
+updatedAt: "2026-08-25"
+author: "Adam Bush"
+authorUrl: "https://www.linkedin.com/in/adam-bush/"
+authorSameAs:
+  - "https://www.linkedin.com/in/adam-bush/"
+tags:
+  - "mcp"
+  - "beginner"
+  - "ecommerce"
+  - "woocommerce"
+category: "ecommerce"
+focusKeyword: "woocommerce mcp server"
+draft: false
+cornerstone: false
+topic_source: new_topic
+cluster: ecommerce
+faqItems:
+  - question: "Do I need to install a plugin on my WordPress site to use a WooCommerce MCP server?"
+    answer: "Most WooCommerce MCP servers connect through the WooCommerce REST API, which is already built into WooCommerce. You will generate API keys from wp-admin, but you typically do not need a separate plugin."
+  - question: "Can a WooCommerce MCP server process refunds or cancel orders?"
+    answer: "Some can, depending on which REST API scopes you grant the key. Read/write access lets an agent modify orders, so only grant write permissions if you actually want the agent taking those actions."
+  - question: "Is there one official WooCommerce MCP server?"
+    answer: "No. WooCommerce has not shipped its own official MCP server as of this writing, so every option in MCPFind's directory is community-built. Compare a few before committing, since quality and maintenance vary."
+  - question: "How is a WooCommerce MCP server different from a Shopify one?"
+    answer: "Shopify is a hosted platform with its own official app ecosystem and, per MCPFind's directory, more established MCP coverage. WooCommerce is self-hosted WordPress, so its MCP servers talk to your own site's REST API rather than a centralized Shopify endpoint."
+---
+
+WooCommerce runs a big chunk of the self-hosted stores on the web. So it is a fair question to ask what an AI agent can actually do with one. Shopify soaks up most of the ecommerce MCP attention, and that tracks, since it is one hosted platform with one API surface and one set of docs to read. WooCommerce plays by different rules. It is a WordPress plugin, which means every store ends up a little bit custom, with its own host, its own security stack, and its own permalink quirks. This guide covers what a WooCommerce MCP server does, which ones sit in MCPFind's directory right now, and how to get one talking to your store without wrecking checkout.
+
+## What Can a WooCommerce MCP Server Do?
+
+The server talks to your store over the WooCommerce REST API. That is the whole trick. It wraps those endpoints as MCP tools and hands them to whatever client you are running, and depending on the scopes attached to your key, those tools can read data or change it. Orders, products, customers, stock counts. Those four cover most of what anyone actually asks for.
+
+Here is what that looks like day to day. You type "how many orders came in today" into Claude and get a number that came out of your database instead of a confident-sounding guess. Same deal with "which products are under 10 units." Some servers push past reading and let you create draft products or bump stock levels straight from the chat window, which is either useful or terrifying depending on how much you trust the agent. None of this needs an extra WooCommerce plugin. The REST API has shipped inside core WooCommerce for years. You generate a consumer key and secret in wp-admin, drop them into the MCP server's config, and from there it is ordinary tool calling.
+
+## Which WooCommerce MCP Servers Are in the MCPFind Directory?
+
+MCPFind's ecommerce category indexes 439 servers. A handful of those target WooCommerce. No single one has pulled ahead the way Stripe and Shopify each have an obvious frontrunner, so treat this as a young, thin corner of the directory rather than a solved problem.
+
+[mcp-server-woocommerce](/servers/io-github-amitgurbani-mcp-server-woocommerce) is one of the more complete community builds, and it covers the core order and product endpoints without much fuss. [woocommerce-mcp](/servers/io-github-wppoland-woocommerce-mcp) is worth putting side by side with it, since the team behind it already ships WordPress plugins and that experience shows up in how the auth handling is structured. Star counts on both are low. That is normal for a niche this new and not a red flag on its own, but it does mean nobody has stress-tested either one against your host, your theme, and the seven plugins you forgot you installed back in 2023. Read the source. Then test on staging.
+
+## How Do You Set Up a WooCommerce MCP Server?
+
+Credentials first. In wp-admin, go to WooCommerce, then Settings, then Advanced, then REST API, and create a new key. Pick Read/Write only if you genuinely want the agent changing things. Read keeps you out of trouble while you are still poking at it.
+
+Next, add the server to your MCP client config with your store URL and the consumer key and secret you just generated:
+
+```json
+{
+  "mcpServers": {
+    "woocommerce": {
+      "command": "npx",
+      "args": ["-y", "mcp-server-woocommerce"],
+      "env": {
+        "WOOCOMMERCE_URL": "https://yourstore.com",
+        "WOOCOMMERCE_CONSUMER_KEY": "ck_xxxx",
+        "WOOCOMMERCE_CONSUMER_SECRET": "cs_xxxx"
+      }
+    }
+  }
+}
+```
+
+Restart the client. Ask something small first, like a count of recent orders. If that comes back clean, the harder calls usually follow without any extra fiddling.
+
+## Is It Safe to Give an AI Agent Access to Your Store?
+
+Start read-only. An agent that answers "what did we sell last week" without you exporting a CSV and squinting at it in a spreadsheet is already worth the twenty minutes of setup, and not one bit of that needs write scopes. Write is where the real risk sits. An agent that can update prices and cancel orders can also update the wrong prices and cancel the wrong orders, and it will do both quickly and with total confidence.
+
+If you are granting write scopes anyway, do it on a staging copy of the store first. Most WordPress hosts spin up a staging clone in a couple of clicks these days, so the whole exercise costs you an afternoon at the outside. Run the agent through a dozen realistic tasks there. Pay attention to what it does when a prompt is vague, because that is where the surprises live. Once you have watched it behave on the boring stuff, promoting write access to production is a much shorter jump than it looks from here. Skipping staging to save that afternoon is exactly how one sloppy prompt turns into a batch of cancelled orders and a Monday spent writing refund emails.
+
+## What If You Run Multiple WooCommerce Stores?
+
+One server entry per store. Each one gets its own credentials and its own store URL, and there is no clever way around that, because the WooCommerce REST API is scoped to a single WordPress install by design. A single connection cannot span two sites.
+
+Naming matters more than it sounds like it should. If you are running stores for clients, label the config entries `woocommerce-clientname` instead of a bare `woocommerce`. Obvious advice, right up until store number three shows up and nobody can remember whose key is sitting in which block. Keep the credential files apart too. A leaked key on one client's store should never reach into a second client's store just because both secrets happened to live in the same folder. Anyone already managing a stack of client sites does this by reflex, and nothing about MCP changes the rule.
+
+## How Does WooCommerce MCP Coverage Compare to Other Ecommerce Platforms?
+
+Shopify's MCP coverage in MCPFind's directory runs further ahead, which follows from the shape of the platform: one hosted stack, one API version, one target for developers to aim at. WooCommerce is thousands of independently configured WordPress installs with wildly different plugin stacks behind them. Building against that is harder, and fewer people have bothered. If your store runs on Shopify instead, the [Shopify MCP server guide](/blog/shopify-mcp-server-all-four-explained) walks through that setup directly, and the [best ecommerce MCP servers roundup](/blog/best-mcp-servers-ecommerce-stripe-shopify) puts the Stripe and Shopify options next to each other.
+
+The fragmentation is not a defect. It is what self-hosted software looks like when nobody owns the deployment. And if you are already comfortable running WordPress yourself, you are comfortable enough to read through two REST API wrappers and pick whichever codebase you would rather hand a write key. For the mechanics of what any MCP server is doing underneath all of this, [What Is MCP?](/blog/what-is-mcp) covers the basics.
+
+## How Do You Troubleshoot a WooCommerce MCP Server Connection?
+
+Nine times out of ten it is a 401. That means the consumer key and secret got mangled somewhere on the way into the config, or the key's permission level does not cover what the server is trying to call. One dropped character produces the exact same generic auth failure as a totally wrong key, so if there is any doubt at all about how the copy and paste went, regenerate the pair and put it in fresh rather than staring at the string trying to spot the typo.
+
+Second most common: security plugins. Wordfence, iThemes, and the rest of them will happily rate-limit or flat-out block REST API traffic coming from a user agent they do not recognize, and from the client side that looks identical to a broken MCP server. Check the plugin's log before you go blaming the server. Third one is permalinks. If your store runs a custom permalink structure, open `yourstore.com/wp-json/wc/v3/` in a browser and confirm you get JSON back instead of a 404. No amount of config editing repairs a REST route that is not reachable in the first place. Fix the route, then reconnect.
+
+## Frequently Asked Questions
+
+### Do I need to install a plugin on my WordPress site to use a WooCommerce MCP server?
+
+Most WooCommerce MCP servers connect through the WooCommerce REST API, which is already built into WooCommerce. You will generate API keys from wp-admin, but you typically do not need a separate plugin.
+
+### Can a WooCommerce MCP server process refunds or cancel orders?
+
+Some can, depending on which REST API scopes you grant the key. Read/write access lets an agent modify orders, so only grant write permissions if you actually want the agent taking those actions.
+
+### Is there one official WooCommerce MCP server?
+
+No. WooCommerce has not shipped its own official MCP server as of this writing, so every option in MCPFind's directory is community-built. Compare a few before committing, since quality and maintenance vary.
+
+### How is a WooCommerce MCP server different from a Shopify one?
+
+Shopify is a hosted platform with its own official app ecosystem and, per MCPFind's directory, more established MCP coverage. WooCommerce is self-hosted WordPress, so its MCP servers talk to your own site's REST API rather than a centralized Shopify endpoint.

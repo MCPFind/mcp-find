@@ -1,0 +1,100 @@
+---
+title: "SQLite MCP Server: Query a Local Database From Claude"
+description: "Set up a SQLite MCP server so Claude, Cursor, or Windsurf can read and write a local database file directly. No hosted database, no extra service to run."
+excerpt: "SQLite is the simplest database to hand an AI agent, since the whole thing lives in one file. This guide walks through picking a SQLite MCP server from the directory, configuring it in Claude Desktop, and the permission tradeoffs worth knowing before you let an agent write to your data."
+date: "2026-08-24"
+updatedAt: "2026-08-24"
+author: "Adam Bush"
+authorUrl: "https://www.linkedin.com/in/adam-bush/"
+authorSameAs:
+  - "https://www.linkedin.com/in/adam-bush/"
+tags:
+  - "mcp"
+  - "developer"
+  - "databases"
+  - "sqlite"
+category: "databases"
+focusKeyword: "sqlite mcp server"
+draft: false
+cornerstone: false
+topic_source: new_topic
+cluster: databases
+faqItems:
+  - question: "Does a SQLite MCP server need a network connection?"
+    answer: "No. SQLite reads and writes a single file on disk, so the MCP server runs entirely locally over stdio. There is no port to open and no remote endpoint to secure."
+  - question: "Can Claude create a new SQLite database from scratch?"
+    answer: "Yes, most SQLite MCP servers will create the database file if it does not already exist. This makes SQLite a common choice for agents that need to persist scratch data or memory between sessions."
+  - question: "Is a SQLite MCP server safe to point at a production file?"
+    answer: "Only if you have a backup and understand the server's write permissions. Some SQLite servers in the MCPFind directory are read-only by design; others allow full CRUD. Check the individual server's README before connecting it to anything you cannot afford to lose."
+  - question: "How is a SQLite MCP server different from a Postgres or MySQL one?"
+    answer: "Postgres and MySQL servers connect over a network to a running database process, usually with a username and password. A SQLite server just opens a file path, so setup is faster but there is no built-in access control beyond your OS file permissions."
+---
+
+SQLite is the shortcut. If you want an AI agent querying a database and you would rather not stand up Postgres or pay for a hosted instance, one file on disk does the job, with no server process to babysit, no connection string, and no credentials anybody has to rotate later. MCPFind's directory currently lists 617 servers in the database category, and a handful of those exist for no reason other than handing that single file to Claude, Cursor, or whichever MCP client you happen to be running. What follows covers picking one, wiring it into Claude Desktop, and thinking hard about write access before you point an agent at a file that isn't disposable.
+
+## What Does a SQLite MCP Server Actually Do?
+
+A SQLite MCP server opens a local `.db` or `.sqlite` file and exposes it as a small set of tools. Usually that means `query`, `list_tables`, and `describe_table`, sometimes with a write tool sitting next to them. Ask Claude what the last ten rows of your orders table look like and it calls `list_tables` first, reads the schema back, then runs real SQL instead of guessing at column names it has never seen.
+
+The interesting part is what isn't there. SQLite has no client-server layer, so no database process sits between the model and your file checking credentials or enforcing roles. The MCP server is the entire boundary. That's simpler than a Postgres setup, where you would at minimum have a role with limited grants, and it is also considerably thinner. MCPFind's databases category holds 617 servers averaging 7.17 stars, and the SQLite-specific ones skew toward small single-purpose wrappers rather than maintained projects with a release cadence and an issue tracker somebody watches. Read the source before you trust one with data that matters.
+
+## Which SQLite MCP Server Should You Use?
+
+There's no dominant pick here. Postgres has an obvious leader, Supabase has an official server, and SQLite has a scattering of community projects where nobody has pulled away on stars, commit frequency, or how fast issues get answered. Go in expecting to evaluate rather than default to the top result.
+
+[db-mcp (SQLite MCP Server)](/servers/io-github-neverinfamous-db-mcp) is among the more actively maintained entries in the directory and covers the basics well enough: query execution plus schema inspection, which is most of what you need for read-heavy work. [mcp-encrypted-sqlite](/servers/io-github-rosch100-mcp-encrypted-sqlite) is narrower. Reach for it when the file has to stay encrypted at rest, since plain SQLite won't do that for you and a `.db` sitting on disk is readable by anything with filesystem access. Neither one is a large project. Clone whichever you pick, skim the tool definitions to see exactly what surface it hands the model, run it against a throwaway copy first, and budget an afternoon for reading source, because documentation on the smaller wrappers runs thin.
+
+## How Do You Configure a SQLite MCP Server in Claude Desktop?
+
+Open `claude_desktop_config.json` and add an entry under `mcpServers` that points at the server package and your database file path. A typical config looks like this:
+
+```json
+{
+  "mcpServers": {
+    "sqlite": {
+      "command": "npx",
+      "args": ["-y", "mcp-sqlite-server", "--db-path", "/Users/you/data/app.db"]
+    }
+  }
+}
+```
+
+Restart Claude Desktop once you save, since it only reads that file at launch. No tools showing up in the list? Nine times out of ten the path is relative, or it is absolute but points at a location the user account running Claude Desktop can't read. macOS rarely trips on this. A locked-down Linux box with tight home directory permissions will, and the error message you get back won't say so clearly. While you're editing the config, check whether the server accepts a `--readonly` flag and turn it on for anything you would be upset to lose, because a single misfired prompt producing an unscoped `DELETE FROM` isn't recoverable without a backup.
+
+## What Are the Risks of Letting an Agent Write to a SQLite File?
+
+Full write access means whatever SQL the model decides to run. `DROP TABLE`. An `UPDATE` whose `WHERE` clause matched a lot more rows than anyone expected. SQLite ships no query approval layer of its own, no statement-level permissions, nothing that inspects intent before execution happens. Some MCP servers bolt on a confirmation step or default to read-only mode. Plenty of them don't, and the README won't always tell you which kind you installed.
+
+So copy the file first. Running `cp app.db app.db.bak` takes half a second and covers the failure that actually shows up in practice, which is almost never a malicious agent and almost always a well-meaning one executing a broad update it sincerely believed was narrow. If your server supports read-only mode, explore in it. Watch twenty or thirty queries go by, get a feel for how the model phrases things against your particular schema, then switch to write mode once nothing it does surprises you anymore. None of this is unique to SQLite. What is specific to SQLite: a single file gives you no point-in-time recovery, no write-ahead log you can archive and replay, and none of the rollback surface a managed Postgres instance hands you without asking.
+
+## How Does SQLite Compare to Other Databases in the MCPFind Directory?
+
+Postgres, MySQL, and Supabase soak up most of the attention in MCPFind's databases category, which makes sense given those are what production apps actually run on. SQLite isn't competing in that bracket. It's what you reach for when you want a database an agent can create, fill, query, and throw away inside a single session, with zero infrastructure attached to it and nothing to clean up afterward.
+
+Already on Postgres? Start with the [Postgres MCP server guide](/blog/connect-postgresql-claude-mcp) instead of retrofitting SQLite into a stack that doesn't need it. If caching or ephemeral key-value storage is closer to what you're after than relational queries, the [Redis MCP server](/blog/redis-mcp-server-caching-guide) fits better. The [ClickHouse MCP server](/blog/clickhouse-mcp-server-analytics-olap-guide) writeup covers columnar analytics, and the [Neon MCP server](/blog/neon-mcp-server-serverless-postgres) one covers serverless Postgres with database branching, both of them workloads SQLite was never designed to touch. Self-hosting rather than paying for managed? The [self-hosted Supabase guide](/blog/self-hosted-supabase-mcp-server) walks through that tradeoff directly. And if the protocol itself is new to you, [What Is MCP?](/blog/what-is-mcp) is the place to begin.
+
+## What Errors Come Up Most Often With a SQLite MCP Server?
+
+Bad file paths, by a wide margin. Point the config at a relative path, or at one whose parent directory doesn't exist yet, and the server typically starts clean, reports nothing wrong, and then fails on the first query you send it. Use absolute paths, always. Confirm the directory exists before you expect the server to create a file inside it, because most wrappers will happily create a `.db` and will not create the folder holding it.
+
+Locked databases come second. SQLite permits exactly one writer at a time, so if a dev server or a background job already holds a write lock on that file, the MCP server's write either hangs or errors out depending on how the busy timeout is configured. Shut down the other connections before you test, or point the server at a copy while your app keeps running against the original.
+
+Then there's the empty-schema case, which trips people up because it looks like a connection problem. Some wrappers expect tables to already exist and won't infer structure from a file that has nothing in it, so `list_tables` comes back with an empty array and you start debugging the wrong layer. Before going further, verify the config points at the live `.db` rather than a stale backup with a similar name sitting in the same folder. That last one accounts for more wasted debugging time than it has any right to.
+
+## Frequently Asked Questions
+
+### Does a SQLite MCP server need a network connection?
+
+No. SQLite reads and writes a single file on disk, so the MCP server runs entirely locally over stdio. There is no port to open and no remote endpoint to secure.
+
+### Can Claude create a new SQLite database from scratch?
+
+Yes, most SQLite MCP servers will create the database file if it does not already exist. This makes SQLite a common choice for agents that need to persist scratch data or memory between sessions.
+
+### Is a SQLite MCP server safe to point at a production file?
+
+Only if you have a backup and understand the server's write permissions. Some SQLite servers in the MCPFind directory are read-only by design; others allow full CRUD. Check the individual server's README before connecting it to anything you cannot afford to lose.
+
+### How is a SQLite MCP server different from a Postgres or MySQL one?
+
+Postgres and MySQL servers connect over a network to a running database process, usually with a username and password. A SQLite server just opens a file path, so setup is faster but there is no built-in access control beyond your OS file permissions.
