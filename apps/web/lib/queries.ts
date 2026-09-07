@@ -7,6 +7,7 @@ import { supabase } from './supabase';
 import type { Server, ServerListItem, ServerWithTools, ServerListParams, ServerListResponse } from '@mcpfind/shared';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@mcpfind/shared';
 import { isIndexable, type IndexableServerInput } from './indexable';
+import { maxLastmod } from './sitemap-lastmod';
 
 // Excludes readme_content and search_vector to avoid pulling large blobs in list queries.
 // canonical_slug is included so route generation (sitemap, links) can use the stable URL column.
@@ -373,9 +374,35 @@ export const getIndexableTopServers = cache(
 // select here since this is scanned once per sitemap generation and this
 // text is never returned in the XML response.
 const SITEMAP_SIGNAL_COLUMNS =
-  'slug,canonical_slug,updated_at,registry_status,github_archived,readme_content,has_tools,tool_count,package_name,package_type,github_stars,category';
+  'slug,canonical_slug,updated_at,registry_updated_at,registry_status,github_archived,readme_content,has_tools,tool_count,package_name,package_type,github_stars,category';
 
-type SitemapRow = Pick<ServerListItem, 'slug' | 'canonical_slug' | 'updated_at'> & IndexableServerInput;
+type SitemapRow = Pick<
+  ServerListItem,
+  'slug' | 'canonical_slug' | 'updated_at' | 'registry_updated_at'
+> &
+  IndexableServerInput;
+
+/**
+ * What the sitemap emitters consume. `lastmod` is already resolved here —
+ * GREATEST(updated_at, registry_updated_at) — so no downstream file has to
+ * decide what a server page's real modification date is, and none of them
+ * can quietly substitute `now()`.
+ *
+ * `registry_updated_at` is a genuine upstream change stamp (it drives the
+ * name, description and version the page renders), and it moves independently
+ * of our own `updated_at`. Ignoring it, as this query did until 2026-09, made
+ * every page look frozen at the last successful enrichment run even when the
+ * registry had since republished it.
+ *
+ * `lastmod` is null when the row carries no usable timestamp at all. That is
+ * a real answer, and the emitters render it by omitting <lastmod> rather than
+ * inventing a date.
+ */
+export interface SitemapUrlRow {
+  slug: string;
+  canonical_slug: string | null;
+  lastmod: string | null;
+}
 
 // Fetches the FULL ordered (github_stars desc) list of indexable servers'
 // sitemap fields, scanning the raw `servers` table past Supabase's 1,000-row
@@ -388,11 +415,11 @@ type SitemapRow = Pick<ServerListItem, 'slug' | 'canonical_slug' | 'updated_at'>
 // slicing the ALREADY-FILTERED list per shard, guarantees every advertised
 // shard is dense — see sitemap.xml/route.ts and sitemap-servers.ts.
 const _getIndexableSitemapRows = cache(
-  (): Promise<Pick<ServerListItem, 'slug' | 'canonical_slug' | 'updated_at'>[]> =>
+  (): Promise<SitemapUrlRow[]> =>
     unstable_cache(
       async () => {
         const SUPABASE_MAX = 1000;
-        const results: Pick<ServerListItem, 'slug' | 'canonical_slug' | 'updated_at'>[] = [];
+        const results: SitemapUrlRow[] = [];
         for (let offset = 0; ; offset += SUPABASE_MAX) {
           const { data } = await supabase
             .from('servers')
@@ -406,7 +433,7 @@ const _getIndexableSitemapRows = cache(
               results.push({
                 slug: row.slug,
                 canonical_slug: row.canonical_slug,
-                updated_at: row.updated_at,
+                lastmod: maxLastmod([row.updated_at, row.registry_updated_at]),
               });
             }
           }
@@ -417,6 +444,34 @@ const _getIndexableSitemapRows = cache(
       ['indexable-sitemap-rows'],
       { tags: ['servers'], revalidate: 3600 }
     )()
+);
+
+/**
+ * The most recent real modification date across every indexable server.
+ *
+ * Used as the honest lastmod for pages that aggregate the catalogue (`/`,
+ * `/servers`) and for the shard entries in sitemap.xml. Reads the same
+ * already-cached list the shards slice from, so it adds no query and cannot
+ * drift from the shard bodies — which is exactly how the index came to claim
+ * `today` while the shard it pointed at said 2026-03-25.
+ *
+ * Null when there are no indexable servers: omit <lastmod>.
+ */
+export const getIndexableSitemapMaxLastmod = cache(
+  async (): Promise<string | null> =>
+    maxLastmod((await _getIndexableSitemapRows()).map(r => r.lastmod))
+);
+
+/**
+ * Max real lastmod within one shard's slice — the value sitemap.xml must
+ * advertise for that shard. Derived from the shard's own contents, so the
+ * index and the shard body can never disagree.
+ */
+export const getSitemapShardLastmod = cache(
+  async (offset: number, pageSize: number): Promise<string | null> => {
+    const rows = await getServersSitemapPage(offset, pageSize);
+    return maxLastmod(rows.map(r => r.lastmod));
+  }
 );
 
 // Total count of indexable servers — drives how many shards sitemap.xml
@@ -431,7 +486,7 @@ export const getIndexableServerCount = cache(
 // address positions within the indexable sequence, so every in-range shard
 // is guaranteed non-empty and dense.
 export const getServersSitemapPage = cache(
-  async (offset: number, pageSize: number): Promise<Pick<ServerListItem, 'slug' | 'canonical_slug' | 'updated_at'>[]> => {
+  async (offset: number, pageSize: number): Promise<SitemapUrlRow[]> => {
     const rows = await _getIndexableSitemapRows();
     return rows.slice(offset, offset + pageSize);
   }
@@ -567,17 +622,28 @@ export const getCategoryLastUpdated = cache(
   (): Promise<Record<string, string>> =>
     unstable_cache(
       async () => {
+        // registry_updated_at is read alongside updated_at for the same reason
+        // the sitemap rows read it: it is a real upstream change stamp for
+        // fields the category listing renders, and it moves independently.
+        // The per-category value is the max of both across the rows we see.
+        //
+        // NOTE: PostgREST caps this select at its default page size, so this
+        // is the max over the most-recently-updated rows, not a whole-table
+        // MAX(). Every value returned is still a real timestamp belonging to
+        // a real row in that category — it can under-report, never invent.
         const { data } = await supabase
           .from('servers')
-          .select('category, updated_at')
+          .select('category, updated_at, registry_updated_at')
           .eq('registry_status', 'active')
           .order('updated_at', { ascending: false });
 
         const result: Record<string, string> = {};
         for (const row of data || []) {
-          if (row.category && !result[row.category]) {
-            result[row.category] = row.updated_at;
-          }
+          if (!row.category) continue;
+          const rowLastmod = maxLastmod([row.updated_at, row.registry_updated_at]);
+          if (!rowLastmod) continue;
+          const best = maxLastmod([result[row.category], rowLastmod]);
+          if (best) result[row.category] = best;
         }
         return result;
       },
