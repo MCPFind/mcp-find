@@ -1,0 +1,96 @@
+---
+title: "Elasticsearch MCP Server Deprecated: Here's What Replaces It"
+description: "Elastic's official MCP server for Elasticsearch is deprecated in favor of the Agent Builder MCP endpoint. Here's what changed and which option to use."
+excerpt: "The elastic/mcp-server-elasticsearch repo is deprecated and only receiving security patches. Elastic replaced it with the Agent Builder MCP endpoint in 9.2+ and Serverless. Here's the tool-by-tool breakdown of what changed."
+date: "2026-08-04"
+updatedAt: "2026-08-04"
+author: "Gus Marquez"
+authorUrl: "https://www.linkedin.com/in/gustavoamarquez"
+authorSameAs:
+  - "https://www.linkedin.com/in/gustavoamarquez"
+tags:
+  - "mcp"
+  - "developer"
+  - "search"
+  - "elasticsearch"
+  - "migration"
+category: "search"
+focusKeyword: "elasticsearch mcp server deprecated"
+topic_source: "new_topic"
+draft: false
+cornerstone: false
+faqItems:
+  - question: "Is the deprecated elastic/mcp-server-elasticsearch repo still usable?"
+    answer: "Yes. It still runs and still receives critical security updates, per its own README. What it will not get is new features. If you are not yet on Elastic 9.2+ or Serverless, it remains your only official option."
+  - question: "What does the Agent Builder MCP endpoint actually replace?"
+    answer: "It replaces the fixed five-tool set the old repo shipped. You get one endpoint exposing whatever tools an admin has configured in Agent Builder, plus ES|QL execution, so the tool list becomes a deployment-level decision and the server itself bakes in nothing."
+  - question: "Can I use the Agent Builder MCP endpoint on self-managed Elasticsearch?"
+    answer: "Partially. Elastic's docs list it as preview on self-managed 9.2 and GA starting in 9.3. It is already GA on Elasticsearch Serverless. Check which state your cluster is in before relying on it for production agent workflows."
+  - question: "Does MCPFind's directory list Elastic's official MCP server?"
+    answer: "No. The only Elasticsearch entry in MCPFind's search category as of this writing is an unofficial community server with zero recorded GitHub stars. Neither the deprecated official repo nor the new Agent Builder endpoint is indexed yet."
+---
+
+The elastic/mcp-server-elasticsearch repo carries a deprecation notice now. It points at a replacement most people wiring up MCP for Elasticsearch have not heard of yet: the Agent Builder MCP endpoint, built into Elastic 9.2 and Elasticsearch Serverless. The old repo still runs and still gets security patches, so nothing breaks today. But if you're setting up Elasticsearch MCP access for the first time, you're picking between two architectures, with no single setup path to follow. Which one you should actually be running comes down to how your Elastic deployment is set up, and that turns out to be less obvious than it sounds. The rest of this walks through the differences that matter.
+
+## What Happened to Elasticsearch's Official MCP Server?
+
+Elastic deprecated its standalone MCP server repo, `elastic/mcp-server-elasticsearch`, sometime around October 2025. The README doesn't hedge: "This MCP server is deprecated and will only receive critical security updates going forward." The replacement is the Agent Builder MCP endpoint, which ships inside Elastic itself starting in version 9.2.
+
+Elastic stopped shipping features to that repo. The rest of it kept working. It sits at 704 stars, still takes security fixes, and will work fine if you clone it this afternoon. Elastic's own Search Labs blog introduced the replacement on October 20, 2025, and the framing was clear enough: a built-in endpoint, not a separately maintained open-source project. Teams that already have this repo wired into a client are under no pressure to switch. New setups are where the decision actually lands.
+
+## What Tools Does the Deprecated Repo Expose?
+
+The repo ships five tools, and that set never changes. `list_indices` enumerates your indices. `get_mappings` returns field mappings for one. `search` runs Query DSL, `esql` executes ES|QL, and `get_shards` reports shard placement. That's the whole surface. Nothing new lands without a release, which is exactly why Elastic stopped iterating on it.
+
+Auth runs through an API key (`ES_API_KEY`) or username and password (`ES_USERNAME`/`ES_PASSWORD`). Distribution is Docker-only per the current README:
+
+```
+docker run -i --rm -e ES_URL -e ES_API_KEY \
+  docker.elastic.co/mcp/elasticsearch stdio
+```
+
+There's an HTTP mode and an `mcp-proxy` bridge option too. A separate npm package listing shows up in search results, but it returned an access error on direct inspection, so treat that as unconfirmed rather than a supported install path.
+
+Those five cover most day-to-day search work. What they don't cover is schema changes or cluster administration. `esql` is the one worth knowing about even if you've never touched ES|QL, since it's Elastic's piped query language and it gives the agent a way to filter, aggregate, and transform results in a single call instead of stitching together three or four raw search requests.
+
+## What Is the New Agent Builder MCP Endpoint?
+
+One endpoint instead of five fixed tools: `{KIBANA_URL}/api/agent_builder/mcp`, serving whatever tool catalog an admin has configured. Elastic's own phrasing: "Elastic Agent Builder automatically exposes all available tools via a secure MCP endpoint." Their example use case is a semantic-search tool over an internal docs index. ES|QL execution carries over from the old repo.
+
+That's the architectural shift, and you want it straight in your head before you migrate anything. With the old repo, every client got the same five tools no matter who was connecting. The new endpoint hands each client whatever catalog an administrator chose to expose, so two teams pointed at the same Elastic deployment can see completely different tool lists depending on how Agent Builder was configured on each end. That flexibility has a price, and the consumer pays it. You can't assume what's available until you connect and look, and whoever configured the endpoint never feels that cost.
+
+## How Do You Authenticate to the Agent Builder MCP Endpoint?
+
+The two methods here do different jobs. An API key works on both self-managed and Serverless deployments, gated behind the `agentBuilder:read` Kibana privilege, and it suits automation or machine-to-machine access where nothing is waiting on a human to click approve. OAuth 2.1 is Serverless-only right now. Per-user consent, short-lived refreshing tokens, built for interactive team-facing setups rather than scripts.
+
+Version support is the part that trips people up. The deprecation notice just says "9.2.0+," but Elastic's dedicated docs page draws a sharper line: self-managed 9.2 gets preview-only access, and GA support doesn't land until 9.3. Serverless is already GA. Run self-managed Elastic on 9.2 today and you're testing a preview feature, not depending on a finished one. Let that distinction shape whether you point production agent workflows at it yet.
+
+## Are There Community Alternatives to Both Official Options?
+
+Yes, and the fragmentation is a big part of why "elasticsearch mcp server tools list" is such a genuinely confusing search right now. Several third-party forks fill gaps the official options leave open. Each carries a different tool set. There's no single page comparing them. `cr7258/elasticsearch-mcp-server` is the most established of the bunch at 295 stars and 62 forks, built independently of Elastic's own repo. Smaller projects like `Akhilvis/elastic-mcp` and the various `ampcome-mcps` variants target specific gaps too, usually broader index management or OpenSearch compatibility that the official tool skips.
+
+None of these are official. You trade away Elastic's support and security patch cadence in exchange for whatever one feature the fork happens to add. That trade pencils out when you need a specific capability the official five-tool set doesn't cover and you can't wait for Agent Builder to reach GA on your deployment tier. Running in production against customer data? Stick with an Elastic-maintained option, deprecated or not, until the migration path is fully baked.
+
+## Should You Migrate Now or Wait?
+
+If you're on Elasticsearch Serverless, the Agent Builder endpoint is GA and does more, so there isn't much reason to keep the deprecated repo running. Self-managed on 9.2 is the harder call, since you're weighing a stable five-tool repo in maintenance mode against a preview endpoint that doesn't reach GA until 9.3. Staying on the old repo until 9.3 lands is a defensible call, and it's probably the one I'd make myself on a production cluster I cared about.
+
+MCPFind's [search category](/categories/search) indexes 1,467 servers averaging 19.46 GitHub stars, and Elasticsearch barely registers in it. One listed entry: [io-github-tocharianou-elasticsearch](/servers/io-github-tocharianou-elasticsearch), an unofficial community server with zero recorded stars. Neither Elastic's deprecated repo nor the new endpoint shows up in our index yet, since the latter ships inside the product rather than as a standalone open-source project. New to any of this MCP terminology? [Our guide to what MCP is](/blog/what-is-mcp) covers the basics first. We don't have a sibling post in the search cluster live yet either, so browse the [full MCPFind blog](/blog) for adjacent guides while that changes.
+
+## Frequently Asked Questions
+
+### Is the deprecated elastic/mcp-server-elasticsearch repo still usable?
+
+Yes. It runs, and it still receives critical security updates, per its own README. New features are what it won't get. If you're not on Elastic 9.2+ or Serverless yet, it remains your only official option.
+
+### What does the Agent Builder MCP endpoint actually replace?
+
+It replaces the fixed five-tool set the old repo shipped. You get one endpoint exposing whatever tools an admin has configured in Agent Builder, plus ES|QL execution, so the tool list becomes a deployment-level decision and the server itself bakes in nothing.
+
+### Can I use the Agent Builder MCP endpoint on self-managed Elasticsearch?
+
+Partially. Elastic's docs list it as preview on self-managed 9.2 and GA starting in 9.3. It's already GA on Elasticsearch Serverless. Check which state your cluster is in before you rely on it for production agent workflows.
+
+### Does MCPFind's directory list Elastic's official MCP server?
+
+No. As of this writing, the only Elasticsearch entry in MCPFind's search category is an unofficial community server with zero recorded GitHub stars. The deprecated official repo isn't indexed, and neither is the new Agent Builder endpoint.

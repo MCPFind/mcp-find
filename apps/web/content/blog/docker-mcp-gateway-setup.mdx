@@ -1,0 +1,78 @@
+---
+title: "How to Set Up Docker's MCP Gateway for Multiple Servers"
+description: "Learn how Docker's MCP Gateway lets you run several MCP servers behind one endpoint instead of managing separate configs for each tool in Claude or Cursor."
+excerpt: "Docker's MCP Gateway multiplexes multiple MCP servers behind a single connection point. Here's how it differs from a plain Docker deploy, and which MCPFind-indexed servers are good gateway candidates."
+date: "2026-08-19"
+updatedAt: "2026-08-19"
+author: "Adam Bush"
+authorUrl: "https://www.linkedin.com/in/adam-bush/"
+authorSameAs:
+  - "https://www.linkedin.com/in/adam-bush/"
+tags:
+  - "mcp"
+  - "developer"
+  - "docker"
+  - "devtools"
+category: "devtools"
+focusKeyword: "docker mcp gateway setup"
+draft: false
+cornerstone: false
+topic_source: new_topic
+faqItems:
+  - question: "Do I need Docker Desktop, or does the MCP Gateway work with plain Docker Engine?"
+    answer: "The gateway ships as part of Docker Desktop's MCP Toolkit feature. It also runs as a standalone container on Docker Engine without Desktop, but the catalog browsing UI is Desktop-only."
+  - question: "Can I mix stdio and HTTP servers behind one gateway?"
+    answer: "Yes. The gateway normalizes both transport types so your client sees one consistent connection, even if the underlying servers use different transports internally."
+  - question: "Does the gateway add its own authentication layer?"
+    answer: "It can. You can configure per-server secrets through the gateway's secret store instead of passing credentials directly to each container, which keeps API keys out of individual server configs."
+---
+
+Connect more than two or three MCP servers to Claude or Cursor and the config sprawl shows up fast. Every tool needs its own entry, and the environment variables pile up behind each one. Docker's MCP Gateway takes a different angle: several servers sit behind one endpoint, and your client connects to it once. This guide walks through the setup, where it diverges from a plain Docker deploy, and which servers in MCPFind's directory make good candidates to run through it. Assumed background here is that you're comfortable with Docker and you've used at least one MCP server already.
+
+## What Is Docker's MCP Gateway, and How Is It Different From a Plain Deploy?
+
+The MCP Gateway is one container that runs multiple MCP servers inside itself and presents them to your client as a single connection, which is backwards from a plain Docker deploy where every server gets packaged into a container of its own with a dedicated port and config.
+
+If you've already stood up a server using our [Docker deployment guide](/blog/deploy-mcp-server-docker-guide), you know how that pattern scales. One container, one config entry, repeated for every tool you add. The gateway flips it. You add servers to a catalog file once, and the gateway process handles starting them, stopping them, and routing calls to the right one internally. Your Claude Desktop or Cursor config then points at a single gateway address rather than five or ten separate entries. Where this really pays off is past the experimenting stage, when several tools are live during a normal workday and the config file itself has quietly become the thing slowing you down.
+
+## How Do You Install and Configure the MCP Gateway?
+
+Start in Docker Desktop's settings and enable the MCP Toolkit. That installs the gateway as a background service. Adding servers to the catalog happens either through the Desktop UI or by editing a `catalog.yaml` file by hand.
+
+A catalog entry names the image and sets the environment variables that server needs. It can also scope secrets through Docker's built-in secret store instead of leaving them sitting in plaintext env vars. Once there's at least one server in the catalog, the gateway exposes a single MCP endpoint. Typically stdio if you're running Claude Desktop locally, HTTP if you've set it up as a shared service. Point your MCP client config at that one gateway entry, drop the individual server commands, and everything in the catalog becomes reachable through it. Restarting or updating a single server then means editing its catalog entry and nothing else, and your client config never has to change, which is where the time comes back once you're managing more than a handful of tools.
+
+## Which MCPFind-Indexed Servers Work Well Behind a Gateway?
+
+Container-packaged servers with clean environment-variable configs are the best fit. The gateway model assumes each server can start cleanly from a Docker image with secrets injected, so anything that needs hand-holding at boot fights the design. MCPFind's devtools category is full of good candidates. It's the largest in the directory at 6,364 servers averaging 16.99 stars.
+
+Check for an official image before you commit to the gateway pattern for a given tool, because plenty of listed servers don't ship one. Our [Docker Catalog vs MCP Directory](/blog/docker-mcp-catalog-toolkit-guide) post gets into how Docker's own catalog differs from a general directory listing like MCPFind's, and the difference bites right here. Docker's catalog only carries servers its team has containerized and vetted, a smaller, curated subset of what MCPFind indexes broadly. Server you want isn't in Docker's catalog yet? You can still build your own image from its source and add it manually. That's more setup work up front, though it keeps you inside the gateway model instead of dropping back to individual configs for the gaps.
+
+## When Should You Skip the Gateway and Run Servers Individually?
+
+Skip it if you're only running one or two servers, or if you need per-server process isolation to debug something. Consolidation is the gateway's whole value proposition, and consolidation costs you something in return: one crashed dependency inside the gateway container is harder to isolate than a standalone container falling over on its own.
+
+For teams standardizing MCP access across multiple developers, the gateway earns its complexity. A shared catalog config beats everyone maintaining a personal list of stdio commands. Solo experimentation is a different story, and so is the case where you're actively chasing down why one specific server keeps misbehaving. Run that one standalone until the tool calls behave the way you expect, then fold it into the gateway catalog once it's stable. That's the same sequencing you'll see across MCPFind's devtools coverage: get the tool validated on its own before you wrap operational complexity around it.
+
+There's a middle ground here too. Your most-used, stable servers can run through the gateway while a newly-added or actively-changing server sits outside it as a standalone container. Give the new server a few days of real use, and once it's proven itself, moving it in is a one-line addition to `catalog.yaml`.
+
+## How Do You Monitor and Debug Servers Running Inside the Gateway?
+
+Docker Desktop's MCP Toolkit UI gives you per-server logs and status for everything inside the gateway. You can see which internal server handled a given tool call without going and inspecting raw container output yourself. Each server keeps its own log stream even while the gateway multiplexes the connection out to your client.
+
+When a specific tool call fails, the gateway's logging makes it obvious which underlying server threw the error. Failures surface with the originating server's name attached, so you're not squinting at a generic gateway-level error and guessing. Your visibility into individual servers survives the consolidation just fine, and you get it through the gateway's own tooling instead of a pile of separate `docker logs` commands per container. And for teams running the gateway shared across multiple developers, centralizing logs this way is an upgrade over debugging standalone containers scattered across different machines. Everyone hits the same gateway, and its log output reflects the full catalog at once.
+
+## Frequently Asked Questions
+
+### Do I need Docker Desktop, or does the MCP Gateway work with plain Docker Engine?
+
+The gateway ships as part of Docker Desktop's MCP Toolkit feature. It also runs as a standalone container on Docker Engine without Desktop, though the catalog browsing UI is Desktop-only.
+
+### Can I mix stdio and HTTP servers behind one gateway?
+
+Yes. The gateway normalizes both transport types, so your client sees one consistent connection even when the underlying servers use different transports internally.
+
+### Does the gateway add its own authentication layer?
+
+It can. Configure per-server secrets through the gateway's secret store rather than passing credentials directly to each container, and your API keys stay out of individual server configs.
+
+If you're new to MCP entirely, start with MCPFind's [plain-English guide to what MCP is](/blog/what-is-mcp) before you touch gateway configuration. Browse the [devtools category](/categories/devtools) to see the full 6,364-server list this gateway pattern applies to, and check out the [Chrome DevTools MCP server guide](/blog/chrome-devtools-mcp-server-guide) for one specific tool that pairs well with a gateway setup. Haven't containerized a single server yet? Start with the [basic Docker deployment guide](/blog/deploy-mcp-server-docker-guide), then come back here when that container is ready to move into a catalog.

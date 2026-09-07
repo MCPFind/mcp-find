@@ -1,0 +1,89 @@
+---
+title: "X's Official MCP Server: What Its 200+ Endpoints Expose"
+description: "X launched a hosted MCP server on June 30, 2026, giving AI tools access to 200+ API endpoints. Here's how it works, what it can do, and how to connect it."
+excerpt: "X now runs a hosted MCP server at api.x.com/mcp, distinct from its older open-source xmcp project. Here's what it exposes, how authentication works, and where it fits next to the 30+ unofficial X servers already in MCPFind's directory."
+date: "2026-08-06"
+updatedAt: "2026-08-06"
+author: "Adam Bush"
+authorUrl: "https://www.linkedin.com/in/adam-bush/"
+authorSameAs:
+  - "https://www.linkedin.com/in/adam-bush/"
+tags:
+  - "mcp"
+  - "developer"
+  - "social"
+  - "twitter"
+  - "x"
+category: "social"
+focusKeyword: "x mcp server"
+topic_source: "new_topic"
+draft: false
+cornerstone: false
+faqItems:
+  - question: "Do you need a paid X API plan to use the hosted MCP server?"
+    answer: "No source, including X's own docs, states a specific paid tier as a requirement. The docs do say that writes count against your existing rate limits, which historically favor paid API tiers on X, so heavy write usage will likely hit limits faster on a free plan."
+  - question: "Can the X MCP server post on your behalf?"
+    answer: "Nobody outside X can say for certain right now. The capabilities section above covers why the public sources contradict each other on this, so until X clarifies, the practical move is to test the specific write action you need against a low-stakes account first. Confirm that drafting an Article or adding a Bookmark actually goes through before you wire it into anything that runs unattended."
+  - question: "Is X's official MCP server the same project as the open-source xmcp GitHub repo?"
+    answer: "No. xdevplatform/xmcp is an older, separate, self-hosted server you run yourself, built on FastMCP with 849 GitHub stars. The hosted server at api.x.com/mcp, announced June 30, 2026, is a newer, fully managed service with no code to run."
+  - question: "Does MCPFind's directory list X's official MCP server?"
+    answer: "Not at the moment, though our social category already indexes over 30 third-party servers that touch X or Twitter data, none of which is X's own hosted endpoint or the official xdevplatform/xmcp repo."
+---
+
+Want an AI tool to read or post on X? There's now an official way to do it, and it doesn't involve running a server yourself. X's developer team announced a hosted MCP server on June 30, 2026, at `api.x.com/mcp`, giving Claude, Cursor, and other MCP clients direct access to more than 200 of X's API endpoints. This is not the same thing as `xmcp`, the open-source project X has kept on GitHub for a while now. The names overlap, and that has already tripped people up online. Here's what the hosted server actually exposes, how you authenticate to it, and where it differs from both the older self-hosted option and the pile of unofficial X scrapers already sitting in MCPFind's directory.
+
+## What Is X's Official MCP Server?
+
+As of June 30, 2026, X runs two hosted MCP endpoints. One is `api.x.com/mcp`, which covers the actual X API and its tools. The other is `docs.x.com/mcp`, built for searching X's own developer documentation. Both came straight from X's developer team, posted on devcommunity.x.com and the official `@XDevelopers` account, and TechCrunch covered the launch the same day.
+
+The word hosted is doing the heavy lifting there: neither one is something you install. They're managed services X operates, so hooking up your MCP client is a matter of pointing at a URL and authenticating. No code to deploy. That's the split from `xdevplatform/xmcp`, the open-source GitHub project X maintains separately, which you do run yourself. Seen a reference to an "official X MCP server" dated before June 2026? That was almost certainly the older self-hosted project, not this one.
+
+## What Can You Do With the Hosted X MCP Server?
+
+X's docs lay out the tool coverage: posts (content plus engagement metrics), full-archive search across posts, users, and news, user lookups by handle or ID, bookmark management including folders, trending topics by location, and drafting or publishing Articles. The docs-search endpoint tacks on two more tools, scoped to X's own documentation.
+
+Things get messier on the write side, where TechCrunch's launch-day coverage says the server "does not support write operations, preventing autonomous posting." But X's own docs list bookmark add and remove, plus Article drafting and publishing. Those are writes by any normal definition. Maybe TechCrunch meant you can't post a tweet through it specifically, which the docs don't clearly rule in or out either. If your use case hangs on one particular write action, go test it yourself instead of taking either source at face value.
+
+## How Do You Authenticate to X's MCP Server?
+
+You've got two paths, and both start in the same place, with registering an app in the X Developer Portal. OAuth 2.0 with PKCE is what X recommends when your tool acts on a specific user's behalf, since it ties access to that person's account and their permissions. There's also a static App-only Bearer token, which works fine but is read-only. That rules it out for posting, bookmarking, or drafting anything.
+
+On cost: neither X's docs nor the press coverage names a paid API tier as a requirement for the MCP endpoint itself. The docs do say writes count against your existing rate limits, and X's API has historically kept the meaningful rate-limit headroom behind paid tiers. So connecting may well be free, while write-heavy usage slams into the same wall a free-tier API key always hits.
+
+## What About the Separate Docs Search MCP Server?
+
+X also runs that second hosted endpoint, `docs.x.com/mcp`. It searches X's own developer documentation rather than X data itself, and it exposes exactly two tools: `search_x`, for searching across the docs, and `get_page_x`, which pulls a specific documentation page in full.
+
+Two servers, near-identical names, and people wire up the wrong one. Most of the coverage went to the 200-plus endpoints on the API server, so this one got buried. But think about what you're building. If it's an AI coding assistant or an agent that needs to reason about how X's API works, rather than one that actually calls X on a user's behalf, the docs server is the more relevant of the two by a wide margin. Same app-registration step in the Developer Portal applies. It only reads public documentation instead of account data, though, so in practice the authentication bar is lighter than what the main API server expects for anything past read-only lookups.
+
+## Is This Different From the Older xmcp Project?
+
+Yes, and they're built for different setups. `xdevplatform/xmcp`, sitting at 849 GitHub stars, is a local, self-hosted server built on FastMCP that wraps X's OpenAPI spec. You deploy it. You manage its credentials, and you keep it running. It predates the June 2026 hosted launch, and it's still a valid option if you specifically want a self-hosted setup, whether that's for cost control, network isolation, or just not wanting your MCP connection to depend on X's own uptime.
+
+The hosted `api.x.com/mcp` server swaps that control for zero deployment. Register an app, authenticate, start calling tools. There's no server process to babysit and no container to keep patched. Your costs stop at the X API usage you're already paying for. Teams who already run their own infrastructure without blinking may still prefer the self-hosted repo. Everyone else finally gets a real official option, one that did not exist before June 2026.
+
+## How Does This Compare to MCPFind's Indexed X Servers?
+
+MCPFind's [social category](/categories/social) holds 253 servers right now, averaging just 0.11 GitHub stars, and X-related listings account for a disproportionate slice of the noise in it. More than 30 entries in our index touch X or Twitter data somehow. You had pay-per-call scrapers and unofficial wrappers around third-party data providers, and if you went far enough down that road, browser-automation tools that log in as you instead of using an API key at all.
+
+Not one of them is X's own account. One deserves naming directly: [io-github-kaitoinfra-twitterapi-io-mcp-server](/servers/io-github-kaitoinfra-twitterapi-io-mcp-server) calls itself the "official MCP server for twitterapi.io." That's accurate on its own terms, since twitterapi.io is a real third-party data provider. It isn't official for X itself, and it doesn't claim to be, but the wording still trips people up in search results. Before you hand any server your credentials, check whose API it actually wraps.
+
+For the broader picture of how MCP wires into other platforms, start with [our guide to what MCP is](/blog/what-is-mcp). The rest of the communication cluster covers nearby ground: [email setup](/blog/mcp-server-email-gmail-outlook-setup), [Slack and team chat](/blog/best-mcp-servers-communication-slack-teams), [Discord bots](/blog/discord-mcp-server-community-bots), [Twilio SMS and voice](/blog/twilio-mcp-server-sms-voice), and [Intercom support search](/blog/intercom-mcp-server-support-search).
+
+## Frequently Asked Questions
+
+### Do you need a paid X API plan to use the hosted MCP server?
+
+No source says so, X's own docs included. What the docs do say is that writes count against your existing rate limits, and those limits have historically favored paid API tiers on X. Heavy write usage on a free plan will hit the ceiling sooner.
+
+### Can the X MCP server post on your behalf?
+
+Nobody outside X can say for certain right now. The capabilities section above covers why the public sources contradict each other on this, so until X clarifies, the practical move is to test the specific write action you need against a low-stakes account first. Confirm that drafting an Article or adding a Bookmark actually goes through before you wire it into anything that runs unattended.
+
+### Is X's official MCP server the same project as the open-source xmcp GitHub repo?
+
+No. xdevplatform/xmcp is older, separate, and self-hosted, built on FastMCP with 849 GitHub stars, and you run it yourself. The hosted server at api.x.com/mcp, announced June 30, 2026, is a newer, fully managed service with no code to run.
+
+### Does MCPFind's directory list X's official MCP server?
+
+Not at the moment, though our social category already indexes over 30 third-party servers that touch X or Twitter data, none of which is X's own hosted endpoint or the official xdevplatform/xmcp repo.

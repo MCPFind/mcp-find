@@ -1,0 +1,85 @@
+---
+title: "Pinterest vs Microsoft Advertising MCP Servers"
+description: "Pinterest and Microsoft Advertising both launched official MCP servers on June 17, 2026. Here's what each one actually exposes, and how to get access to it."
+excerpt: "Two ad platforms shipped MCP servers on the same day, one week ahead of Cannes Lions. Pinterest's is an invite-only alpha; Microsoft's is a broadly available pilot. Neither is indexed in MCPFind's directory yet. Here's the real difference between them."
+date: "2026-08-12"
+updatedAt: "2026-08-12"
+author: "Adam Bush"
+authorUrl: "https://www.linkedin.com/in/adam-bush/"
+authorSameAs:
+  - "https://www.linkedin.com/in/adam-bush/"
+tags:
+  - "mcp"
+  - "beginner"
+  - "advertising"
+  - "marketing"
+  - "pinterest"
+category: "other"
+focusKeyword: "pinterest and microsoft advertising mcp servers compared"
+topic_source: "new_topic"
+draft: false
+cornerstone: false
+faqItems:
+  - question: "Can anyone use Pinterest's new MCP server right now?"
+    answer: "Not yet. Pinterest launched it as an invite-only alpha with a named set of agency partners: PMG, Pacvue, Dentsu, Havas, Innovid by Mediaocean, and Omnicom's Jump450. There is no public signup listed as of this writing."
+  - question: "Is Microsoft Advertising's MCP server free to use?"
+    answer: "Yes, Microsoft's own product page describes it as free to connect. You still need an active Microsoft Advertising account with campaigns to query, the MCP server itself does not carry a separate fee."
+  - question: "Can either MCP server create or edit ad campaigns, or only read data?"
+    answer: "Both are read-only at launch. Pinterest's exposes campaign, analytics, and keyword insight data; Microsoft's exposes campaign, ad group, ad, and keyword data plus performance metrics. Neither one lets an agent push changes back to a live campaign yet."
+  - question: "Why did Pinterest and Microsoft Advertising launch MCP servers on the same day?"
+    answer: "Both launches landed June 17, 2026, roughly a week before Cannes Lions, the advertising industry's biggest annual event. That timing is common for ad-tech announcements meant to set the agenda going into the conference, though neither company has stated the overlap was coordinated."
+---
+
+Two competing ad platforms shipped official MCP servers on the exact same day. June 17, 2026. Pinterest and Microsoft Advertising both went live roughly a week ahead of Cannes Lions, and both now hand AI agents structured access to campaign and performance data instead of a dashboard export you have to babysit. The date matches and the protocol matches, but the two products barely resemble each other. One is a closed alpha with six named partners. The other, anybody with an account can join. Here's what each server actually exposes, who can reach it today, and where the two of them land next to the third-party ad tools MCPFind already indexes.
+
+## What Do Pinterest and Microsoft Advertising's New MCP Servers Actually Do?
+
+Both hand an AI agent structured, read-only access to your advertising account data. No spreadsheet export, no dashboard screenshot pasted into a chat window. Pinterest's server surfaces campaign, analytics, and keyword insight data, and it also carries the taste, trend, and intent signals that Pinterest's whole ad platform is built around. Microsoft Advertising's covers more familiar PPC ground: campaigns, ad groups, ads, and keywords, plus the performance metrics you'd expect. Spend, clicks, impressions, click-through rate, conversions, return on ad spend.
+
+Where both stop short is on writes. Your agent can pull a performance report or summarize how a campaign's keyword mix is doing, but it can't pause that campaign or nudge a bid through the MCP server.
+
+## How Does Pinterest's MCP Server Differ From Microsoft Advertising's?
+
+Start with who can actually get in, because that's where the two diverge hardest. Pinterest went with an invite-only alpha and named exactly six agency partners: PMG, Pacvue, Dentsu, Havas, Innovid by Mediaocean, and Omnicom's Jump450. Microsoft Advertising went the other direction with an open pilot, a meaningfully broader rollout that any advertiser with an account can join.
+
+Then there's the data itself. Pinterest's platform runs on visual discovery, so its server pushes taste graph and intent signals forward alongside the standard campaign metrics, and that's data with no clean equivalent over on a traditional search-ads platform. Microsoft Advertising stays closer to conventional PPC reporting. Campaign and keyword performance, basically the shape any agent trained on Google Ads or Meta Ads reporting already recognizes on sight. Running both platforms at your agency? Plan on the Microsoft integration being live and useful long before Pinterest's alpha opens up further.
+
+## Which AI Tools Can Connect to These Ad-Platform MCP Servers?
+
+Microsoft Advertising supports the widest client list at launch: M365 Copilot through Copilot Studio, Claude desktop, ChatGPT desktop, and any other MCP-compatible client. Because the server is a standard MCP endpoint rather than something bolted to one vendor's tooling, the client list is really just whatever speaks MCP, and that wide-open client story lines up with the wide-open access model by design.
+
+Pinterest hasn't published a general client list. With the alpha scoped to six named partners, client support so far is whatever those six agencies happen to run internally, and there's no public integration guide to read. If you're not one of the six, you don't have a documented path to connect any client to Pinterest's MCP server, alpha access or not. That'll probably change as the program widens, but nothing in Pinterest's own announcement puts a date on it.
+
+## Why Are Ad Platforms Racing to Launch Official MCP Servers Now?
+
+Neither company invented this move. Developers were building third-party MCP connectors for ad platforms long before either vendor shipped anything official, because agencies wanted agent access to campaign data badly enough to just go build it themselves. MCPFind's directory already carries community versions for [Reddit Ads](/servers/io-github-mkerchenski-reddit-ads-mcp), [Meta Ads](/servers/io-github-mike25app-scaleforge-mcp-meta-ads), and [LinkedIn Ads](/servers/io-github-pipeworx-io-linkedin-ads). None of them affiliated with the platforms they touch.
+
+Enough unofficial tooling piles up in a category, the platform notices, and an official launch follows on the vendor's own terms: tighter scopes, read-only defaults, and a rollout the platform controls rather than one shaped by whatever a community project decided to expose. Pinterest and Microsoft both fit that shape, and more ad platforms probably will over the next year.
+
+## Are Pinterest and Microsoft's Official Ad MCP Servers in MCPFind's Directory Yet?
+
+Neither one is indexed yet. The directory tracks third-party ad-platform servers today, and these two official launches are simply too new, plus too access-restricted in Pinterest's case, to have landed in the index. Indexing takes something public to point at: a repo, or a documented endpoint with connection instructions. Pinterest's alpha has neither outside its six partners.
+
+The related third-party tooling already in there does tell you how crowded this corner is getting. [Pinterest Ads MCP Server](/servers/io-github-cesteral-pinterest-mcp) is an unofficial, community-built option covering Pinterest ad CRUD operations. A separate [multi-platform ad connector](/servers/io-github-opusgrowth-ads-mcp) reaches Google, Microsoft, TikTok, and LinkedIn Ads across roughly 233 tools. Neither is affiliated with Pinterest or Microsoft. And MCPFind's [social category](/categories/social) holds 262 servers at a 0.11 average star count, thin by any measure, so an official vendor listing from either company would stand out considerably once it lands. Both of those community entries carry zero recorded GitHub stars in MCPFind's index right now, which tracks with how young and narrowly scoped the whole official ad-platform-MCP category still is.
+
+## Frequently Asked Questions
+
+### Can anyone use Pinterest's new MCP server right now?
+
+Only the six named alpha partners, for now. Pinterest launched it as an invite-only alpha: PMG, Pacvue, Dentsu, Havas, Innovid by Mediaocean, and Omnicom's Jump450. No public signup is listed as of this writing.
+
+### Is Microsoft Advertising's MCP server free to use?
+
+Yes. Microsoft's own product page describes it as free to connect. You'll still need an active Microsoft Advertising account with campaigns in it to query, but the MCP server itself doesn't carry a separate fee.
+
+### Can either MCP server create or edit ad campaigns, or only read data?
+
+Both servers ship read-only at launch. Pinterest's side gives you campaign, analytics, and keyword insight data, while Microsoft's covers campaign, ad group, ad, and keyword data plus the performance metrics on top of that. No agent is pushing a change back into a live campaign yet.
+
+### Why did Pinterest and Microsoft Advertising launch MCP servers on the same day?
+
+Both landed June 17, 2026, roughly a week before Cannes Lions, the advertising industry's biggest annual event. Ad-tech announcements cluster there on purpose, since the goal is to set the agenda going into the conference. Neither company has stated the overlap was coordinated.
+
+New to how any of this works under the hood? Start with MCPFind's [cornerstone guide to MCP](/blog/what-is-mcp), before you wire an advertising server into anything.
+
+A few others worth your time. [Docker MCP Catalog vs MCP Directory](/blog/docker-mcp-catalog-toolkit-guide) gets at how the ecosystem discovers new servers like these two in the first place, and if you're building the agent side instead of just querying it, [OpenAI Agents SDK vs MCP](/blog/openai-agents-sdk-vs-mcp) is the one to read. Vendor-hosted launch versus community project? That comparison lives in [Open-Source vs Commercial MCP Servers](/blog/open-source-vs-commercial-mcp-servers-2026). Pinterest and Microsoft both ship theirs as hosted endpoints, so [Remote MCP Servers vs Local](/blog/remote-vs-local-mcp-server) applies here too. And [Using MCP Servers with Gemini CLI](/blog/mcp-servers-gemini-cli-setup-guide) walks a client-side setup on a totally different tool, same pattern underneath.

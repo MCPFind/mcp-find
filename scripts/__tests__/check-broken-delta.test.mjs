@@ -33,10 +33,22 @@ let tempSnapshotPath;
 
 function runScript(mapPath, snapshotPath) {
   try {
+    // task 11 / C-31..C-35: `execFileSync` with NO explicit `stdio` echoes the
+    // child's stderr live to the parent (Gate 5's) terminal *in addition to*
+    // populating `err.stderr` on failure — confirmed empirically. That live
+    // echo is what leaked this test's synthetic negative-path diagnostics
+    // ("Current BROKEN: 30", "invalid quality_status value(s)") into Gate
+    // output unlabeled, indistinguishable from a real production alert, even
+    // though this test PASSES and never touches production data. Passing
+    // `stdio` explicitly (identical 'pipe' semantics for every fd) suppresses
+    // that live echo while still fully capturing stdout/stderr into `err`
+    // below — output is then only surfaced when an assertion actually fails,
+    // via the `stderr: ${result.output}` messages already on the assertions
+    // in this file, which is exactly where a real regression would need it.
     const stdout = execFileSync(
       process.execPath,
       [scriptPath, "--map-path", mapPath, "--state-path", snapshotPath],
-      { encoding: "utf-8" },
+      { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] },
     );
     return { exitCode: 0, output: stdout };
   } catch (err) {

@@ -21,15 +21,85 @@ jobs:
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      # T1 fix (2026-08-25): captured BEFORE the sync run so the
+      # "Determine changed slugs" step below can ask Supabase for every row
+      # whose updated_at moved at/after this timestamp — i.e. the rows this
+      # run's registry-sync/github-enrichment stages actually touched, not
+      # every synced row. last_synced_at is bumped on every upsert
+      # regardless of real change (see packages/sync/src/registry-sync.ts);
+      # updated_at is only set by github-enrichment.ts on rows it re-enriches
+      # (packages/sync/src/github-enrichment.ts:125), which is itself a
+      # rotating, rate-limited subset (line 22's staleness/star-zero filter)
+      # — not the full ~24k table on every run. That makes updated_at the
+      # correct "changed" signal for this step, sourced entirely from
+      # existing sync.yml/Supabase secrets without touching packages/sync.
+      - name: Capture sync start timestamp
+        id: sync_start
+        run: echo "ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
       - run: pnpm --filter @mcpfind/sync run start
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           GH_ENRICHMENT_TOKEN: ${{ secrets.GH_ENRICHMENT_TOKEN }}
+      # Determines the real changed-slug set for the cache-bust step below.
+      # Paginated via PostgREST's Range header (default page size cap),
+      # bounded at 20 pages / 20,000 rows as a safety ceiling for one
+      # workflow run. On ANY failure (network, malformed response, missing
+      # secrets) this step sets ok=false and the next step falls back to the
+      # documented, explicit full-purge opt-in — never silently skips
+      # revalidation entirely.
+      - name: Determine changed slugs since sync start
+        id: changed_slugs
+        if: success()
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SYNC_START: ${{ steps.sync_start.outputs.ts }}
+        run: |
+          set -euo pipefail
+          pages_dir="$(mktemp -d)"
+          page=0
+          ok=true
+          while [ "$page" -lt 20 ]; do
+            start=$((page * 1000))
+            end=$((start + 999))
+            if ! curl -sf \
+              -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+              -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+              -H "Range: ${start}-${end}" \
+              "${SUPABASE_URL}/rest/v1/servers?select=slug&updated_at=gte.${SYNC_START}" \
+              -o "${pages_dir}/${page}.json"; then
+              ok=false
+              break
+            fi
+            count=$(jq 'length' "${pages_dir}/${page}.json")
+            if [ "$count" -lt 1000 ]; then
+              break
+            fi
+            page=$((page + 1))
+          done
+          if [ "$ok" = "true" ]; then
+            jq -s '[.[][] | .slug]' "${pages_dir}"/*.json > "${pages_dir}/all-slugs.json"
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+            echo "file=${pages_dir}/all-slugs.json" >> "$GITHUB_OUTPUT"
+            echo "count=$(jq 'length' "${pages_dir}/all-slugs.json")" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Bust Vercel cache
         if: success()
         continue-on-error: true
         run: |
+          if [ "${{ steps.changed_slugs.outputs.ok }}" = "true" ]; then
+            payload=$(jq -n --slurpfile slugs "${{ steps.changed_slugs.outputs.file }}" '{slugs: $slugs[0]}')
+          else
+            # Documented, explicit fallback (see apps/web/app/api/revalidate/
+            # route.ts::POST) — used ONLY when the changed-slug query above
+            # failed, never on the default happy path.
+            payload='{"full": true}'
+          fi
           curl -sf --retry 2 --retry-delay 5 -X POST https://mcpfind.org/api/revalidate \
             -H "Content-Type: application/json" \
-            -H "x-revalidate-token: ${{ secrets.REVALIDATE_TOKEN }}"
+            -H "x-revalidate-token: ${{ secrets.REVALIDATE_TOKEN }}" \
+            -d "$payload"

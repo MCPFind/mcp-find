@@ -38,14 +38,24 @@ vi.mock('@/lib/escape-xml', () => ({
 vi.mock('@/lib/queries', () => ({
   getIndexableServerCount: vi.fn(),
   getServersSitemapPage: vi.fn(),
+  getSitemapShardLastmod: vi.fn(async () => null),
+  getIndexableSitemapMaxLastmod: vi.fn(async () => null),
+  getCategoryLastUpdated: vi.fn(async () => ({})),
+}));
+
+// The static shard's URL list is exercised by its own tests; here it only
+// needs to resolve so the index route can ask it for a lastmod.
+vi.mock('@/lib/sitemap-static-pages', () => ({
+  getStaticSitemapEntries: vi.fn(async () => []),
+  getStaticSitemapLastmod: vi.fn(async () => null),
 }));
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeServerRow(slug: string) {
-  return { slug, canonical_slug: null, updated_at: '2024-01-01T00:00:00Z' };
+function makeServerRow(slug: string, lastmod: string | null = '2024-01-01T00:00:00Z') {
+  return { slug, canonical_slug: null, lastmod };
 }
 
 function makeServerBatch(size: number, startIndex = 0) {
@@ -294,5 +304,84 @@ describe('sitemap invariant — advertised shards == non-empty shards', () => {
 
   it('holds for N=12555 (spans 3 batches — the exact regression scenario)', async () => {
     await assertInvariant(12555);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Route-level regression for the 2026-09 crawl-decay fabrications.
+//
+// These assertions fail against the pre-fix routes by construction:
+//   - sitemap.xml/route.ts:18,21,24 stamped `lastmod = today` on the index
+//     and on every shard entry, unconditionally.
+//   - sitemap-servers.ts:34 hardcoded `<changefreq>daily</changefreq>`.
+// ---------------------------------------------------------------------------
+
+describe('sitemap honesty — no synthesised dates, no hardcoded cadence', () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  it('index emits no <lastmod> at all when no shard has a real timestamp', async () => {
+    const { getIndexableServerCount, getSitemapShardLastmod } = await import('@/lib/queries');
+    vi.mocked(getIndexableServerCount).mockResolvedValue(457);
+    vi.mocked(getSitemapShardLastmod).mockResolvedValue(null);
+
+    const { GET } = await import('@/app/sitemap.xml/route');
+    const body = await (await GET()).text();
+
+    expect(body).not.toContain('<lastmod>');
+    expect(body).not.toContain(new Date().toISOString().split('T')[0]!);
+  });
+
+  it('index reports the shard contents date, not today', async () => {
+    const { getIndexableServerCount, getSitemapShardLastmod } = await import('@/lib/queries');
+    vi.mocked(getIndexableServerCount).mockResolvedValue(457);
+    vi.mocked(getSitemapShardLastmod).mockResolvedValue('2026-03-25T00:00:00Z');
+
+    const { GET } = await import('@/app/sitemap.xml/route');
+    const body = await (await GET()).text();
+
+    expect(body).toContain('<lastmod>2026-03-25</lastmod>');
+    expect(body).not.toContain(new Date().toISOString().split('T')[0]!);
+  });
+
+  it('shard does not claim daily cadence for a five-month-old URL', async () => {
+    const { getServersSitemapPage } = await import('@/lib/queries');
+    vi.mocked(getServersSitemapPage).mockResolvedValue([
+      makeServerRow('frozen-server', '2026-03-25T00:00:00Z'),
+    ]);
+
+    const { getServersSitemapBatch } = await import('@/lib/sitemap-servers');
+    const body = await (await getServersSitemapBatch(0)).text();
+
+    expect(body).toContain('<lastmod>2026-03-25</lastmod>');
+    expect(body).not.toContain('<changefreq>daily</changefreq>');
+  });
+
+  it('shard omits both lastmod and changefreq for a URL with no timestamp', async () => {
+    const { getServersSitemapPage } = await import('@/lib/queries');
+    vi.mocked(getServersSitemapPage).mockResolvedValue([makeServerRow('no-stamp', null)]);
+
+    const { getServersSitemapBatch } = await import('@/lib/sitemap-servers');
+    const body = await (await getServersSitemapBatch(0)).text();
+
+    expect(body).toContain('no-stamp');
+    expect(body).not.toContain('<lastmod>');
+    expect(body).not.toContain('<changefreq>');
+  });
+
+  it('all sitemap responses cap the shared cache at the 1h revalidate window', async () => {
+    const { getIndexableServerCount, getServersSitemapPage } = await import('@/lib/queries');
+    vi.mocked(getIndexableServerCount).mockResolvedValue(1);
+    vi.mocked(getServersSitemapPage).mockResolvedValue([makeServerRow('s')]);
+
+    const { GET } = await import('@/app/sitemap.xml/route');
+    const { getServersSitemapBatch } = await import('@/lib/sitemap-servers');
+
+    for (const res of [await GET(), await getServersSitemapBatch(0)]) {
+      expect(res.headers.get('Cache-Control')).toBe(
+        'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400',
+      );
+    }
   });
 });

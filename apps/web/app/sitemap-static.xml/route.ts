@@ -1,79 +1,25 @@
-import { getCategoryLastUpdated } from '@/lib/queries';
-import { SITE_URL, CATEGORIES } from '@mcpfind/shared';
-import { getAllPosts } from '@/lib/blog';
-import { escapeXml } from '@/lib/escape-xml';
+import { getStaticSitemapEntries } from '@/lib/sitemap-static-pages';
+import { renderSitemapUrl, SITEMAP_CACHE_CONTROL } from '@/lib/sitemap-lastmod';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const [categoryLastUpdated] = await Promise.all([
-    getCategoryLastUpdated(),
-  ]);
-
-  const today = new Date().toISOString().split('T')[0];
-
-  const staticPages = [
-    { url: SITE_URL, changefreq: 'daily', priority: '1.0', lastmod: today },
-    { url: `${SITE_URL}/servers`, changefreq: 'daily', priority: '0.9', lastmod: today },
-    { url: `${SITE_URL}/submit`, changefreq: 'monthly', priority: '0.5', lastmod: today },
-  ];
-
-  const categoryPages = CATEGORIES.map(cat => ({
-    url: `${SITE_URL}/categories/${cat}`,
-    changefreq: 'weekly' as const,
-    priority: '0.8',
-    lastmod: categoryLastUpdated[cat] || today,
-  }));
-
-  // Blog pages
-  const blogPosts = getAllPosts();
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-
-  const blogIndexPage = [{
-    url: `${SITE_URL}/blog`,
-    changefreq: 'weekly' as const,
-    priority: '0.8',
-    lastmod: blogPosts[0]?.frontmatter.updatedAt || blogPosts[0]?.frontmatter.date || today,
-  }];
-
-  const blogPages = blogPosts.map(post => {
-    const lastmod = post.frontmatter.updatedAt || post.frontmatter.date;
-    const isRecent = new Date(lastmod) > thirtyDaysAgo;
-    return {
-      url: `${SITE_URL}/blog/${post.slug}`,
-      changefreq: (isRecent ? 'weekly' : 'monthly') as string,
-      priority: post.frontmatter.cornerstone ? '0.8' : '0.6',
-      lastmod,
-    };
-  });
-
-  const allPages = [...staticPages, ...categoryPages, ...blogIndexPage, ...blogPages];
-
-  const renderUrl = (p: { url: string; changefreq: string; priority: string; lastmod?: string }) => {
-    let lastmodStr = '';
-    if (p.lastmod) {
-      try {
-        lastmodStr = `\n    <lastmod>${new Date(p.lastmod).toISOString().split('T')[0]}</lastmod>`;
-      } catch {
-        // Skip lastmod for invalid dates
-      }
-    }
-    return `  <url>
-    <loc>${escapeXml(p.url)}</loc>
-    <changefreq>${p.changefreq}</changefreq>
-    <priority>${p.priority}</priority>${lastmodStr}
-  </url>`;
-  };
+  // The URL list — and every lastmod on it — is built in lib/sitemap-static-pages.ts
+  // so that sitemap.xml can advertise this shard's real max lastmod from the
+  // same source. No page here gets a `today` fallback any more: `/`, `/servers`
+  // and `/submit` all used to carry a rolling date that moved on every request
+  // regardless of whether anything had changed.
+  const entries = await getStaticSitemapEntries();
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${allPages.map(renderUrl).join('\n')}
+${entries.map(entry => renderSitemapUrl(entry)).join('\n')}
 </urlset>`;
 
   return new Response(xml, {
     headers: {
       'Content-Type': 'application/xml',
-      'Cache-Control': 'public, max-age=86400',
+      'Cache-Control': SITEMAP_CACHE_CONTROL,
     },
   });
 }

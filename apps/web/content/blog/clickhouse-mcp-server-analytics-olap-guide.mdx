@@ -1,0 +1,103 @@
+---
+title: "ClickHouse MCP Server Guide for Analytics and OLAP"
+description: "ClickHouse's official MCP server connects AI agents to analytics and OLAP workloads with read-only defaults. Here's the setup, the tools, and the auth model."
+excerpt: "ClickHouse ships a first-party MCP server that queries both ClickHouse Cloud and self-hosted instances, read-only by default, with writes gated behind explicit env vars. This guide covers install, auth, tool names, and where it fits next to Snowflake."
+date: "2026-08-13"
+updatedAt: "2026-08-13"
+author: "Adam Bush"
+authorUrl: "https://www.linkedin.com/in/adam-bush/"
+authorSameAs:
+  - "https://www.linkedin.com/in/adam-bush/"
+tags:
+  - "mcp"
+  - "developer"
+  - "databases"
+  - "analytics"
+  - "olap"
+category: "databases"
+focusKeyword: "clickhouse mcp server for analytics and olap workloads"
+topic_source: "new_topic"
+draft: false
+cornerstone: false
+faqItems:
+  - question: "Can ClickHouse's MCP server write or modify data, not just query it?"
+    answer: "Only if you turn it on. Writes are disabled by default (CLICKHOUSE_ALLOW_WRITE_ACCESS=false), and destructive operations like DROP or TRUNCATE need a second, separate flag (CLICKHOUSE_ALLOW_DROP=true) on top of that. An agent cannot touch your data by accident with default settings."
+  - question: "Does the ClickHouse MCP server work with the public ClickHouse SQL playground?"
+    answer: "Yes. The official README includes an example configuration pointed at the public sql-clickhouse.clickhouse.com playground, which is a useful way to try the server before connecting it to a real database."
+  - question: "Do I need a ClickHouse Cloud account to use this MCP server?"
+    answer: "No. The server connects to either ClickHouse Cloud or a self-hosted ClickHouse instance through the same set of environment variables, so a local or on-prem cluster works exactly the same way a cloud one does."
+  - question: "Is there an embedded, file-based option if I don't want to run a full ClickHouse server?"
+    answer: "Yes, through the chdb extra. Installing with pip install 'mcp-clickhouse[chdb]' adds a run_chdb_select_query tool backed by chDB, ClickHouse's embedded engine, so you can query local files without standing up a server at all."
+---
+
+Analytics databases showed up late to MCP. Transactional ones got there first, and ClickHouse's official server closes that gap with a scope that's narrower and more deliberate than most database integrations bother with. Read-only by default. It talks to ClickHouse Cloud and self-hosted clusters through the same environment variables, and there's an embedded option for querying local files without running a server at all. What follows: the real install command, the actual tool names, how auth works, and one genuine discrepancy between ClickHouse's own docs page and its GitHub README that you'll want to know about before you configure anything.
+
+## What Is the ClickHouse MCP Server and Who Publishes It?
+
+This one's first-party. ClickHouse publishes it at `github.com/ClickHouse/mcp-clickhouse` and links to it straight from their own documentation. Apache-2.0 licensed, roughly 850 GitHub stars as of this writing, which counts for something in a databases category where the average listed server barely clears single digits.
+
+It's built for analytics and OLAP work, not general-purpose database administration. The tool surface covers schema exploration and query execution against ClickHouse, and then there's a separate path for chDB, ClickHouse's embedded query engine, which lets you run analytical queries against local files with no running server at all. That split is useful if your workflow spans a live cluster and ad hoc file analysis both. You cover both cases from a single install with different tools, so there's no second integration sitting around that you also have to keep alive.
+
+## How Do You Install and Connect the ClickHouse MCP Server?
+
+There are two install paths. The recommended one leans on `uv`, which sorts out the Python environment for you and skips the separate virtual environment step:
+
+```json
+{
+  "mcpServers": {
+    "clickhouse": {
+      "command": "uv",
+      "args": ["run", "--with", "mcp-clickhouse", "--python", "3.10", "mcp-clickhouse"],
+      "env": {
+        "CLICKHOUSE_HOST": "your-instance.clickhouse.cloud",
+        "CLICKHOUSE_USER": "default",
+        "CLICKHOUSE_PASSWORD": "your-password"
+      }
+    }
+  }
+}
+```
+
+The other option is a plain `pip install mcp-clickhouse`. Add `pip install "mcp-clickhouse[chdb]"` if you want the embedded chDB tool too. A handful of optional environment variables let you tune past the basics: `CLICKHOUSE_PORT`, `CLICKHOUSE_SECURE`, `CLICKHOUSE_VERIFY`, `CLICKHOUSE_CONNECT_TIMEOUT`, `CLICKHOUSE_ROLE`, and `CLICKHOUSE_DATABASE` all narrow or adjust the connection without you touching any code. The README even ships an example pointed at the public `sql-clickhouse.clickhouse.com` playground, which is a fast way to test the whole setup before you wire in real credentials.
+
+## What Tools Does the ClickHouse MCP Server Expose?
+
+The GitHub README lists three core tools: `run_query`, `list_databases`, and `list_tables`. Add `run_chdb_select_query` for the embedded chDB path, plus a `/health` endpoint for monitoring. The surface is deliberately narrow: you find out what's there, then you query it, and that's the whole loop.
+
+The two published sources disagree on one tool name. ClickHouse's own documentation page calls the query tool `run_select_query`. The GitHub README, which is the more actively maintained source, calls it `run_query`. So if your client shows a tool name you weren't expecting after connecting, that mismatch between the docs page and the current code is the likely reason, not a broken install. Go with the README until ClickHouse reconciles the two.
+
+## What Kinds of Questions Can an Agent Answer With the ClickHouse MCP Server?
+
+Anything that maps to a read-only analytical query against tables it can already see. A typical exchange opens with `list_databases`, moves to `list_tables` once the agent settles on one, then lands on `run_query` for the actual SELECT statement, usually with a GROUP BY or a window function in it, because that's the kind of question OLAP databases exist to answer quickly. Ask something like "which product category drove the most revenue last month" and the agent walks that same three-step path before coming back with a real answer instead of a guess.
+
+The small tool set works in your favor here. An agent holding only `run_query`, `list_databases`, and `list_tables` can't wander into schema changes or administrative territory by accident, because those operations aren't exposed as tools at all. Teams pointing agents at production analytics data on a recurring basis get more real safety out of that constraint than out of any prompt instruction telling the model to be careful.
+
+## Is the ClickHouse MCP Server Safe to Run Against a Production Cluster?
+
+Reasonably, yes, as long as you leave the defaults alone. Queries run read-only unless you go set `CLICKHOUSE_ALLOW_WRITE_ACCESS=true` yourself. Even then, destructive statements like DROP or TRUNCATE need a second, separate flag on top of that one, `CLICKHOUSE_ALLOW_DROP=true`. An agent connected with default settings simply cannot alter your data. That restriction lives in the server's own configuration defaults, so it holds whether or not anyone on your team remembers to be careful.
+
+The two-flag structure is meaningfully more conservative than what a lot of database MCP servers ship with, where read and write access tend to sit behind the same single credential. For a production analytics cluster, the practical move is to connect with a scoped, read-only ClickHouse user and leave the write flags off. The database-level permission then holds regardless of what the server config says, or who copies that config where.
+
+## How Does ClickHouse Compare to Other Databases in MCPFind's Directory?
+
+MCPFind's [databases category](/categories/databases) indexes 576 servers at a 7.68 average star count, well above the near-zero averages you see in newer categories. ClickHouse's own server would land near the top of that field if it were indexed today. It isn't in MCPFind's directory yet as an official listing. The closest match currently indexed is [DB Connect MCP](/servers/io-github-yugui923-db-connect-mcp), an unofficial multi-database server that reaches PostgreSQL, MySQL, and ClickHouse through a single connector. So the gap here is in directory coverage, not in the server, which is in fine shape.
+
+For teams already running [Snowflake](/blog/snowflake-mcp-server-enterprise-data), the difference that matters is concurrency. ClickHouse's own engineering team cites support for over 1,000 concurrent queries against roughly eight per warehouse on Snowflake. Real architectural gap, and worth weighing if your agent workloads fire off many queries in parallel. If Postgres-flavored analytics is more your speed, MCPFind's guides to [Neon](/blog/neon-mcp-server-serverless-postgres), [self-hosted Supabase](/blog/self-hosted-supabase-mcp-server), [Redis](/blog/redis-mcp-server-caching-guide), and [MySQL](/blog/mysql-mcp-server-setup-guide) cover the rest of the databases cluster, with pretty varied setup patterns between them. The [cornerstone guide](/blog/what-is-mcp) covers MCP itself, which is the place to start if you're wiring a database server into a live workflow for the first time.
+
+## Frequently Asked Questions
+
+### Can ClickHouse's MCP server write or modify data, not just query it?
+
+Only if you turn it on. Writes are off by default (`CLICKHOUSE_ALLOW_WRITE_ACCESS=false`), and destructive operations like DROP or TRUNCATE need a second, separate flag (`CLICKHOUSE_ALLOW_DROP=true`) on top of that. With default settings, an agent can't touch your data by accident.
+
+### Does the ClickHouse MCP server work with the public ClickHouse SQL playground?
+
+Yes. The official README includes an example configuration pointed at the public `sql-clickhouse.clickhouse.com` playground, which is a handy way to try the server before you connect it to a real database.
+
+### Do I need a ClickHouse Cloud account to use this MCP server?
+
+No. The server connects to either ClickHouse Cloud or a self-hosted ClickHouse instance through the same set of environment variables, so a local or on-prem cluster works exactly the way a cloud one does.
+
+### Is there an embedded, file-based option if I don't want to run a full ClickHouse server?
+
+Yes, through the chdb extra. Install with `pip install "mcp-clickhouse[chdb]"` and you get a `run_chdb_select_query` tool backed by chDB, ClickHouse's embedded engine, so you can query local files without standing up a server at all.

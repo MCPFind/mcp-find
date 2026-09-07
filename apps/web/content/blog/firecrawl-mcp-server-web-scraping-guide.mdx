@@ -1,0 +1,108 @@
+---
+title: "Firecrawl MCP Server: Web Scraping for AI Agents"
+description: "Firecrawl's MCP server gives AI agents 26 tools for scraping, crawling, and researching the web. Here's the tool list, setup steps, and credit tracking."
+excerpt: "Firecrawl's MCP server has grown well past a simple scrape-and-crawl pair into 26 tools covering research, monitoring, and interactive browsing. If you want an agent that can pull structured data from the open web, here's what you're actually installing."
+date: "2026-08-20"
+updatedAt: "2026-08-20"
+author: "Adam Bush"
+authorUrl: "https://www.linkedin.com/in/adam-bush/"
+authorSameAs:
+  - "https://www.linkedin.com/in/adam-bush/"
+tags:
+  - "mcp"
+  - "developer"
+  - "devtools"
+  - "web-scraping"
+category: "devtools"
+focusKeyword: "firecrawl mcp server"
+topic_source: "new_topic"
+draft: false
+cornerstone: false
+faqItems:
+  - question: "Do I need a paid Firecrawl account to use the MCP server?"
+    answer: "You need a Firecrawl API key, and the free tier includes a starter allotment of credits. Heavier use, especially the research and monitoring tool families, will draw down credits fast enough that most teams move to a paid plan."
+  - question: "Can the Firecrawl MCP server scrape pages behind a login?"
+    answer: "The core scrape and crawl tools target publicly accessible pages. Firecrawl's interact tools can simulate clicks and form actions during a session, but authenticated scraping still depends on what the target site allows and isn't a guaranteed capability."
+  - question: "What's the difference between firecrawl_scrape and firecrawl_crawl?"
+    answer: "firecrawl_scrape pulls content from a single URL you already have. firecrawl_crawl starts from a URL and follows links across the site, so you get content from many pages in one job instead of one page at a time."
+  - question: "Does Firecrawl's MCP server return raw HTML or cleaned content?"
+    answer: "Cleaned by default. Firecrawl converts pages to Markdown or structured JSON before handing results back, which is why agents can work with the output directly instead of parsing HTML first."
+---
+
+Ask an AI agent about a page it has never seen and you'll usually get a confident guess assembled from training data. Firecrawl's MCP server is how you stop that. The [official repo](https://github.com/firecrawl/firecrawl-mcp-server) is up to 26 tools now, and they stretch from a plain single-page scrape all the way out to scheduled jobs that watch a page and report back when it changes. Academic paper search is in there too. This guide walks through what those tools actually do today, how you wire the server into a client, and how the credit numbers baked into tool responses keep you from discovering a big bill after the fact.
+
+## What Is the Firecrawl MCP Server?
+
+This is the official server for [Firecrawl's](https://firecrawl.dev) scraping and crawling API, maintained in the `firecrawl` GitHub org. It sits at 7,296 stars and ships MIT licensed. For scale: MCPFind's [devtools category](/categories/devtools) is the largest in our index at 6,290 servers, and the average entry there carries 17.19 stars. Firecrawl clears that average by more than four hundred times, which tells you roughly how many people are trying to get clean web content into an agent.
+
+One caveat on links. MCPFind's directory doesn't yet carry a confirmed listing for the official Firecrawl repo, and we'd rather send you somewhere real than invent a slug. So this post points at the devtools category page and the [automation category](/categories/automation), where a few scraping-adjacent tools already live. Shopping for alternatives? Those two pages are the place to start.
+
+The server talks over stdio for local use, but the scraping itself runs on Firecrawl's hosted API. None of that infrastructure has to live on your machine.
+
+The cheap version is a plain `fetch()` call. It grabs whatever HTML comes back on the first try and stops there. Firecrawl renders JavaScript-heavy pages before it extracts anything, retries failed requests, and rotates through anti-bot handling on its own. Point a basic fetch tool at a site that builds its content client-side and your agent gets an empty shell back. Firecrawl returns what a person in a browser would actually see, and closing that gap is the entire reason this server exists.
+
+## What Tools Does the Firecrawl MCP Server Include?
+
+Twenty-six tools is too many to read as a flat list, so here they are in groups. We checked this against the repo's own README on the main branch rather than an older cached summary, since the tool set has expanded a lot since Firecrawl's early releases and stale write-ups are easy to find.
+
+Start with the core. `firecrawl_scrape` pulls a single URL. `firecrawl_map` sketches out a site's structure so you know what you're dealing with before committing to a crawl. `firecrawl_search` and `firecrawl_search_feedback` cover search. Then there's `firecrawl_crawl` for the multi-page job, paired with `firecrawl_check_crawl_status` for when a job runs long enough that your agent needs to check back in on it. And `firecrawl_parse` pulls structured data out of a page you've already fetched.
+
+Two families go well past scraping. The research family is five tools (`firecrawl_research_search_papers`, `inspect_paper`, `related_papers`, `read_paper`, and `search_github`), aimed squarely at academic and code research. The monitoring family is seven, and it's the more interesting group: an agent can create, list, run, and check scheduled jobs that watch a page for changes over time instead of grabbing it once and forgetting about it. Think of it as a cron job your agent owns.
+
+That leaves two pairs worth knowing. `firecrawl_agent` and `firecrawl_agent_status` hand multi-step research tasks off to Firecrawl's own infrastructure. `firecrawl_interact` and `firecrawl_interact_stop` simulate clicks and form actions inside a session.
+
+## How Do You Set Up the Firecrawl MCP Server?
+
+Installation runs through npx. Same pattern most npm-published MCP servers use.
+
+```json
+{
+  "mcpServers": {
+    "firecrawl": {
+      "command": "npx",
+      "args": ["-y", "firecrawl-mcp"],
+      "env": {
+        "FIRECRAWL_API_KEY": "your-api-key-here"
+      }
+    }
+  }
+}
+```
+
+Grab your API key from Firecrawl's dashboard before you wire any of this up. Then paste the config into Claude Desktop, Cursor, Windsurf, or whatever client you're running that supports local stdio servers, and restart it. No build step. No local scraping engine to install. The heavy lifting happens on Firecrawl's servers, so your machine is really just making API calls.
+
+Already running other devtools MCP servers next to this one? Nothing about the config changes. It's a standard MCP server and it slots into the same `mcpServers` block as everything else in your client config.
+
+One trap to check before your first real job. Rate limits come from your Firecrawl plan, not from the MCP server, so a crawl that tries to pull hundreds of pages at once on a free-tier key will hit a wall partway through and leave you holding a half-finished result. Scope your first `firecrawl_crawl` call to one small section of a site, watch how fast the credits move, then widen it once you know what a page actually costs for your use case.
+
+## How Does Firecrawl Track API Credit Usage?
+
+Scraping at scale costs real money. Firecrawl's answer is to build usage signals directly into specific tool outputs, so you're not tabbing over to a separate dashboard in the middle of a task.
+
+The feedback calls, specifically `firecrawl_search_feedback` and `firecrawl_feedback`, return `creditsRefunded` and `dailyCapReached` fields in their responses. Crawl jobs go further. A `firecrawl_crawl` result includes a `creditsUsed` field showing exactly what the completed job cost.
+
+That distinction matters and it's easy to misread. The credit fields ride along with the specific job or feedback call that generated them. There's no standalone balance-check tool in the set to call on its own whenever you feel like it. An agent, or you reading its output, sees the cost of an action in the same place the result shows up rather than buried in a billing page you'd have to go check.
+
+Job-scoped visibility earns its keep once you're running the monitoring or research families. A single tool call in either one can trigger several internal Firecrawl operations, so the credit cost compounds faster than a plain scrape would lead you to expect.
+
+Plenty of scraping tools only surface usage after the fact, in an emailed invoice or a dashboard you have to remember to open. Attaching the number to the response itself changes what an agent can do with it. If `dailyCapReached` comes back true, the agent can stop a research task right there instead of burning through calls that are going to fail anyway once the cap actually hits.
+
+## Frequently Asked Questions
+
+### Do I need a paid Firecrawl account to use the MCP server?
+
+You need a Firecrawl API key, and the free tier includes a starter allotment of credits. Heavier use, especially the research and monitoring tool families, draws those down fast enough that most teams end up moving to a paid plan.
+
+### Can the Firecrawl MCP server scrape pages behind a login?
+
+The core scrape and crawl tools target publicly accessible pages. Firecrawl's interact tools can simulate clicks and form actions during a session, so there's a path, but authenticated scraping still depends on what the target site allows and isn't a guaranteed capability.
+
+### What's the difference between firecrawl_scrape and firecrawl_crawl?
+
+One page versus many. firecrawl_scrape pulls content from a single URL you already have. firecrawl_crawl starts from a URL and follows links across the site, so one job hands you content from many pages instead of going one page at a time.
+
+### Does Firecrawl's MCP server return raw HTML or cleaned content?
+
+Cleaned, by default. Firecrawl converts pages to Markdown or structured JSON before handing results back, which is why agents can work with the output directly instead of parsing HTML first.
+
+This is the first devtools-cluster post MCPFind has published since [our Chrome DevTools MCP guide](/blog/chrome-devtools-mcp-server-guide), and it'll be the anchor that future devtools posts link back to for scraping-related tooling. New to MCP as a concept? Start with [what MCP is](/blog/what-is-mcp) before you wire any server into a client. The [full blog archive](/blog) has guides on connecting other specific tools.

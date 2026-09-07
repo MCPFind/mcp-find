@@ -6,7 +6,8 @@ import { unstable_cache } from 'next/cache';
 import { supabase } from './supabase';
 import type { Server, ServerListItem, ServerWithTools, ServerListParams, ServerListResponse } from '@mcpfind/shared';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@mcpfind/shared';
-import { isIndexable, type IndexableServerInput } from './indexable';
+import { isIndexable, readmeLengthOf, type IndexableServerInput } from './indexable';
+import { maxLastmod } from './sitemap-lastmod';
 
 // Excludes readme_content and search_vector to avoid pulling large blobs in list queries.
 // canonical_slug is included so route generation (sitemap, links) can use the stable URL column.
@@ -19,6 +20,11 @@ const SERVER_LIST_COLUMNS = 'id,slug,canonical_slug,name,description,version,cat
 // pulling it on every detail-page fetch for nothing.
 const SERVER_DETAIL_COLUMNS = `${SERVER_LIST_COLUMNS},readme_content`;
 
+// Applies the WHERE-clause filters shared between the paginated listing
+// query below and the count-only query in _getFilteredCount — kept as one
+// literal filter block per function (small duplication, no generic/`any`
+// query-builder typing) so the two can never silently drift on which rows
+// count as "matching."
 async function _listServers(params: ServerListParams): Promise<ServerListResponse> {
   const page = Math.max(1, params.page || 1);
   const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, params.limit || DEFAULT_PAGE_SIZE));
@@ -26,9 +32,19 @@ async function _listServers(params: ServerListParams): Promise<ServerListRespons
   const sort = params.sort || 'stars';
   const status = params.status || 'active';
 
+  // T2 fix (2026-08-25): count:'exact' used to run unconditionally on this
+  // select, forcing Postgres to materialize every matching row (COUNT(*)
+  // OVER()) on EVERY paginated request regardless of page — confirmed via a
+  // local EXPLAIN ANALYZE showing a full Seq Scan touching all matching rows
+  // for the count alone (see supabase/migrations/008_status_stars_index.sql
+  // and the T2 evidence in the task-store notes). The count is now sourced
+  // from getFilteredCount() below instead: a SEPARATELY unstable_cache'd
+  // call keyed by the filter combo (not the page), so the expensive count
+  // query runs once per filter combo per cache window instead of once per
+  // page request.
   let query = supabase
     .from('servers')
-    .select(SERVER_LIST_COLUMNS, { count: 'exact' })
+    .select(SERVER_LIST_COLUMNS)
     .eq('registry_status', status);
 
   // Full-text search
@@ -72,17 +88,90 @@ async function _listServers(params: ServerListParams): Promise<ServerListRespons
   // the render open until the platform's function-duration ceiling.
   query = query.range(offset, offset + limit - 1).abortSignal(AbortSignal.timeout(8000));
 
-  const { data, count, error } = await query;
+  const [{ data, error }, total] = await Promise.all([
+    query,
+    getFilteredCount(params),
+  ]);
   if (error) throw new Error(`Query failed: ${error.message}`);
 
   return {
     servers: (data || []) as ServerListItem[],
-    total: count || 0,
+    total,
     page,
     limit,
-    totalPages: Math.ceil((count || 0) / limit),
+    totalPages: Math.ceil(total / limit),
   };
 }
+
+// Count-only query for the same filter combo _listServers applies above —
+// deliberately a SEPARATE unstable_cache entry keyed on the filter portion
+// of ServerListParams only (no page/limit/sort), so a crawler walking every
+// page of one filter combo pays the count('exact') cost once per cache
+// window instead of once per page. head:true skips returning row data
+// entirely — only the count is fetched.
+async function _getFilteredCount(params: ServerListParams): Promise<number> {
+  const status = params.status || 'active';
+
+  let query = supabase
+    .from('servers')
+    .select('*', { count: 'exact', head: true })
+    .eq('registry_status', status);
+
+  if (params.q) {
+    query = query.textSearch('search_vector', params.q, { type: 'websearch' });
+  }
+  if (params.category) {
+    query = query.eq('category', params.category);
+  }
+  if (params.packageTypes?.length) {
+    query = query.in('package_type', params.packageTypes);
+  }
+  if (params.languages?.length) {
+    query = query.in('github_language', params.languages);
+  }
+  if (params.hasTools) query = query.eq('has_tools', true);
+  if (params.hasResources) query = query.eq('has_resources', true);
+  if (params.hasPrompts) query = query.eq('has_prompts', true);
+  if (params.isOfficial) query = query.eq('is_official', true);
+  if (params.featured) query = query.eq('featured', true);
+
+  query = query.abortSignal(AbortSignal.timeout(8000));
+
+  const { count, error } = await query;
+  if (error) throw new Error(`Count query failed: ${error.message}`);
+  return count || 0;
+}
+
+const getFilteredCount = cache(
+  async (params: ServerListParams): Promise<number> => {
+    // Page/limit/sort intentionally excluded — the count is identical
+    // across every page and every sort order of the same filter combo.
+    const countCacheKey = [
+      params.category ?? '',
+      params.q ?? '',
+      (params.packageTypes ?? []).join(','),
+      (params.languages ?? []).join(','),
+      params.hasTools ? '1' : '',
+      params.hasResources ? '1' : '',
+      params.hasPrompts ? '1' : '',
+      params.isOfficial ? '1' : '',
+      params.featured ? '1' : '',
+      params.status ?? '',
+    ].join('\x00');
+    try {
+      return await unstable_cache(
+        () => _getFilteredCount(params),
+        ['filtered-count', countCacheKey],
+        // Narrow 'servers-listing' aggregate tag (T1) in addition to the
+        // blanket 'servers' tag — see app/api/revalidate/route.ts::POST.
+        { tags: ['servers', 'servers-listing'], revalidate: 21600 }
+      )();
+    } catch (err) {
+      console.error('getFilteredCount: upstream failed, returning 0', err);
+      return 0;
+    }
+  }
+);
 
 export const listServers = cache(
   async (params: ServerListParams): Promise<ServerListResponse> => {
@@ -107,7 +196,10 @@ export const listServers = cache(
         // 6h — was 1h. The directory changes slowly; a longer window means
         // repeat crawler hits on the same filter/sort/page combo reuse the
         // cached result instead of re-querying Supabase.
-        { tags: ['servers'], revalidate: 21600 }
+        // 'servers-listing' (T1, 2026-08-25) is the narrow aggregate tag
+        // /api/revalidate busts by default now — 'servers' stays as the
+        // blanket tag, only busted on an explicit full-purge opt-in.
+        { tags: ['servers', 'servers-listing'], revalidate: 21600 }
       )();
     } catch (err) {
       // Upstream failed or hit the 8s abort timeout — degrade to an empty
@@ -210,7 +302,7 @@ export const getServerCount = cache(
         return count || 0;
       },
       ['server-count'],
-      { tags: ['servers'], revalidate: 21600 }
+      { tags: ['servers', 'servers-listing'], revalidate: 21600 }
     )()
 );
 
@@ -227,14 +319,97 @@ export const getTopServers = cache(
         return (data || []) as ServerListItem[];
       },
       ['top-servers', String(limit)],
-      { tags: ['servers'], revalidate: 21600 }
+      { tags: ['servers', 'servers-listing'], revalidate: 21600 }
     )()
 );
 
+// ---------------------------------------------------------------------------
+// isIndexable() signal scans — README length, not README body
+// ---------------------------------------------------------------------------
+//
+// Every scan below evaluates isIndexable() over the whole `servers` table.
+// The predicate's README signal used to require readme_content, so all four
+// scans SELECTed the full README body across the table purely to compute
+// `trim(...).length >= 400`. With READMEs NULL on ~97.8% of rows that is
+// ~7 MB per request; a repaired enrichment backfill (~21k rows, ~12 KB mean)
+// turns it into ~250 MB per request on force-dynamic sitemap routes. That is
+// why the enrichment repair was blocked behind this.
+//
+// Migration 010 adds `servers.readme_length`, a GENERATED ALWAYS ... STORED
+// column holding exactly `length(btrim(readme_content))`, so the same
+// decision costs 4 bytes per row and never detoasts the README.
+//
+// The migration is deliberately NOT a deploy-order dependency: the first
+// window of each scan tries the lean column set, and if Postgres reports the
+// column does not exist yet, this module falls back to the old readme_content
+// set for the rest of the process and derives readme_length in JS. Same
+// eligible set either way — only the byte cost differs.
+
+interface SelectResult {
+  data: unknown[] | null;
+  error?: { code?: string; message?: string } | null;
+}
+
+/** null = not probed yet; false = migration 010 not applied on this database. */
+let _readmeLengthColumnAvailable: boolean | null = null;
+
+/** Test seam — resets the per-process probe. */
+export function __resetReadmeLengthProbe(): void {
+  _readmeLengthColumnAvailable = null;
+}
+
+function isMissingReadmeLengthColumn(error: SelectResult['error']): boolean {
+  if (!error) return false;
+  // PostgREST surfaces an unknown column as Postgres 42703 (undefined_column).
+  // The message check is a fallback for clients that drop the code.
+  return error.code === '42703' && (error.message ?? '').includes('readme_length');
+}
+
+/** A row shape carrying either the length column or the legacy body column. */
+type ReadmeSignalRow = { readme_length?: number | null; readme_content?: string | null };
+
+/**
+ * Runs one window of a signal scan, preferring the lean (readme_length)
+ * column set and degrading to the legacy (readme_content) set exactly once
+ * per process if migration 010 has not been applied yet.
+ *
+ * Returns rows already normalised so `readme_length` is populated on both
+ * paths — isIndexable() never sees the difference.
+ */
+async function selectIndexableSignalWindow<T extends ReadmeSignalRow>(
+  run: (columns: string) => PromiseLike<SelectResult>,
+  columns: { lean: string; legacy: string }
+): Promise<T[] | null> {
+  if (_readmeLengthColumnAvailable !== false) {
+    const { data, error } = await run(columns.lean);
+    if (!isMissingReadmeLengthColumn(error)) {
+      if (!error) _readmeLengthColumnAvailable = true;
+      return data as T[] | null;
+    }
+    _readmeLengthColumnAvailable = false;
+    console.warn(
+      '[queries] servers.readme_length is missing — migration 010 is not applied. ' +
+        'Falling back to selecting readme_content, which is correct but transfers ' +
+        'README bodies on every indexable scan.'
+    );
+  }
+
+  const { data } = await run(columns.legacy);
+  if (!data) return null;
+  return (data as T[]).map(row => ({
+    ...row,
+    readme_length: readmeLengthOf(row.readme_content ?? null),
+  }));
+}
+
 // Columns needed for both list display (ServerListItem) and the isIndexable()
-// signal check — SERVER_LIST_COLUMNS plus readme_content (excluded from the
-// list columns as a large blob, but required to evaluate signal 1).
-const INDEXABLE_LIST_COLUMNS = `${SERVER_LIST_COLUMNS},readme_content`;
+// signal check — SERVER_LIST_COLUMNS plus the README signal. `lean` names the
+// generated readme_length column (4 bytes/row); `legacy` is the pre-migration
+// fallback that pulls the body and measures it in JS.
+const INDEXABLE_LIST_COLUMNS = {
+  lean: `${SERVER_LIST_COLUMNS},readme_length`,
+  legacy: `${SERVER_LIST_COLUMNS},readme_content`,
+};
 
 type IndexableListRow = ServerListItem & IndexableServerInput;
 
@@ -254,14 +429,18 @@ export const getIndexableTopServers = cache(
         const SUPABASE_MAX = 1000;
         const results: ServerListItem[] = [];
         for (let offset = 0; results.length < limit; offset += SUPABASE_MAX) {
-          const { data } = await supabase
-            .from('servers')
-            .select(INDEXABLE_LIST_COLUMNS)
-            .eq('registry_status', 'active')
-            .order('github_stars', { ascending: false })
-            .range(offset, offset + SUPABASE_MAX - 1);
+          const data = await selectIndexableSignalWindow<IndexableListRow>(
+            columns =>
+              supabase
+                .from('servers')
+                .select(columns)
+                .eq('registry_status', 'active')
+                .order('github_stars', { ascending: false })
+                .range(offset, offset + SUPABASE_MAX - 1),
+            INDEXABLE_LIST_COLUMNS
+          );
           if (!data || data.length === 0) break;
-          for (const row of data as IndexableListRow[]) {
+          for (const row of data) {
             if (isIndexable(row)) {
               results.push(row as ServerListItem);
               if (results.length >= limit) break;
@@ -272,19 +451,50 @@ export const getIndexableTopServers = cache(
         return results.slice(0, limit);
       },
       ['indexable-top-servers', String(limit)],
-      { tags: ['servers'], revalidate: 21600 }
+      { tags: ['servers', 'servers-listing'], revalidate: 21600 }
     )()
 );
 
 // Columns needed to evaluate isIndexable() in addition to the sitemap's own
-// slug/canonical_slug/updated_at fields. readme_content is the one signal not
-// already in SERVER_LIST_COLUMNS (excluded there as a large blob) — safe to
-// select here since this is scanned once per sitemap generation and this
-// text is never returned in the XML response.
-const SITEMAP_SIGNAL_COLUMNS =
-  'slug,canonical_slug,updated_at,registry_status,github_archived,readme_content,has_tools,tool_count,package_name,package_type,github_stars,category';
+// slug/canonical_slug/updated_at fields.
+//
+// The README signal is read as readme_length, never readme_content. This scan
+// covers the ENTIRE servers table on a force-dynamic route; selecting the body
+// here was the single largest transfer in the app and the reason the GitHub
+// enrichment backfill could not be turned back on.
+const SITEMAP_SIGNAL_COLUMNS = {
+  lean: 'slug,canonical_slug,updated_at,registry_updated_at,registry_status,github_archived,readme_length,has_tools,tool_count,package_name,package_type,github_stars,category',
+  legacy:
+    'slug,canonical_slug,updated_at,registry_updated_at,registry_status,github_archived,readme_content,has_tools,tool_count,package_name,package_type,github_stars,category',
+};
 
-type SitemapRow = Pick<ServerListItem, 'slug' | 'canonical_slug' | 'updated_at'> & IndexableServerInput;
+type SitemapRow = Pick<
+  ServerListItem,
+  'slug' | 'canonical_slug' | 'updated_at' | 'registry_updated_at'
+> &
+  IndexableServerInput;
+
+/**
+ * What the sitemap emitters consume. `lastmod` is already resolved here —
+ * GREATEST(updated_at, registry_updated_at) — so no downstream file has to
+ * decide what a server page's real modification date is, and none of them
+ * can quietly substitute `now()`.
+ *
+ * `registry_updated_at` is a genuine upstream change stamp (it drives the
+ * name, description and version the page renders), and it moves independently
+ * of our own `updated_at`. Ignoring it, as this query did until 2026-09, made
+ * every page look frozen at the last successful enrichment run even when the
+ * registry had since republished it.
+ *
+ * `lastmod` is null when the row carries no usable timestamp at all. That is
+ * a real answer, and the emitters render it by omitting <lastmod> rather than
+ * inventing a date.
+ */
+export interface SitemapUrlRow {
+  slug: string;
+  canonical_slug: string | null;
+  lastmod: string | null;
+}
 
 // Fetches the FULL ordered (github_stars desc) list of indexable servers'
 // sitemap fields, scanning the raw `servers` table past Supabase's 1,000-row
@@ -297,25 +507,29 @@ type SitemapRow = Pick<ServerListItem, 'slug' | 'canonical_slug' | 'updated_at'>
 // slicing the ALREADY-FILTERED list per shard, guarantees every advertised
 // shard is dense — see sitemap.xml/route.ts and sitemap-servers.ts.
 const _getIndexableSitemapRows = cache(
-  (): Promise<Pick<ServerListItem, 'slug' | 'canonical_slug' | 'updated_at'>[]> =>
+  (): Promise<SitemapUrlRow[]> =>
     unstable_cache(
       async () => {
         const SUPABASE_MAX = 1000;
-        const results: Pick<ServerListItem, 'slug' | 'canonical_slug' | 'updated_at'>[] = [];
+        const results: SitemapUrlRow[] = [];
         for (let offset = 0; ; offset += SUPABASE_MAX) {
-          const { data } = await supabase
-            .from('servers')
-            .select(SITEMAP_SIGNAL_COLUMNS)
-            .eq('registry_status', 'active')
-            .order('github_stars', { ascending: false })
-            .range(offset, offset + SUPABASE_MAX - 1);
+          const data = await selectIndexableSignalWindow<SitemapRow>(
+            columns =>
+              supabase
+                .from('servers')
+                .select(columns)
+                .eq('registry_status', 'active')
+                .order('github_stars', { ascending: false })
+                .range(offset, offset + SUPABASE_MAX - 1),
+            SITEMAP_SIGNAL_COLUMNS
+          );
           if (!data || data.length === 0) break;
-          for (const row of data as SitemapRow[]) {
+          for (const row of data) {
             if (isIndexable(row)) {
               results.push({
                 slug: row.slug,
                 canonical_slug: row.canonical_slug,
-                updated_at: row.updated_at,
+                lastmod: maxLastmod([row.updated_at, row.registry_updated_at]),
               });
             }
           }
@@ -326,6 +540,34 @@ const _getIndexableSitemapRows = cache(
       ['indexable-sitemap-rows'],
       { tags: ['servers'], revalidate: 3600 }
     )()
+);
+
+/**
+ * The most recent real modification date across every indexable server.
+ *
+ * Used as the honest lastmod for pages that aggregate the catalogue (`/`,
+ * `/servers`) and for the shard entries in sitemap.xml. Reads the same
+ * already-cached list the shards slice from, so it adds no query and cannot
+ * drift from the shard bodies — which is exactly how the index came to claim
+ * `today` while the shard it pointed at said 2026-03-25.
+ *
+ * Null when there are no indexable servers: omit <lastmod>.
+ */
+export const getIndexableSitemapMaxLastmod = cache(
+  async (): Promise<string | null> =>
+    maxLastmod((await _getIndexableSitemapRows()).map(r => r.lastmod))
+);
+
+/**
+ * Max real lastmod within one shard's slice — the value sitemap.xml must
+ * advertise for that shard. Derived from the shard's own contents, so the
+ * index and the shard body can never disagree.
+ */
+export const getSitemapShardLastmod = cache(
+  async (offset: number, pageSize: number): Promise<string | null> => {
+    const rows = await getServersSitemapPage(offset, pageSize);
+    return maxLastmod(rows.map(r => r.lastmod));
+  }
 );
 
 // Total count of indexable servers — drives how many shards sitemap.xml
@@ -340,16 +582,20 @@ export const getIndexableServerCount = cache(
 // address positions within the indexable sequence, so every in-range shard
 // is guaranteed non-empty and dense.
 export const getServersSitemapPage = cache(
-  async (offset: number, pageSize: number): Promise<Pick<ServerListItem, 'slug' | 'canonical_slug' | 'updated_at'>[]> => {
+  async (offset: number, pageSize: number): Promise<SitemapUrlRow[]> => {
     const rows = await _getIndexableSitemapRows();
     return rows.slice(offset, offset + pageSize);
   }
 );
 
 // Columns needed to evaluate isIndexable() for the generateStaticParams gate,
-// plus canonical_slug/slug for the static param itself.
-const INDEXABLE_SLUG_COLUMNS =
-  'slug,canonical_slug,registry_status,github_archived,readme_content,has_tools,tool_count,package_name,package_type,github_stars,category';
+// plus canonical_slug/slug for the static param itself. README signal read as
+// a length, never as a body — see selectIndexableSignalWindow above.
+const INDEXABLE_SLUG_COLUMNS = {
+  lean: 'slug,canonical_slug,registry_status,github_archived,readme_length,has_tools,tool_count,package_name,package_type,github_stars,category',
+  legacy:
+    'slug,canonical_slug,registry_status,github_archived,readme_content,has_tools,tool_count,package_name,package_type,github_stars,category',
+};
 
 type IndexableSlugRow = { slug: string; canonical_slug: string | null } & IndexableServerInput;
 
@@ -369,15 +615,19 @@ export const getIndexableServerSlugs = cache(
         const allRows: IndexableSlugRow[] = [];
         const results: string[] = [];
         for (let offset = 0; results.length < limit; offset += SUPABASE_MAX) {
-          const { data } = await supabase
-            .from('servers')
-            .select(INDEXABLE_SLUG_COLUMNS)
-            .eq('registry_status', 'active')
-            .order('github_stars', { ascending: false })
-            .range(offset, offset + SUPABASE_MAX - 1);
+          const data = await selectIndexableSignalWindow<IndexableSlugRow>(
+            columns =>
+              supabase
+                .from('servers')
+                .select(columns)
+                .eq('registry_status', 'active')
+                .order('github_stars', { ascending: false })
+                .range(offset, offset + SUPABASE_MAX - 1),
+            INDEXABLE_SLUG_COLUMNS
+          );
           if (!data || data.length === 0) break;
-          allRows.push(...(data as IndexableSlugRow[]));
-          for (const row of data as IndexableSlugRow[]) {
+          allRows.push(...data);
+          for (const row of data) {
             if (isIndexable(row)) {
               results.push(row.canonical_slug ?? row.slug);
               if (results.length >= limit) break;
@@ -407,7 +657,7 @@ export const getServersByCategory = cache(
         return (data || []) as ServerListItem[];
       },
       ['servers-by-category', category],
-      { tags: ['servers', `category-${category}`], revalidate: 21600 }
+      { tags: ['servers', 'servers-listing', `category-${category}`], revalidate: 21600 }
     )()
 );
 
@@ -429,15 +679,19 @@ export const getIndexableServersByCategory = cache(
         const SUPABASE_MAX = 1000;
         const results: ServerListItem[] = [];
         for (let offset = 0; ; offset += SUPABASE_MAX) {
-          const { data } = await supabase
-            .from('servers')
-            .select(INDEXABLE_LIST_COLUMNS)
-            .eq('category', category)
-            .eq('registry_status', 'active')
-            .order('github_stars', { ascending: false })
-            .range(offset, offset + SUPABASE_MAX - 1);
+          const data = await selectIndexableSignalWindow<IndexableListRow>(
+            columns =>
+              supabase
+                .from('servers')
+                .select(columns)
+                .eq('category', category)
+                .eq('registry_status', 'active')
+                .order('github_stars', { ascending: false })
+                .range(offset, offset + SUPABASE_MAX - 1),
+            INDEXABLE_LIST_COLUMNS
+          );
           if (!data || data.length === 0) break;
-          for (const row of data as IndexableListRow[]) {
+          for (const row of data) {
             if (isIndexable(row)) {
               results.push(row as ServerListItem);
             }
@@ -447,7 +701,7 @@ export const getIndexableServersByCategory = cache(
         return results;
       },
       ['indexable-servers-by-category', category],
-      { tags: ['servers', `category-${category}`], revalidate: 21600 }
+      { tags: ['servers', 'servers-listing', `category-${category}`], revalidate: 21600 }
     )()
 );
 
@@ -468,7 +722,7 @@ export const getCategoryCount = cache(
         return count || 0;
       },
       ['category-count', category],
-      { tags: ['servers', `category-${category}`], revalidate: 21600 }
+      { tags: ['servers', 'servers-listing', `category-${category}`], revalidate: 21600 }
     )()
 );
 
@@ -476,22 +730,33 @@ export const getCategoryLastUpdated = cache(
   (): Promise<Record<string, string>> =>
     unstable_cache(
       async () => {
+        // registry_updated_at is read alongside updated_at for the same reason
+        // the sitemap rows read it: it is a real upstream change stamp for
+        // fields the category listing renders, and it moves independently.
+        // The per-category value is the max of both across the rows we see.
+        //
+        // NOTE: PostgREST caps this select at its default page size, so this
+        // is the max over the most-recently-updated rows, not a whole-table
+        // MAX(). Every value returned is still a real timestamp belonging to
+        // a real row in that category — it can under-report, never invent.
         const { data } = await supabase
           .from('servers')
-          .select('category, updated_at')
+          .select('category, updated_at, registry_updated_at')
           .eq('registry_status', 'active')
           .order('updated_at', { ascending: false });
 
         const result: Record<string, string> = {};
         for (const row of data || []) {
-          if (row.category && !result[row.category]) {
-            result[row.category] = row.updated_at;
-          }
+          if (!row.category) continue;
+          const rowLastmod = maxLastmod([row.updated_at, row.registry_updated_at]);
+          if (!rowLastmod) continue;
+          const best = maxLastmod([result[row.category], rowLastmod]);
+          if (best) result[row.category] = best;
         }
         return result;
       },
       ['category-last-updated'],
-      { tags: ['servers'], revalidate: 21600 }
+      { tags: ['servers', 'servers-listing'], revalidate: 21600 }
     )()
 );
 
@@ -509,6 +774,6 @@ export const getLastSyncTime = cache(
         return data?.completed_at || null;
       },
       ['last-sync-time'],
-      { tags: ['servers'], revalidate: 21600 }
+      { tags: ['servers', 'servers-listing'], revalidate: 21600 }
     )()
 );

@@ -53,9 +53,10 @@ const GOOD_SERVER = {
   slug: 'good-server',
   canonical_slug: 'good-server',
   updated_at: '2026-07-01T00:00:00Z',
+  registry_updated_at: null,
   registry_status: 'active',
   github_archived: false,
-  readme_content: 'A comprehensive README describing setup and usage. '.repeat(10),
+  readme_length: 500,
   has_tools: true,
   tool_count: 5,
   package_name: '@acme/mcp-server-good',
@@ -68,9 +69,10 @@ const THIN_SERVER = {
   slug: 'thin-server',
   canonical_slug: 'thin-server',
   updated_at: '2026-07-01T00:00:00Z',
+  registry_updated_at: null,
   registry_status: 'active',
   github_archived: false,
-  readme_content: null,
+  readme_length: null,
   has_tools: false,
   tool_count: 0,
   package_name: null,
@@ -105,8 +107,46 @@ describe('getServersSitemapPage — applies isIndexable() gate', () => {
     expect(rows[0]).toEqual({
       slug: 'good-server',
       canonical_slug: 'good-server',
-      updated_at: '2026-07-01T00:00:00Z',
+      lastmod: '2026-07-01T00:00:00Z',
     });
+  });
+
+  it('resolves lastmod to GREATEST(updated_at, registry_updated_at)', async () => {
+    // registry_updated_at is the newer of the two here — it is a real upstream
+    // change stamp for fields the page renders, so it must win.
+    const queryMock = makeSupabaseQueryMock({
+      data: [{ ...GOOD_SERVER, registry_updated_at: '2026-09-05T00:00:00Z' }],
+    });
+    vi.doMock('./supabase', () => ({ supabase: queryMock }));
+
+    const { getServersSitemapPage } = await import('./queries');
+    const rows = await getServersSitemapPage(0, 1000);
+
+    expect(rows[0]?.lastmod).toBe('2026-09-05T00:00:00Z');
+  });
+
+  it('keeps updated_at when it is newer than registry_updated_at', async () => {
+    const queryMock = makeSupabaseQueryMock({
+      data: [{ ...GOOD_SERVER, registry_updated_at: '2026-01-01T00:00:00Z' }],
+    });
+    vi.doMock('./supabase', () => ({ supabase: queryMock }));
+
+    const { getServersSitemapPage } = await import('./queries');
+    const rows = await getServersSitemapPage(0, 1000);
+
+    expect(rows[0]?.lastmod).toBe('2026-07-01T00:00:00Z');
+  });
+
+  it('reports lastmod null — never a substituted date — when the row has no timestamp', async () => {
+    const queryMock = makeSupabaseQueryMock({
+      data: [{ ...GOOD_SERVER, updated_at: null, registry_updated_at: null }],
+    });
+    vi.doMock('./supabase', () => ({ supabase: queryMock }));
+
+    const { getServersSitemapPage } = await import('./queries');
+    const rows = await getServersSitemapPage(0, 1000);
+
+    expect(rows[0]?.lastmod).toBeNull();
   });
 
   it('returns an empty array when all rows are thin', async () => {
@@ -133,7 +173,7 @@ describe('getServersSitemapPage — applies isIndexable() gate', () => {
     const { getServersSitemapPage } = await import('./queries');
     const page0 = await getServersSitemapPage(0, 1000);
     expect(page0).toEqual([
-      { slug: 'good-server', canonical_slug: 'good-server', updated_at: '2026-07-01T00:00:00Z' },
+      { slug: 'good-server', canonical_slug: 'good-server', lastmod: '2026-07-01T00:00:00Z' },
     ]);
 
     // A shard starting past the single indexable row must be empty (there's
@@ -204,5 +244,172 @@ describe('getIndexableServerSlugs — applies isIndexable() gate for generateSta
     const slugs = await getIndexableServerSlugs(1200);
 
     expect(slugs).toEqual(['good-server']);
+  });
+});
+
+/**
+ * Task 5 — the indexable scans must not transfer README bodies.
+ *
+ * Every scan here evaluates isIndexable() across the whole `servers` table on
+ * force-dynamic routes. Selecting readme_content to compute one length
+ * comparison costs ~7 MB per request today, and ~250 MB per request once
+ * GitHub enrichment is repaired (~21k enrichable rows at a ~12 KB mean
+ * README) — which is why the enrichment backfill was blocked behind this.
+ *
+ * These tests assert on the actual column string sent to PostgREST, because
+ * the regression this guards against is invisible in the returned data: the
+ * rows come back correct either way, only the bytes on the wire change.
+ */
+
+/** Records every select() column string and lets the test decide each result. */
+function makeRecordingSupabase(
+  handler: (columns: string) => { data: unknown[] | null; error?: { code?: string; message?: string } | null }
+) {
+  const selects: string[] = [];
+  let current: { data: unknown[] | null; error?: { code?: string; message?: string } | null } = {
+    data: [],
+  };
+  const chain: Record<string, unknown> = {};
+  for (const m of ['from', 'eq', 'order', 'range']) {
+    chain[m] = vi.fn(() => chain);
+  }
+  chain.select = vi.fn((columns: string) => {
+    selects.push(columns);
+    current = handler(columns);
+    return chain;
+  });
+  chain.then = (resolve: (v: unknown) => void) => resolve(current);
+  return { chain, selects };
+}
+
+const MISSING_COLUMN_ERROR = {
+  code: '42703',
+  message: 'column servers.readme_length does not exist',
+};
+
+describe('indexable scans — select readme_length, never readme_content', () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  it('the sitemap scan asks for readme_length and not readme_content', async () => {
+    const { chain, selects } = makeRecordingSupabase(() => ({ data: [GOOD_SERVER], error: null }));
+    vi.doMock('./supabase', () => ({ supabase: chain }));
+
+    const { getServersSitemapPage } = await import('./queries');
+    await getServersSitemapPage(0, 1000);
+
+    expect(selects).toHaveLength(1);
+    expect(selects[0]).toContain('readme_length');
+    expect(selects[0]).not.toContain('readme_content');
+  });
+
+  it('the generateStaticParams scan asks for readme_length and not readme_content', async () => {
+    const { chain, selects } = makeRecordingSupabase(() => ({ data: [GOOD_SERVER], error: null }));
+    vi.doMock('./supabase', () => ({ supabase: chain }));
+
+    const { getIndexableServerSlugs } = await import('./queries');
+    await getIndexableServerSlugs(1200);
+
+    expect(selects[0]).toContain('readme_length');
+    expect(selects[0]).not.toContain('readme_content');
+  });
+
+  it('the gated top-servers scan asks for readme_length and not readme_content', async () => {
+    const { chain, selects } = makeRecordingSupabase(() => ({ data: [GOOD_SERVER], error: null }));
+    vi.doMock('./supabase', () => ({ supabase: chain }));
+
+    const { getIndexableTopServers } = await import('./queries');
+    await getIndexableTopServers(10);
+
+    expect(selects[0]).toContain('readme_length');
+    expect(selects[0]).not.toContain('readme_content');
+  });
+
+  it('the gated category scan asks for readme_length and not readme_content', async () => {
+    const { chain, selects } = makeRecordingSupabase(() => ({ data: [GOOD_SERVER], error: null }));
+    vi.doMock('./supabase', () => ({ supabase: chain }));
+
+    const { getIndexableServersByCategory } = await import('./queries');
+    await getIndexableServersByCategory('developer-tools');
+
+    expect(selects[0]).toContain('readme_length');
+    expect(selects[0]).not.toContain('readme_content');
+  });
+});
+
+describe('indexable scans — degrade correctly when migration 010 is not applied', () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  it('falls back to readme_content and derives the length in JS, yielding the same rows', async () => {
+    // Pre-migration database: the lean select 42703s, the legacy select works
+    // and returns the README body instead of its length.
+    const LEGACY_GOOD = {
+      ...GOOD_SERVER,
+      readme_length: undefined,
+      readme_content: 'A comprehensive README describing setup and usage. '.repeat(10),
+    };
+    delete (LEGACY_GOOD as Record<string, unknown>).readme_length;
+    const LEGACY_THIN = { ...THIN_SERVER, readme_content: null };
+    delete (LEGACY_THIN as Record<string, unknown>).readme_length;
+
+    const { chain, selects } = makeRecordingSupabase(columns =>
+      columns.includes('readme_length')
+        ? { data: null, error: MISSING_COLUMN_ERROR }
+        : { data: [LEGACY_GOOD, LEGACY_THIN], error: null }
+    );
+    vi.doMock('./supabase', () => ({ supabase: chain }));
+
+    const { getServersSitemapPage } = await import('./queries');
+    const rows = await getServersSitemapPage(0, 1000);
+
+    // Same eligible set as the lean path — the fallback is a byte-cost
+    // decision, never an eligibility decision.
+    expect(rows).toEqual([
+      { slug: 'good-server', canonical_slug: 'good-server', lastmod: '2026-07-01T00:00:00Z' },
+    ]);
+    expect(selects[0]).toContain('readme_length');
+    expect(selects[1]).toContain('readme_content');
+  });
+
+  it('probes for the missing column once per process, not once per window', async () => {
+    const LEGACY_THIN = { ...THIN_SERVER, readme_content: null };
+    delete (LEGACY_THIN as Record<string, unknown>).readme_length;
+
+    const { chain, selects } = makeRecordingSupabase(columns =>
+      columns.includes('readme_length')
+        ? { data: null, error: MISSING_COLUMN_ERROR }
+        : { data: [LEGACY_THIN], error: null }
+    );
+    vi.doMock('./supabase', () => ({ supabase: chain }));
+
+    const { getServersSitemapPage, getIndexableServerSlugs, __resetReadmeLengthProbe } =
+      await import('./queries');
+    __resetReadmeLengthProbe();
+
+    await getServersSitemapPage(0, 1000);
+    await getIndexableServerSlugs(1200);
+
+    const leanAttempts = selects.filter(c => c.includes('readme_length'));
+    expect(leanAttempts).toHaveLength(1);
+  });
+
+  it('does NOT treat an unrelated query error as a missing readme_length column', async () => {
+    // A transient failure must not silently downgrade the whole process to
+    // the expensive column set for the rest of its life.
+    const { chain, selects } = makeRecordingSupabase(() => ({
+      data: null,
+      error: { code: '57014', message: 'canceling statement due to statement timeout' },
+    }));
+    vi.doMock('./supabase', () => ({ supabase: chain }));
+
+    const { getServersSitemapPage } = await import('./queries');
+    const rows = await getServersSitemapPage(0, 1000);
+
+    expect(rows).toEqual([]);
+    expect(selects).toHaveLength(1);
+    expect(selects[0]).not.toContain('readme_content');
   });
 });

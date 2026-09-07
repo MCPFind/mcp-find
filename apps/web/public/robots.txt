@@ -1,5 +1,118 @@
 User-agent: *
 Allow: /
+# T3 fix (2026-08-25): /servers has no page-level cache key bound (see
+# lib/queries.ts::listServers's 12-param cacheKey) and this file previously
+# had zero Disallow lines, so a crawler varying sort/q/pkg/lang/page
+# combinations generated a proportionally unbounded number of distinct,
+# cold-cache renders. Non-canonical query permutations are disallowed below;
+# bare /servers and every /servers/<slug> detail page remain fully
+# crawlable, and default pagination (page param alone, no other filters) is
+# allowed to a bounded depth instead of the full ~1,016-page tail.
+Disallow: /servers?*q=
+Disallow: /servers?*sort=
+Disallow: /servers?*pkg=
+Disallow: /servers?*lang=
+Disallow: /servers?*tools=
+Disallow: /servers?*resources=
+Disallow: /servers?*prompts=
+Disallow: /servers?*official=
+Disallow: /servers?*featured=
+Disallow: /servers?*page=
+Allow: /servers?page=1$
+Allow: /servers?page=2$
+Allow: /servers?page=3$
+Allow: /servers?page=4$
+Allow: /servers?page=5$
+Allow: /servers?page=6$
+Allow: /servers?page=7$
+Allow: /servers?page=8$
+Allow: /servers?page=9$
+Allow: /servers?page=10$
+
+# ---------------------------------------------------------------------------
+# Blocked crawlers (2026-09-07): these four are already denied 403 at the edge
+# by WAF rule. The groups below state the same intent robots.txt-side, so
+# compliant crawlers stop before spending a request; non-compliant ones are
+# still caught by the WAF. Volumes are from the complete 292-UA access-log
+# listing for the sample window.
+#   MJ12bot      -   695 req/window, Majestic backlink index
+#   SemrushBot   -   142 req/window, Semrush SEO index
+#   serpstatbot  -   852 req/window, Serpstat SEO index
+#   ShapBot      -   420 req/window, Parallel Web Systems (B2B AI infra);
+#                    robots.txt compliance is disputed, hence the WAF rule.
+# None of these feed Google Search, Bing, or any AI answer surface, so
+# blocking them carries no search or AI-discoverability cost.
+# NOT blocked and deliberately absent from this file: AhrefsBot and
+# AhrefsSiteAudit, both needed for Ahrefs Site Audit / Webmaster Tools. They
+# intentionally have NO named group so they keep inheriting the
+# User-agent: * rules above, including the T3 crawl-budget limits. Do not add
+# an "Allow: /" group for them - a named group would drop that inheritance.
+# ---------------------------------------------------------------------------
+
+User-agent: MJ12bot
+Disallow: /
+
+User-agent: SemrushBot
+Disallow: /
+
+User-agent: serpstatbot
+Disallow: /
+
+User-agent: ShapBot
+Disallow: /
+
+# ---------------------------------------------------------------------------
+# Amazonbot (2026-09-07): PENDING DECISION - throttled, not blocked.
+# Largest single bot in the window at 1,459 requests. Verified ai_crawler
+# (powers Alexa and Rufus), so a Disallow would cost real AI discoverability.
+# Rate-limiting keeps the discoverability and removes most of the volume.
+# Amazon documents Crawl-delay support for Amazonbot; Googlebot ignores
+# Crawl-delay, which is why it appears in this group only.
+# The T3 rules are REPEATED below on purpose: a named group does not inherit
+# from User-agent: *, so a group containing only Crawl-delay would have
+# silently GRANTED Amazonbot the full unbounded query-permutation space.
+# TO BLOCK INSTEAD: replace this entire group with the two lines
+#   User-agent: Amazonbot
+#   Disallow: /
+# TO REVERT TO UNTHROTTLED: delete this entire group; Amazonbot then inherits
+# the User-agent: * rules again.
+# ---------------------------------------------------------------------------
+
+User-agent: Amazonbot
+Crawl-delay: 10
+Allow: /
+Disallow: /servers?*q=
+Disallow: /servers?*sort=
+Disallow: /servers?*pkg=
+Disallow: /servers?*lang=
+Disallow: /servers?*tools=
+Disallow: /servers?*resources=
+Disallow: /servers?*prompts=
+Disallow: /servers?*official=
+Disallow: /servers?*featured=
+Disallow: /servers?*page=
+Allow: /servers?page=1$
+Allow: /servers?page=2$
+Allow: /servers?page=3$
+Allow: /servers?page=4$
+Allow: /servers?page=5$
+Allow: /servers?page=6$
+Allow: /servers?page=7$
+Allow: /servers?page=8$
+Allow: /servers?page=9$
+Allow: /servers?page=10$
+
+# ---------------------------------------------------------------------------
+# Welcomed AI and search crawlers. Deliberate GEO posture - unchanged.
+# Note (2026-09-07): each named group below overrides User-agent: * entirely,
+# so these six do NOT inherit the T3 query-param limits. That is the existing
+# behavior and is left as-is to avoid any discoverability risk during crawl
+# recovery. If their query-permutation volume later becomes a problem, copy
+# the Disallow/Allow block from the Amazonbot group into the offending group
+# rather than deleting the group.
+# Googlebot is intentionally not listed: with no named group it inherits
+# User-agent: * (Allow: / plus the T3 limits), which is the intended state.
+# ---------------------------------------------------------------------------
 
 User-agent: GPTBot
 Allow: /
@@ -13,13 +126,14 @@ Allow: /
 User-agent: Google-Extended
 Allow: /
 
-Sitemap: https://mcpfind.org/sitemap.xml
-
-# AI-readable content index
-llms.txt: https://mcpfind.org/llms.txt
-
 User-agent: Bingbot
 Allow: /
 
-User-agent: AppleBot-Extended
+User-agent: Applebot-Extended
 Allow: /
+
+# AI-readable content index: https://mcpfind.org/llms.txt
+# (kept as a comment - "llms.txt:" is not a robots.txt directive and no
+# parser consumes it; see 2026-09-07 audit.)
+
+Sitemap: https://mcpfind.org/sitemap.xml
