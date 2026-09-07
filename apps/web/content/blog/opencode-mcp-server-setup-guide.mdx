@@ -1,0 +1,107 @@
+---
+title: "OpenCode MCP Server Setup: Add Any MCP to Your Terminal"
+description: "OpenCode is a provider-agnostic terminal coding agent with roughly 200,000 GitHub stars. Here's the exact config for adding local and remote MCP servers."
+excerpt: "OpenCode doesn't lock you into one AI provider, and it doesn't lock you into one MCP transport either. This guide covers the real opencode.json config, the exact JSON keys for local and remote servers, and which MCPFind-listed servers actually make sense in a terminal workflow."
+date: "2026-09-02"
+updatedAt: "2026-09-02"
+author: "Adam Bush"
+authorUrl: "https://www.linkedin.com/in/adam-bush/"
+authorSameAs:
+  - "https://www.linkedin.com/in/adam-bush/"
+tags:
+  - "mcp"
+  - "developer"
+  - "devtools"
+  - "terminal"
+  - "opencode"
+category: "devtools"
+focusKeyword: "opencode mcp server"
+topic_source: "new_topic"
+draft: false
+cornerstone: false
+faqItems:
+  - question: "Is OpenCode the same project as opencode-ai/opencode on GitHub?"
+    answer: "Two different projects share the name, and that trips people up constantly. The provider-agnostic terminal agent covered here lives at github.com/anomalyco/opencode (formerly sst/opencode, after the team rebranded). The Go-based project at github.com/opencode-ai/opencode is unrelated to it. Check the org name before you clone."
+  - question: "Does OpenCode work with local models, not just hosted ones?"
+    answer: "It connects to more than 75 AI providers rather than locking you into one vendor, and that list covers local model runners alongside hosted options from Anthropic, OpenAI, and others."
+  - question: "Can I turn an MCP server on and off without deleting its config?"
+    answer: "Every server entry in opencode.json takes an enabled field. Set it to false and the server goes quiet, while the command, URL, and environment variables you already configured stay right where they are."
+  - question: "Does OpenCode support OAuth for remote MCP servers?"
+    answer: "Remote server entries accept an oauth field alongside headers, so a hosted MCP server that requires an OAuth flow won't leave you hand-managing a static bearer token."
+  - question: "Where does OpenCode look for its config file first?"
+    answer: "Project root wins. A project-root opencode.json takes priority over the global one at ~/.config/opencode/opencode.json, which means you can commit a team-shared MCP setup to a repo without touching anyone's personal global config."
+---
+
+Most terminal coding agents ship with a fixed toolset. OpenCode doesn't. It's an open-source project sitting at roughly 200,000 GitHub stars as of this writing, it connects to more than 75 AI providers, and it speaks MCP natively, which means you can wire in any MCP server MCPFind indexes, local or remote, through a single config file with a handful of field names you have to get exactly right. If you've wanted an AI coding agent that lives in your terminal without locking you to a single model vendor, that combination is the reason to look.
+
+## What Is OpenCode, and Why Does MCP Matter Here?
+
+OpenCode is a provider-agnostic, open-source terminal coding agent. You point it at whichever AI provider you want, and it runs your prompts, edits files, and executes commands from the command line, no editor window involved. One naming note before you go looking: the project rebranded from its original `sst/opencode` name to `anomalyco/opencode`, so if you land on an old URL, that's why.
+
+MCP is what lets OpenCode reach outside its own codebase. Without it, an agent only sees what you paste into the prompt. Our [guide to what MCP is](/blog/what-is-mcp) covers the basics if you haven't worked with the protocol before. Wire an MCP server in and OpenCode can query a database or hit an API the same way any MCP-compatible client can.
+
+The provider-agnostic part has a useful side effect. Since OpenCode isn't tied to one AI vendor, it's a genuinely neutral way to test whether an MCP server behaves consistently across different underlying models, something a single-provider client can't show you. Swap the model out, keep the same MCP config, and watch whether the tool calls still land the way you expect.
+
+## How Do You Add an MCP Server to OpenCode?
+
+OpenCode reads server definitions from `opencode.json`. It checks your project root first, then falls back to the global file at `~/.config/opencode/opencode.json`. The top-level key is `mcp`, and each entry needs a `type` of either `local` or `remote`.
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "my-local-mcp-server": {
+      "type": "local",
+      "command": ["npx", "-y", "my-mcp-command"],
+      "enabled": true,
+      "environment": { "MY_ENV_VAR": "my_env_var_value" }
+    },
+    "my-remote-mcp": {
+      "type": "remote",
+      "url": "https://my-mcp-server.com",
+      "enabled": true,
+      "headers": { "Authorization": "Bearer MY_API_KEY" }
+    }
+  }
+}
+```
+
+Local servers run as a subprocess through the `command` array, same as most stdio-based MCP clients. Remote servers connect over HTTP via `url`, and they can carry `headers` or an `oauth` block in place of a bare bearer token. Both types accept an `enabled` flag, which is the fastest way to pause a server while you chase down something unrelated, without gutting its whole config block.
+
+From the CLI, `opencode mcp list` shows what's configured, and `opencode mcp auth <server-name>` handles the OAuth handshake for a remote server. When a connection isn't working, `opencode mcp debug <server-name>` is the first thing worth running. One thing to expect: there isn't a documented one-line `opencode mcp add` command as of this writing, so you hand-write the JSON block yourself, then verify it with `list` and `debug`.
+
+## What's Different About OpenCode Compared to Claude Code or Cursor?
+
+Claude Code runs Claude models. Cursor runs its own stack with provider options layered on top. OpenCode was built provider-agnostic from day one, connecting to 75-plus providers, so moving from a hosted model to a local one doesn't drag your whole toolchain along with it, including whatever MCP servers you've already wired in. That matters more once a team standardizes on one MCP setup and later wants to swap the underlying model without redoing that work.
+
+Our [Cursor setup guide](/blog/how-to-use-mcp-with-cursor) and the [Claude Code GitHub tutorial](/blog/github-mcp-server-claude-code-tutorial) both cover editor-embedded workflows, where the agent sits next to your code in an IDE panel. OpenCode works differently. It runs as a standalone terminal process, so there's no inline diff review in an editor and the agent behaves like any other command-line tool you can pipe into a shell script or a CI step. If your day-to-day already lives in a terminal more than an IDE, you can run the same MCP servers a desktop client would give you without leaving the shell.
+
+`opencode.json` is a plain JSON file, so you can commit it to a repo and share one MCP setup across every contributor's machine. An IDE-embedded agent usually stashes its MCP config in an editor-specific settings file, which doesn't travel the same way between VS Code, Cursor, and JetBrains without some manual translation.
+
+## Which MCPFind Servers Are Worth Connecting to OpenCode?
+
+Terminal workflows favor MCP servers that don't need a visual interface to be useful. Code search, dependency graphs, log queries, infrastructure tools: all of them fit naturally. MCPFind's [devtools category](/categories/devtools) currently indexes 6,700 servers, averaging 16.14 GitHub stars, which makes it the highest-volume category in the entire directory and the best starting point for a terminal-first setup. A server built around a rich visual dashboard is the opposite case, since most of its value evaporates once you're only reading its output as JSON in a terminal pane.
+
+Take one concrete example already in the directory. The [Chrome DevTools MCP server](/servers/io-github-chromedevtools-chrome-devtools-mcp), sitting at 31,292 stars, hands an agent network requests and console logs without you opening a browser window yourself, which fits a headless terminal workflow better than it fits most editor-embedded setups. We cover its full tool list in our [dedicated Chrome DevTools guide](/blog/chrome-devtools-mcp-server-guide), the only other post in MCPFind's devtools-cluster so far. For debugging a build pipeline without leaving the terminal, OpenCode plus a devtools-category MCP server covers more ground than a browser-based inspector alone. That's a narrow but real reason to keep both a terminal agent and a browser-based tool on hand rather than picking just one.
+
+## Frequently Asked Questions
+
+### Is OpenCode the same project as opencode-ai/opencode on GitHub?
+
+Two different projects share the name, and that trips people up constantly. The provider-agnostic terminal agent covered here lives at github.com/anomalyco/opencode (formerly sst/opencode, after the team rebranded). The Go-based project at github.com/opencode-ai/opencode is unrelated to it. Check the org name before you clone.
+
+### Does OpenCode work with local models, not just hosted ones?
+
+It connects to more than 75 AI providers rather than locking you into one vendor, and that list covers local model runners alongside hosted options from Anthropic, OpenAI, and others.
+
+### Can I turn an MCP server on and off without deleting its config?
+
+Every server entry in opencode.json takes an enabled field. Set it to false and the server goes quiet, while the command, URL, and environment variables you already configured stay right where they are.
+
+### Does OpenCode support OAuth for remote MCP servers?
+
+Remote server entries accept an oauth field alongside headers, so a hosted MCP server that requires an OAuth flow won't leave you hand-managing a static bearer token.
+
+### Where does OpenCode look for its config file first?
+
+Project root wins. A project-root opencode.json takes priority over the global one at ~/.config/opencode/opencode.json, which means you can commit a team-shared MCP setup to a repo without touching anyone's personal global config.

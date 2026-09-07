@@ -1,0 +1,88 @@
+---
+title: "MCP vs ACP: What's the Difference Between Agent Protocols?"
+description: "MCP and ACP both use JSON-RPC and both showed up recently, but they solve different problems for AI coding agents. Here's the real difference, with sources."
+excerpt: "MCP connects an agent to tools and data. ACP connects an editor to an agent. They sound similar and get confused constantly, but the JetBrains-Zed backed ACP and Anthropic's MCP were built to stack on top of each other."
+date: "2026-08-31"
+updatedAt: "2026-08-31"
+author: "Gus Marquez"
+authorUrl: "https://www.linkedin.com/in/gustavoamarquez"
+authorSameAs:
+  - "https://www.linkedin.com/in/gustavoamarquez"
+tags:
+  - "mcp"
+  - "developer"
+  - "architecture"
+  - "protocols"
+category: "other"
+focusKeyword: "mcp vs acp"
+topic_source: "new_topic"
+draft: false
+cornerstone: false
+faqItems:
+  - question: "Does ACP replace MCP?"
+    answer: "It doesn't. The two operate at different layers and were designed from the start to compose with each other. ACP handles the editor-to-agent connection while MCP handles the agent-to-tool connection, and plenty of products run both at once."
+  - question: "Can ACP run over a network instead of just locally?"
+    answer: "The current ACP spec is stdio-only, so the agent has to run as a subprocess on the same machine as the editor. The v2 draft still doesn't add a remote transport."
+  - question: "Is there a formal way to send MCP traffic through an ACP connection?"
+    answer: "Yes, there is. The extension is called MCP-over-ACP, and it's documented as a draft that carries MCP traffic through an ACP channel. It hasn't been ratified into the core spec yet."
+  - question: "Which editors support ACP today?"
+    answer: "Zed ships it natively, and the JetBrains IDE family does too, which covers IntelliJ IDEA, PyCharm, and WebStorm. Neovim, Emacs, and Sourcegraph have all adopted it. Cursor joined the ACP Agent Registry in March 2026."
+  - question: "Do I need to pick one protocol for my whole stack?"
+    answer: "No. Most real products end up using both: ACP for the editor integration layer, MCP for every tool and data connection underneath it."
+---
+
+Both shipped within the last two years and both run on JSON-RPC. The word "protocol" is sitting right there in each name, and that alone is enough to blur them together in a quick search. The problems they solve are different, though. Model Context Protocol (MCP) hands an AI agent access to tools and data, whether that's a database, a file system, or a search API. Agent Client Protocol (ACP) hands a code editor a standard way to run an agent inside itself, roughly the way the Language Server Protocol let editors talk to any language server without anyone writing custom integration code for each one.
+
+## What Is the Agent Client Protocol (ACP)?
+
+ACP is an open JSON-RPC 2.0 standard that lets a code editor launch an AI coding agent as a subprocess and talk to it. Zed Industries open-sourced it in August 2025. The spec defines sessions, prompt turns, streamed updates, permission requests, and diffs, which are the primitives an editor needs if it wants an agent's reasoning loop living directly in its interface instead of a separate chat window bolted on the side.
+
+JetBrains came on as a co-developer in October 2025, committing to ACP support across IntelliJ IDEA, PyCharm, WebStorm, and the rest of its IDE lineup. The two companies later shipped the ACP Agent Registry in January 2026, a one-click agent picker inside JetBrains IDEs and Zed that works a lot like a plugin marketplace for agents. By mid-2026, editor-side adopters included Neovim, Emacs, and Sourcegraph, while Claude Code, Codex, and Block's Goose implemented the agent side. The project runs on Apache 2.0 at `github.com/zed-industries/agent-client-protocol`, currently migrating from a v1 schema to a v2 draft that formalizes permission requests as a first-class concept rather than an ad hoc extension bolted onto v1.
+
+## How Is ACP Different From MCP?
+
+What separates them is what each one connects. ACP connects an editor to an agent. It's stdio-only and session-based, built around turns, streamed progress updates, and diffs the agent proposes for a developer to accept or reject. MCP works a layer down, connecting an agent to tools and data over either stdio or HTTP, and its primitives are tools, resources, and reusable prompt templates, with no concept of an editor session anywhere in it.
+
+| Aspect | MCP | ACP |
+|---|---|---|
+| Connects | Agent to tools and data | Editor to agent |
+| Transport | stdio or HTTP | stdio only |
+| Core unit | Tool calls | Sessions and turns |
+| Created by | Anthropic, November 2024 | Zed Industries, August 2025 |
+| Key backers | Anthropic, OpenAI, Google DeepMind, thousands of community servers | Zed, JetBrains, Google's Gemini CLI |
+
+The two sit at different depths of the same stack. ACP is the connection an editor opens to an agent. Once that agent is running, everything it reaches for travels over MCP. So an editor speaks ACP to launch Claude Code or Codex as a subprocess, and from there the agent speaks MCP to hit whatever tools it needs: a Postgres server, say, or anything in MCPFind's [devtools category](/categories/devtools), which currently indexes 6,700 servers. There's even a draft spec called MCP-over-ACP for carrying MCP traffic through an ACP channel, and that detail alone tells you these two were designed to stack on top of each other. ACP does have one real limitation today: subprocess-only transport, which means no remote agent execution yet. MCP servers under [ai-ml](/categories/ai-ml) don't share that constraint. Pinterest and Microsoft's [newly launched advertising MCP servers](/blog/pinterest-microsoft-advertising-mcp-servers) sit purely on the MCP side of the split, since neither one touches editor integration at all.
+
+## Who Is Building and Adopting ACP?
+
+Zed and JetBrains are the two companies actively co-developing ACP, and Google's Gemini CLI was an early adopter right alongside Zed itself. Cursor joined the ACP Agent Registry in March 2026. That one matters more than it might sound, because Cursor already has one of the largest MCP-compatible user bases in the ecosystem, which means a meaningful slice of existing MCP users now has an ACP path too, without switching editors.
+
+ACP's editor-side adopter list now includes Neovim, Emacs, marimo, and Sourcegraph. On the agent side, Claude Code, Codex, Block's Goose, and GitHub Copilot CLI all speak it. Wider net than most brand-new protocols get in year one. For comparison, Anthropic open-sourced MCP in November 2024, and within twelve months it had multi-vendor adoption across OpenAI and Google DeepMind, the same kind of build-vs-adopt split we cover in [open-source vs. commercial MCP servers](/blog/open-source-vs-commercial-mcp-servers-2026). [OpenAI's own Agents SDK](/blog/openai-agents-sdk-vs-mcp) made a related bet, shipping built-in tools instead of an ACP-style client layer. Both approaches are still evolving fast enough that either could look different in another six months.
+
+## Should You Use MCP, ACP, or Both?
+
+If you're shipping a tool or a data connector that agents will call, MCP is the one you implement. ACP comes in on the other side of the stack, when you're building an editor, an IDE, or a terminal that has to host a coding agent's interface. Most developers reading this will never write a line of ACP code directly. They'll just use an editor that already speaks it under the hood.
+
+The practical decision only comes up for a small group of people building developer tools themselves. If that's you, treat it as an and. A single product can implement ACP to host agents in its UI, then rely on those same agents calling out over MCP to get real work done. That's the exact architecture Zed uses internally, and it's the same layering choice the [Docker MCP Catalog](/blog/docker-mcp-catalog-toolkit-guide) made when it separated tool discovery from agent hosting. If you want the broader primer first, start with our [guide to what MCP is](/blog/what-is-mcp). The [Chrome DevTools MCP server](/blog/chrome-devtools-mcp-server-guide) is one real example an ACP-hosted agent might reach for once it's running, and it's a useful gut check for whether your own tooling needs both layers or just one.
+
+## Frequently Asked Questions
+
+### Does ACP replace MCP?
+
+It doesn't. The two operate at different layers and were designed from the start to compose with each other. ACP handles the editor-to-agent connection while MCP handles the agent-to-tool connection, and plenty of products run both at once.
+
+### Can ACP run over a network instead of just locally?
+
+The current ACP spec is stdio-only, so the agent has to run as a subprocess on the same machine as the editor. The v2 draft still doesn't add a remote transport.
+
+### Is there a formal way to send MCP traffic through an ACP connection?
+
+Yes, there is. The extension is called MCP-over-ACP, and it's documented as a draft that carries MCP traffic through an ACP channel. It hasn't been ratified into the core spec yet.
+
+### Which editors support ACP today?
+
+Zed ships it natively, and the JetBrains IDE family does too, which covers IntelliJ IDEA, PyCharm, and WebStorm. Neovim, Emacs, and Sourcegraph have all adopted it. Cursor joined the ACP Agent Registry in March 2026.
+
+### Do I need to pick one protocol for my whole stack?
+
+No. Most real products end up using both: ACP for the editor integration layer, MCP for every tool and data connection underneath it.
