@@ -1,14 +1,25 @@
 name: Verify Submission Liveness
 
-# Second-layer CI check: runs AFTER structural validation (validate-pr.yml).
+# Second-layer CI check: runs alongside structural validation (validate-pr.yml).
 # Verifies that submitted github_url repos are public, have licenses, and that
 # claimed packages actually exist on the declared registry.
-# Only fires on PRs that touch community-servers.yml.
+#
+# Fires on both accepted intake paths: community-servers.yml and submissions/.
+#
+# FORK SAFETY — see the long note in validate-pr.yml. A `pull_request` run from
+# a fork gets a READ-ONLY GITHUB_TOKEN regardless of the `permissions:` block
+# below, so every issues.* call in here is best-effort: wrapped in try/catch and
+# never allowed to decide the job's outcome. The authoritative report is the job
+# summary, which a read-only token can always write, and the verdict is carried
+# by core.setFailed. Deliberately NOT using `pull_request_target` — that pattern
+# is absent from this repository and must stay absent.
 
 on:
   pull_request:
     paths:
       - 'community-servers.yml'
+      - 'submissions/**.yml'
+      - 'submissions/**.yaml'
 
 concurrency:
   group: verify-${{ github.event.pull_request.number }}
@@ -19,6 +30,9 @@ jobs:
     name: Liveness & Authenticity
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # pull-requests: write is granted for same-repo PRs, where the comment and
+    # label niceties do work. Forks silently get read-only; the steps below are
+    # written to degrade cleanly when that happens.
     permissions:
       pull-requests: write
       contents: read
@@ -44,13 +58,13 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         # Capture the full output so we can parse the JSON summary block later.
         # We use `set +e` so the step records the exit code without aborting the
-        # job prematurely — the next step handles posting the PR comment first.
+        # job prematurely — the next step handles reporting first.
         run: |
           set +e
           node scripts/verify-submission-liveness.mjs 2>&1 | tee /tmp/liveness-output.txt
           echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
 
-      - name: Post PR comment and apply labels
+      - name: Report results
         uses: actions/github-script@v7
         with:
           script: |
@@ -73,10 +87,11 @@ jobs:
             }
 
             const prNumber = context.payload.pull_request.number;
+            const failed = exitCode !== 0 || failures.length > 0;
 
-            // --- Build comment body ---
+            // --- Build report body ---
             let body;
-            if (exitCode !== 0 || failures.length > 0) {
+            if (failed) {
               const failLines = failures.map(f => `- **FAIL** \`[${f.entry}]\` \`${f.check}\`: ${f.message}`).join('\n');
               const warnLines = warnings.length > 0
                 ? '\n\n**Warnings (review required):**\n' + warnings.map(w => `- **WARN** \`[${w.entry}]\` \`${w.check}\`: ${w.message}`).join('\n')
@@ -86,67 +101,66 @@ jobs:
               const warnLines = warnings.map(w => `- **WARN** \`[${w.entry}]\` \`${w.check}\`: ${w.message}`).join('\n');
               body = `## Liveness & Authenticity Check — Warnings\n\nAll hard checks passed, but the following items need human review:\n\n${warnLines}`;
             } else {
-              body = `## Liveness & Authenticity Check Passed\n\nAll entries verified: repos are public, packages are published, and no owner-match anomalies detected. ✓`;
+              body = `## Liveness & Authenticity Check Passed\n\nAll entries verified: repos are public, packages are published, and no owner-match anomalies detected.`;
             }
 
-            // --- Post or update comment ---
-            // Find an existing comment from this workflow to update (avoid flooding).
-            const { data: comments } = await github.rest.issues.listComments({
-              ...context.repo,
-              issue_number: prNumber,
-            });
-            const existing = comments.find(
-              c => c.user.login === 'github-actions[bot]' && c.body.includes('Liveness & Authenticity')
-            );
-            if (existing) {
-              await github.rest.issues.updateComment({
-                ...context.repo,
-                comment_id: existing.id,
-                body,
-              });
+            // --- Primary report: the job summary. ---
+            // This is the one channel that works on a fork PR's read-only token,
+            // so it is written FIRST and is never allowed to be skipped.
+            await core.summary.addRaw(body).write();
+
+            // --- Best-effort: comment and label. ---
+            // These need a write token, which fork PRs never get. Every call is
+            // individually guarded so a 403 degrades to a log line instead of
+            // aborting the step and hiding the report above.
+            const canWrite = context.payload.pull_request.head.repo.full_name === context.payload.repository.full_name;
+            if (!canWrite) {
+              core.info('Fork PR — GITHUB_TOKEN is read-only. Skipping PR comment and labels; see the job summary above for the full report.');
             } else {
-              await github.rest.issues.createComment({
-                ...context.repo,
-                issue_number: prNumber,
-                body,
-              });
-            }
+              try {
+                const { data: comments } = await github.rest.issues.listComments({
+                  ...context.repo,
+                  issue_number: prNumber,
+                });
+                const existing = comments.find(
+                  c => c.user.login === 'github-actions[bot]' && c.body.includes('Liveness & Authenticity')
+                );
+                if (existing) {
+                  await github.rest.issues.updateComment({ ...context.repo, comment_id: existing.id, body });
+                } else {
+                  await github.rest.issues.createComment({ ...context.repo, issue_number: prNumber, body });
+                }
+              } catch (e) {
+                core.warning(`Could not post PR comment (${e.status ?? '?'}): ${e.message}. The job summary has the full report.`);
+              }
 
-            // --- Apply labels ---
-            // Remove any previously-applied liveness labels first (idempotent).
-            const labelsToRemove = ['needs-changes', 'needs-human-review', 'ready-for-review'];
-            const { data: currentLabels } = await github.rest.issues.listLabelsOnIssue({
-              ...context.repo,
-              issue_number: prNumber,
-            });
-            for (const label of labelsToRemove) {
-              if (currentLabels.some(l => l.name === label)) {
-                try {
-                  await github.rest.issues.removeLabel({
-                    ...context.repo,
-                    issue_number: prNumber,
-                    name: label,
-                  });
-                } catch (_) { /* label may have already been removed — safe to ignore */ }
+              const labelsToRemove = ['needs-changes', 'needs-human-review', 'ready-for-review'];
+              let applyLabel;
+              if (failed) applyLabel = 'needs-changes';
+              else if (warnings.length > 0) applyLabel = 'needs-human-review';
+              else applyLabel = 'ready-for-review';
+
+              try {
+                const { data: currentLabels } = await github.rest.issues.listLabelsOnIssue({
+                  ...context.repo,
+                  issue_number: prNumber,
+                });
+                for (const label of labelsToRemove) {
+                  if (label !== applyLabel && currentLabels.some(l => l.name === label)) {
+                    try {
+                      await github.rest.issues.removeLabel({ ...context.repo, issue_number: prNumber, name: label });
+                    } catch (_) { /* already removed — safe to ignore */ }
+                  }
+                }
+                await github.rest.issues.addLabels({ ...context.repo, issue_number: prNumber, labels: [applyLabel] });
+              } catch (e) {
+                core.warning(`Could not apply labels (${e.status ?? '?'}): ${e.message}.`);
               }
             }
 
-            let applyLabel;
-            if (exitCode !== 0 || failures.length > 0) {
-              applyLabel = 'needs-changes';
-            } else if (warnings.length > 0) {
-              applyLabel = 'needs-human-review';
-            } else {
-              applyLabel = 'ready-for-review';
-            }
-
-            await github.rest.issues.addLabels({
-              ...context.repo,
-              issue_number: prNumber,
-              labels: [applyLabel],
-            });
-
-            // Fail the workflow job itself when there are hard failures.
-            if (exitCode !== 0 || failures.length > 0) {
+            // --- Verdict. ---
+            // The only thing that decides the job outcome. Runs last, and no
+            // API failure above can prevent it.
+            if (failed) {
               core.setFailed(`Liveness checks failed (${failures.length} failure(s), ${warnings.length} warning(s))`);
             }

@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 /**
- * Liveness & authenticity verification for community-servers.yml PR submissions.
+ * Liveness & authenticity verification for community server PR submissions.
+ *
+ * Covers both intake paths: community-servers.yml and submissions/<name>.yml.
  *
  * Checks each NEW or CHANGED entry added in the PR (diff against base):
  *   1. Repo exists & is public  — GitHub API /repos/{owner}/{repo}            [HARD FAIL]
@@ -27,6 +29,7 @@
 
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { collectSubmissionFiles } from './validate-submissions.mjs';
 
 // ---------------------------------------------------------------------------
 // Polyfill: Node 18+ has global fetch; guard for older environments.
@@ -236,6 +239,21 @@ function checkOwnerMatch(packageType, pkgData, submittedOwner, packageName) {
 // ---------------------------------------------------------------------------
 // Get new/changed entries via git diff
 // ---------------------------------------------------------------------------
+/** Every entry currently in a submission file. */
+async function readEntries(yamlPath) {
+  const data = await loadYaml(readFileSync(yamlPath, 'utf-8'));
+  return data?.servers ?? [];
+}
+
+/**
+ * Entries added or changed by this PR in ONE submission file.
+ *
+ * Returns null only when BASE_SHA is unset, which signals "no diff available,
+ * verify everything". A file that does not exist at the base commit is the
+ * normal case for a submissions/<name>.yml one-click submission: every entry in
+ * it is new, so the whole file is returned rather than falling back to a
+ * full-registry scan.
+ */
 async function getNewEntries(yamlPath) {
   const baseSha = process.env.BASE_SHA;
   if (!baseSha) {
@@ -243,21 +261,23 @@ async function getNewEntries(yamlPath) {
     return null; // signals "verify all"
   }
 
+  const allEntries = await readEntries(yamlPath);
+
   let basYamlText;
   try {
-    basYamlText = execSync(`git show ${baseSha}:${yamlPath}`, { encoding: 'utf-8' });
+    basYamlText = execSync(`git show ${baseSha}:${yamlPath}`, {
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
   } catch {
-    console.warn(`WARNING: Could not read ${yamlPath} at ${baseSha} — verifying ALL entries`);
-    return null;
+    // File is new in this PR — every entry in it is a new entry.
+    console.log(`[verify-submission] ${yamlPath} is new in this PR — all ${allEntries.length} entr${allEntries.length === 1 ? 'y' : 'ies'} are new.`);
+    return allEntries;
   }
 
   let baseData;
   try { baseData = await loadYaml(basYamlText); } catch { baseData = { servers: [] }; }
   const baseSet = new Set((baseData?.servers ?? []).map((s) => s.github_url));
-
-  const headText = readFileSync(yamlPath, 'utf-8');
-  const headData = await loadYaml(headText);
-  const allEntries = headData?.servers ?? [];
 
   // New = present in head but not in base (keyed by github_url)
   return allEntries.filter((s) => !baseSet.has(s.github_url));
@@ -267,31 +287,39 @@ async function getNewEntries(yamlPath) {
 // Main
 // ---------------------------------------------------------------------------
 async function main() {
-  const YAML_PATH = 'community-servers.yml';
+  // Both accepted intake paths: the hand-edited registry file and the
+  // one-file-per-server directory the /submit form writes into.
+  const YAML_PATHS = collectSubmissionFiles();
   const token = process.env.GITHUB_TOKEN;
+
+  if (YAML_PATHS.length === 0) {
+    console.log('[verify-submission] No submission files found. Exiting 0.');
+    return { failures: [], warnings: [] };
+  }
 
   if (!token && !DRY_RUN) {
     console.error('ERROR: GITHUB_TOKEN environment variable is required.');
     process.exit(1);
   }
 
-  // Load entries to verify
-  let entries;
-  if (VERIFY_ALL) {
-    const text = readFileSync(YAML_PATH, 'utf-8');
-    const data = await loadYaml(text);
-    entries = data?.servers ?? [];
-    console.log(`[verify-submission] --all flag: verifying all ${entries.length} entries.`);
-  } else {
-    entries = await getNewEntries(YAML_PATH);
-    if (entries === null) {
-      // Fallback to all
-      const text = readFileSync(YAML_PATH, 'utf-8');
-      const data = await loadYaml(text);
-      entries = data?.servers ?? [];
-      console.log(`[verify-submission] Verifying all ${entries.length} entries (fallback).`);
+  // Load entries to verify, across every submission file.
+  const entries = [];
+  for (const yamlPath of YAML_PATHS) {
+    if (VERIFY_ALL) {
+      const all = await readEntries(yamlPath);
+      console.log(`[verify-submission] --all flag: verifying all ${all.length} entries in ${yamlPath}.`);
+      entries.push(...all);
+      continue;
+    }
+
+    const delta = await getNewEntries(yamlPath);
+    if (delta === null) {
+      const all = await readEntries(yamlPath);
+      console.log(`[verify-submission] Verifying all ${all.length} entries in ${yamlPath} (fallback).`);
+      entries.push(...all);
     } else {
-      console.log(`[verify-submission] ${entries.length} new/changed entr${entries.length === 1 ? 'y' : 'ies'} to verify.`);
+      console.log(`[verify-submission] ${delta.length} new/changed entr${delta.length === 1 ? 'y' : 'ies'} in ${yamlPath}.`);
+      entries.push(...delta);
     }
   }
 
