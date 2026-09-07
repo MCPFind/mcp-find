@@ -77,7 +77,8 @@ mcp-find/
 │   ├── shared/            # Shared types, schemas, and constants
 │   ├── mcp-server/        # @mcpfind/server npm package
 │   └── sync/              # GitHub metadata sync worker
-├── community-servers.yml  # Community-submitted server registry
+├── community-servers.yml  # Community-submitted server registry (manual edits)
+├── submissions/           # One-file-per-server intake from the submit form
 └── supabase/              # Database migrations and config
 ```
 
@@ -107,7 +108,7 @@ The server exposes three tools:
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full guide.
 
-To submit a new server, add an entry to `community-servers.yml` and open a pull request. Servers must be open source, published to a package registry, and include at least one MCP tool.
+To submit a new server, either use the [submit form](https://mcpfind.org/submit) — which opens a prefilled PR adding `submissions/<your-server>.yml` — or add an entry to `community-servers.yml` by hand and open a pull request. Both paths run the same validation checks. Servers must be open source, published to a package registry, and include at least one MCP tool.
 
 ---
 
