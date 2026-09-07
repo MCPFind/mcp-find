@@ -1,7 +1,7 @@
 import { getServerBySlug, getIndexableServerSlugs } from "@/lib/queries";
 import { generateServerMetadata, generateServerJsonLd } from "@/lib/metadata";
 import { getQualityStatus } from "@/lib/quality-status";
-import { isIndexable } from "@/lib/indexable";
+import { isIndexable, readmeLengthOf } from "@/lib/indexable";
 import { safeJsonLd } from "@/lib/json-ld";
 import { generateConfig, CLIENT_CONFIGS, CATEGORY_LABELS } from "@mcpfind/shared";
 import type { ClientType } from "@mcpfind/shared";
@@ -168,7 +168,11 @@ export async function generateMetadata({
   // of the manifest-driven BROKEN check above. This is the same predicate used
   // by the sitemap and generateStaticParams — a server must clear this bar in
   // all three places or none (single source of truth, see lib/indexable.ts).
-  if (!isIndexable(server)) {
+  // The detail page already holds the README body (it renders it), so it
+  // derives the length locally instead of reading the generated column —
+  // readmeLengthOf() is the same expression Postgres computes for
+  // servers.readme_length, so this page and the sitemap cannot disagree.
+  if (!isIndexable({ ...server, readme_length: readmeLengthOf(server.readme_content) })) {
     return {
       ...base,
       robots: {

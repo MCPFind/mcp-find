@@ -6,7 +6,7 @@ import { unstable_cache } from 'next/cache';
 import { supabase } from './supabase';
 import type { Server, ServerListItem, ServerWithTools, ServerListParams, ServerListResponse } from '@mcpfind/shared';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@mcpfind/shared';
-import { isIndexable, type IndexableServerInput } from './indexable';
+import { isIndexable, readmeLengthOf, type IndexableServerInput } from './indexable';
 import { maxLastmod } from './sitemap-lastmod';
 
 // Excludes readme_content and search_vector to avoid pulling large blobs in list queries.
@@ -323,10 +323,93 @@ export const getTopServers = cache(
     )()
 );
 
+// ---------------------------------------------------------------------------
+// isIndexable() signal scans — README length, not README body
+// ---------------------------------------------------------------------------
+//
+// Every scan below evaluates isIndexable() over the whole `servers` table.
+// The predicate's README signal used to require readme_content, so all four
+// scans SELECTed the full README body across the table purely to compute
+// `trim(...).length >= 400`. With READMEs NULL on ~97.8% of rows that is
+// ~7 MB per request; a repaired enrichment backfill (~21k rows, ~12 KB mean)
+// turns it into ~250 MB per request on force-dynamic sitemap routes. That is
+// why the enrichment repair was blocked behind this.
+//
+// Migration 010 adds `servers.readme_length`, a GENERATED ALWAYS ... STORED
+// column holding exactly `length(btrim(readme_content))`, so the same
+// decision costs 4 bytes per row and never detoasts the README.
+//
+// The migration is deliberately NOT a deploy-order dependency: the first
+// window of each scan tries the lean column set, and if Postgres reports the
+// column does not exist yet, this module falls back to the old readme_content
+// set for the rest of the process and derives readme_length in JS. Same
+// eligible set either way — only the byte cost differs.
+
+interface SelectResult {
+  data: unknown[] | null;
+  error?: { code?: string; message?: string } | null;
+}
+
+/** null = not probed yet; false = migration 010 not applied on this database. */
+let _readmeLengthColumnAvailable: boolean | null = null;
+
+/** Test seam — resets the per-process probe. */
+export function __resetReadmeLengthProbe(): void {
+  _readmeLengthColumnAvailable = null;
+}
+
+function isMissingReadmeLengthColumn(error: SelectResult['error']): boolean {
+  if (!error) return false;
+  // PostgREST surfaces an unknown column as Postgres 42703 (undefined_column).
+  // The message check is a fallback for clients that drop the code.
+  return error.code === '42703' && (error.message ?? '').includes('readme_length');
+}
+
+/** A row shape carrying either the length column or the legacy body column. */
+type ReadmeSignalRow = { readme_length?: number | null; readme_content?: string | null };
+
+/**
+ * Runs one window of a signal scan, preferring the lean (readme_length)
+ * column set and degrading to the legacy (readme_content) set exactly once
+ * per process if migration 010 has not been applied yet.
+ *
+ * Returns rows already normalised so `readme_length` is populated on both
+ * paths — isIndexable() never sees the difference.
+ */
+async function selectIndexableSignalWindow<T extends ReadmeSignalRow>(
+  run: (columns: string) => PromiseLike<SelectResult>,
+  columns: { lean: string; legacy: string }
+): Promise<T[] | null> {
+  if (_readmeLengthColumnAvailable !== false) {
+    const { data, error } = await run(columns.lean);
+    if (!isMissingReadmeLengthColumn(error)) {
+      if (!error) _readmeLengthColumnAvailable = true;
+      return data as T[] | null;
+    }
+    _readmeLengthColumnAvailable = false;
+    console.warn(
+      '[queries] servers.readme_length is missing — migration 010 is not applied. ' +
+        'Falling back to selecting readme_content, which is correct but transfers ' +
+        'README bodies on every indexable scan.'
+    );
+  }
+
+  const { data } = await run(columns.legacy);
+  if (!data) return null;
+  return (data as T[]).map(row => ({
+    ...row,
+    readme_length: readmeLengthOf(row.readme_content ?? null),
+  }));
+}
+
 // Columns needed for both list display (ServerListItem) and the isIndexable()
-// signal check — SERVER_LIST_COLUMNS plus readme_content (excluded from the
-// list columns as a large blob, but required to evaluate signal 1).
-const INDEXABLE_LIST_COLUMNS = `${SERVER_LIST_COLUMNS},readme_content`;
+// signal check — SERVER_LIST_COLUMNS plus the README signal. `lean` names the
+// generated readme_length column (4 bytes/row); `legacy` is the pre-migration
+// fallback that pulls the body and measures it in JS.
+const INDEXABLE_LIST_COLUMNS = {
+  lean: `${SERVER_LIST_COLUMNS},readme_length`,
+  legacy: `${SERVER_LIST_COLUMNS},readme_content`,
+};
 
 type IndexableListRow = ServerListItem & IndexableServerInput;
 
@@ -346,14 +429,18 @@ export const getIndexableTopServers = cache(
         const SUPABASE_MAX = 1000;
         const results: ServerListItem[] = [];
         for (let offset = 0; results.length < limit; offset += SUPABASE_MAX) {
-          const { data } = await supabase
-            .from('servers')
-            .select(INDEXABLE_LIST_COLUMNS)
-            .eq('registry_status', 'active')
-            .order('github_stars', { ascending: false })
-            .range(offset, offset + SUPABASE_MAX - 1);
+          const data = await selectIndexableSignalWindow<IndexableListRow>(
+            columns =>
+              supabase
+                .from('servers')
+                .select(columns)
+                .eq('registry_status', 'active')
+                .order('github_stars', { ascending: false })
+                .range(offset, offset + SUPABASE_MAX - 1),
+            INDEXABLE_LIST_COLUMNS
+          );
           if (!data || data.length === 0) break;
-          for (const row of data as IndexableListRow[]) {
+          for (const row of data) {
             if (isIndexable(row)) {
               results.push(row as ServerListItem);
               if (results.length >= limit) break;
@@ -369,12 +456,17 @@ export const getIndexableTopServers = cache(
 );
 
 // Columns needed to evaluate isIndexable() in addition to the sitemap's own
-// slug/canonical_slug/updated_at fields. readme_content is the one signal not
-// already in SERVER_LIST_COLUMNS (excluded there as a large blob) — safe to
-// select here since this is scanned once per sitemap generation and this
-// text is never returned in the XML response.
-const SITEMAP_SIGNAL_COLUMNS =
-  'slug,canonical_slug,updated_at,registry_updated_at,registry_status,github_archived,readme_content,has_tools,tool_count,package_name,package_type,github_stars,category';
+// slug/canonical_slug/updated_at fields.
+//
+// The README signal is read as readme_length, never readme_content. This scan
+// covers the ENTIRE servers table on a force-dynamic route; selecting the body
+// here was the single largest transfer in the app and the reason the GitHub
+// enrichment backfill could not be turned back on.
+const SITEMAP_SIGNAL_COLUMNS = {
+  lean: 'slug,canonical_slug,updated_at,registry_updated_at,registry_status,github_archived,readme_length,has_tools,tool_count,package_name,package_type,github_stars,category',
+  legacy:
+    'slug,canonical_slug,updated_at,registry_updated_at,registry_status,github_archived,readme_content,has_tools,tool_count,package_name,package_type,github_stars,category',
+};
 
 type SitemapRow = Pick<
   ServerListItem,
@@ -421,14 +513,18 @@ const _getIndexableSitemapRows = cache(
         const SUPABASE_MAX = 1000;
         const results: SitemapUrlRow[] = [];
         for (let offset = 0; ; offset += SUPABASE_MAX) {
-          const { data } = await supabase
-            .from('servers')
-            .select(SITEMAP_SIGNAL_COLUMNS)
-            .eq('registry_status', 'active')
-            .order('github_stars', { ascending: false })
-            .range(offset, offset + SUPABASE_MAX - 1);
+          const data = await selectIndexableSignalWindow<SitemapRow>(
+            columns =>
+              supabase
+                .from('servers')
+                .select(columns)
+                .eq('registry_status', 'active')
+                .order('github_stars', { ascending: false })
+                .range(offset, offset + SUPABASE_MAX - 1),
+            SITEMAP_SIGNAL_COLUMNS
+          );
           if (!data || data.length === 0) break;
-          for (const row of data as SitemapRow[]) {
+          for (const row of data) {
             if (isIndexable(row)) {
               results.push({
                 slug: row.slug,
@@ -493,9 +589,13 @@ export const getServersSitemapPage = cache(
 );
 
 // Columns needed to evaluate isIndexable() for the generateStaticParams gate,
-// plus canonical_slug/slug for the static param itself.
-const INDEXABLE_SLUG_COLUMNS =
-  'slug,canonical_slug,registry_status,github_archived,readme_content,has_tools,tool_count,package_name,package_type,github_stars,category';
+// plus canonical_slug/slug for the static param itself. README signal read as
+// a length, never as a body — see selectIndexableSignalWindow above.
+const INDEXABLE_SLUG_COLUMNS = {
+  lean: 'slug,canonical_slug,registry_status,github_archived,readme_length,has_tools,tool_count,package_name,package_type,github_stars,category',
+  legacy:
+    'slug,canonical_slug,registry_status,github_archived,readme_content,has_tools,tool_count,package_name,package_type,github_stars,category',
+};
 
 type IndexableSlugRow = { slug: string; canonical_slug: string | null } & IndexableServerInput;
 
@@ -515,15 +615,19 @@ export const getIndexableServerSlugs = cache(
         const allRows: IndexableSlugRow[] = [];
         const results: string[] = [];
         for (let offset = 0; results.length < limit; offset += SUPABASE_MAX) {
-          const { data } = await supabase
-            .from('servers')
-            .select(INDEXABLE_SLUG_COLUMNS)
-            .eq('registry_status', 'active')
-            .order('github_stars', { ascending: false })
-            .range(offset, offset + SUPABASE_MAX - 1);
+          const data = await selectIndexableSignalWindow<IndexableSlugRow>(
+            columns =>
+              supabase
+                .from('servers')
+                .select(columns)
+                .eq('registry_status', 'active')
+                .order('github_stars', { ascending: false })
+                .range(offset, offset + SUPABASE_MAX - 1),
+            INDEXABLE_SLUG_COLUMNS
+          );
           if (!data || data.length === 0) break;
-          allRows.push(...(data as IndexableSlugRow[]));
-          for (const row of data as IndexableSlugRow[]) {
+          allRows.push(...data);
+          for (const row of data) {
             if (isIndexable(row)) {
               results.push(row.canonical_slug ?? row.slug);
               if (results.length >= limit) break;
@@ -575,15 +679,19 @@ export const getIndexableServersByCategory = cache(
         const SUPABASE_MAX = 1000;
         const results: ServerListItem[] = [];
         for (let offset = 0; ; offset += SUPABASE_MAX) {
-          const { data } = await supabase
-            .from('servers')
-            .select(INDEXABLE_LIST_COLUMNS)
-            .eq('category', category)
-            .eq('registry_status', 'active')
-            .order('github_stars', { ascending: false })
-            .range(offset, offset + SUPABASE_MAX - 1);
+          const data = await selectIndexableSignalWindow<IndexableListRow>(
+            columns =>
+              supabase
+                .from('servers')
+                .select(columns)
+                .eq('category', category)
+                .eq('registry_status', 'active')
+                .order('github_stars', { ascending: false })
+                .range(offset, offset + SUPABASE_MAX - 1),
+            INDEXABLE_LIST_COLUMNS
+          );
           if (!data || data.length === 0) break;
-          for (const row of data as IndexableListRow[]) {
+          for (const row of data) {
             if (isIndexable(row)) {
               results.push(row as ServerListItem);
             }
