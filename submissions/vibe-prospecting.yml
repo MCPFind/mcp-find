@@ -2,5 +2,5 @@ servers:
   - name: "Vibe Prospecting"
     github_url: "https://github.com/explorium-ai/vibeprospecting-mcp"
     package_name: "vibe-prospecting"
-    description: "B2B company and contact intelligence for prospecting workflows."
+    description: "Find and enrich companies and professionals from chat with B2B data on 150M+ companies and 800M+ professionals."
     category: "ai-ml"
