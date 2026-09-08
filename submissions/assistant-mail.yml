@@ -1,0 +1,7 @@
+servers:
+  - name: "Assistant Mail"
+    github_url: "https://github.com/AssistantMail/assistantmail-mcp"
+    package_name: "@assistantmail/assistantmail-mcp"
+    description: "Agent email with recipient allowlist and consent before send. For personal and small-team OpenClaw/Hermes operators. Free to try; Starter $9.99 in-app. Not for cold-outbound fleets."
+    package_type: "npm"
+    category: "communication"
