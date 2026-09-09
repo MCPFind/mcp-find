@@ -1,0 +1,103 @@
+---
+title: "BigQuery MCP Server: The Managed vs. Open-Source Options"
+description: "Google ships two separate ways to connect BigQuery to an AI agent: a managed remote MCP server and an open-source toolbox. Here's how they differ and which to pick."
+excerpt: "Google's managed BigQuery MCP server needs zero setup, but the open-source MCP Toolbox for Databases ships nine tools instead of a handful. Here's what each one actually gives you, and how to choose between them."
+date: "2026-08-31"
+updatedAt: "2026-08-31"
+author: "Adam Bush"
+authorUrl: "https://www.linkedin.com/in/adam-bush/"
+authorSameAs:
+  - "https://www.linkedin.com/in/adam-bush/"
+tags:
+  - "mcp"
+  - "developer"
+  - "databases"
+  - "bigquery"
+  - "google-cloud"
+category: "databases"
+focusKeyword: "bigquery mcp server"
+draft: false
+cornerstone: false
+topic_source: "new_topic"
+faqItems:
+  - question: "Does the BigQuery MCP server require a Google Cloud project with billing enabled?"
+    answer: "Yes, for both options. BigQuery queries run against your project's billing account whether you connect through the managed server or the open-source toolbox. Neither one waives BigQuery's own usage costs."
+  - question: "Can I use the BigQuery MCP server with tools other than Claude?"
+    answer: "Yes. Google built the managed server to work with ADK, Gemini CLI, and LangGraph in addition to Claude and Cursor, since it speaks standard MCP over a remote endpoint rather than being tied to one client."
+  - question: "What happens if my BigQuery MCP connection doesn't have the right IAM role?"
+    answer: "Both options fail closed. The managed server rejects the OAuth grant if your account lacks BigQuery access, and the open-source toolbox returns a permissions error from Application Default Credentials if the service account is missing the BigQuery Data Viewer or BigQuery User role."
+  - question: "Does the open-source MCP Toolbox support write operations to BigQuery?"
+    answer: "Its execute_sql tool can run write statements if the underlying credentials allow it, but the toolbox is built around read-heavy analysis tools like schema inspection, forecasting, and contribution analysis rather than table management."
+  - question: "Do I need to install anything to use the managed BigQuery MCP server?"
+    answer: "No. It's a hosted remote endpoint, so you only need to add its URL to your MCP client's configuration and sign in through OAuth. The open-source toolbox is the option that requires a local binary and its own install step."
+---
+
+Google doesn't hand you one obvious path for connecting an AI agent to BigQuery. It hands you two, and they solve different problems. The fully managed remote MCP server requires no installation at all, and it's the fastest way to get Claude or Cursor querying your data warehouse. The open-source MCP Toolbox for Databases takes the other route: you run it on your own machine, it uses your own credentials, and it ships a noticeably larger set of tools. Pick wrong and you're either redoing your setup or working around tools you assumed you'd have. Here's what each one actually does and how to tell which fits your situation. We track 672 database MCP servers in the MCPFind directory, and BigQuery's tooling lands in a category where the setup details vary a lot more than most people expect.
+
+## What Are the Two Ways to Connect BigQuery to an AI Agent?
+
+Google publishes both options, and they split apart at the very first step. The fully managed remote MCP server is hosted by Google itself at a fixed endpoint, needs zero local installation, and authenticates through the Google account you already have. The open-source MCP Toolbox for Databases is a binary you run yourself, and it authenticates through Application Default Credentials instead of an OAuth prompt.
+
+Managed is the quicker on-ramp. You paste an endpoint into your client config and sign in, and that's the entire setup. The toolbox asks more of you up front, but it exposes nine distinct tools against BigQuery instead of a handful, forecasting and contribution analysis among them, and the managed server offers neither. If forecasting or contribution analysis is part of what you need, that alone settles it in the toolbox's favor. Some teams end up running both, one for quick exploration and one for anything that needs the deeper tool surface. That mostly starts to pay off once several agents are hitting BigQuery across different projects, and it's overkill if you're one person testing an idea.
+
+## How Do You Set Up Google's Managed BigQuery MCP Server?
+
+As of January 2026, Google's managed BigQuery MCP server is still in preview. It lives at a fixed remote endpoint and authenticates through standard Google OAuth 2.0 using the BigQuery scope. You add it to your client the same way you'd add any remote MCP server, as a URL entry instead of a local command.
+
+Once connected, it authenticates with the same Google account you already use for BigQuery, so there's no separate API key to generate or rotate. The tool surface covers the core exploration loop: discovering datasets, inspecting table schemas, running queries, browsing results. It's also built for more than one client. Google lists ADK, Gemini CLI, and LangGraph as supported alongside Claude and Cursor, which matters if your team already has agents running outside a single chat interface. Take the preview label seriously, though, because the exact tool list and the endpoint behavior will keep shifting for a while.
+
+## What Does the Open-Source MCP Toolbox for Databases Add?
+
+The MCP Toolbox for Databases is Google's open-source alternative. Its BigQuery source ships nine tools where the managed server ships a smaller set: execute_sql, list_dataset_ids, list_table_ids, get_dataset_info, get_table_info, ask_data_insights, analyze_contribution, forecast, and search_catalog. Two of those, forecast and analyze_contribution, do real statistical work instead of simple lookups.
+
+It communicates over stdio, so you're running a local process and not hitting a hosted endpoint. Auth goes through Application Default Credentials, which means the service account it runs under needs the BigQuery User or BigQuery Data Viewer role at minimum. You'll also want the toolbox binary at v0.7.0 or later. The client config looks like any other local MCP server entry:
+
+```json
+{
+  "mcpServers": {
+    "bigquery-toolbox": {
+      "command": "./toolbox",
+      "args": ["--tools-file", "bigquery-tools.yaml"],
+      "env": {
+        "GOOGLE_APPLICATION_CREDENTIALS": "/path/to/service-account.json"
+      }
+    }
+  }
+}
+```
+
+search_catalog deserves its own mention. An agent can use it to find the right table from a natural-language description, so you don't have to already know the dataset and table name going in.
+
+## What Do Security and Auth Look Like for Each Option?
+
+The two options put access control in different hands, and that decides how much of BigQuery an agent can reach and who is responsible for drawing that line. OAuth ties the managed server to your Google account, so anything you can already see in BigQuery, the agent can see too. Application Default Credentials tie the open-source toolbox to whatever service account you configure, which gives you a narrower blast radius and also puts the burden of scoping that account correctly on you.
+
+The service-account model is usually the safer default once more than one person is involved, since you can hand the toolbox a service account with read-only access to specific datasets instead of pointing an agent at your own full-access credentials. All that provisioning is wasted motion on a project only you touch, where the managed server's OAuth flow gets you connected without opening IAM at all. Neither model stops a badly scoped agent from firing off an expensive query, though, so set BigQuery's own cost controls (custom quotas, maximum bytes billed) regardless of which server you pick.
+
+## Which BigQuery MCP Option Should You Use?
+
+The managed server is the right call when you want a working connection in minutes and forecasting or contribution analysis isn't part of the job. Reach for the open-source toolbox instead if any of these apply: your team wants the full nine-tool surface, compliance says the connection has to run under its own service account, or you want a local process you control end to end. If you can't name a specific tool you need out of the nine, start with the managed server. Switching to the toolbox later costs you a config change, not a rewrite.
+
+MCPFind doesn't carry a dedicated BigQuery listing yet, separate from Google's broader Cloud SQL Admin tooling, in [our databases category](/categories/databases), which tracks 672 servers overall. Treat vendor documentation as the primary source until that changes. If you want a general reference point in that category, [Supabase's official server](/servers/com-supabase-mcp) is the highest-starred entry. If you're still getting your bearings with MCP, [our plain-English guide to what MCP is](/blog/what-is-mcp) covers the groundwork this post assumes, and [ClickHouse's MCP server](/blog/clickhouse-mcp-server-analytics-olap-guide) walks through a similar managed-versus-self-hosted tradeoff one layer over in the data stack.
+
+## Frequently Asked Questions
+
+### Does the BigQuery MCP server require a Google Cloud project with billing enabled?
+
+Yes, for both. BigQuery queries bill to your project's billing account whether the connection came through the managed server or the open-source toolbox. Neither one waives BigQuery's own usage costs.
+
+### Can I use the BigQuery MCP server with tools other than Claude?
+
+Yes. Google built the managed server to work with ADK, Gemini CLI, and LangGraph on top of Claude and Cursor. It speaks standard MCP over a remote endpoint, so nothing about it is tied to a single client.
+
+### What happens if my BigQuery MCP connection doesn't have the right IAM role?
+
+Both options fail closed. If your account lacks BigQuery access, the managed server rejects the OAuth grant. The open-source toolbox returns a permissions error out of Application Default Credentials when the service account is missing the BigQuery Data Viewer or BigQuery User role.
+
+### Does the open-source MCP Toolbox support write operations to BigQuery?
+
+Its execute_sql tool will run write statements if the underlying credentials allow it. But the toolbox is built around read-heavy analysis work, schema inspection, forecasting, contribution analysis, and not around table management.
+
+### Do I need to install anything to use the managed BigQuery MCP server?
+
+No. It's a hosted remote endpoint, so adding its URL to your MCP client's configuration and signing in through OAuth is the whole install. The local binary and its own install step belong to the open-source toolbox.

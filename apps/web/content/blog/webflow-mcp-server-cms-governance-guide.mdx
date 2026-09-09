@@ -1,0 +1,100 @@
+---
+title: "Webflow MCP Server: CMS Automation and Governance Guide"
+description: "Webflow's MCP server now ships governance controls on top of its original CMS automation tools. Here's what changed in MCP 2.0, and how to connect an agent."
+excerpt: "Webflow's MCP server started as a way to let AI agents edit CMS content. MCP 2.0 adds branch workflows, granular access controls, and an audit trail on top of that. Here's what each layer actually does and how to set it up."
+date: "2026-09-02"
+updatedAt: "2026-09-02"
+author: "Adam Bush"
+authorUrl: "https://www.linkedin.com/in/adam-bush/"
+authorSameAs:
+  - "https://www.linkedin.com/in/adam-bush/"
+tags:
+  - "mcp"
+  - "developer"
+  - "devtools"
+  - "webflow"
+  - "cms"
+category: "devtools"
+focusKeyword: "webflow mcp server"
+draft: false
+cornerstone: false
+topic_source: "new_topic"
+faqItems:
+  - question: "Is Webflow's MCP server free to use?"
+    answer: "The MCP server itself doesn't carry a separate charge beyond your existing Webflow plan, but which MCP 2.0 governance features you can use, like custom roles per CMS collection, may depend on your plan tier. Check your account's plan page before assuming a feature is available."
+  - question: "Does the Webflow MCP server work with tools other than Claude?"
+    answer: "Yes. Webflow lists ChatGPT, Cursor, Slack, Postman, and Rovo as supported integrations alongside Claude, though Webflow's own adoption data shows the large majority of current MCP users connect through Claude specifically."
+  - question: "What happened to the original Webflow MCP server from 2025?"
+    answer: "It's still the foundation. MCP 2.0 adds governance and brand-control features on top of the April 2025 server rather than replacing it, so the original content-editing and site-management tools remain part of the same server."
+  - question: "Can the Webflow MCP server undo a change an AI agent made?"
+    answer: "Not automatically. The audit trail in MCP 2.0 records who or what made a change and when it happened. Your team can use that record to track down an unwanted edit and undo it by hand. Rollback stays manual, so review the trail regularly if agents have write access."
+  - question: "Do agent instructions in MCP 2.0 apply to every agent connected to a site?"
+    answer: "Agent instructions are stored at the site level, so any agent connecting through that Webflow site inherits the same voice, tone, and legal rules by default, rather than each agent needing its own separate configuration."
+---
+
+Webflow's MCP server exists so an AI agent can update your site without you clicking through the Designer yourself. It shipped in April 2025 handling CMS content and site editing, and then in July 2026 Webflow put out a much bigger update that people have been calling MCP 2.0 unofficially. The new part is governance: branch workflows, granular access controls, an audit trail. So if you poked at the original server and decided it was too loose to hand a whole team, this update is pointed directly at that objection. Below is what 2.0 actually adds, how it compares to the first version, who needs it, and how to wire it into your own client.
+
+## What Is the Webflow MCP Server?
+
+Webflow's MCP server hooks an AI agent straight into your site's CMS and design system. The agent reads and edits content, adjusts components, and manages pages, all without you opening the Designer. April 2025 was the launch, Webflow's first real step into agentic editing. MCP 2.0 landed in July 2026 and left that foundation in place, adding a governance layer above it.
+
+Webflow hosts the server itself. Self-hosting and patching stay on Webflow's side of the line. According to Webflow, MCP usage across its customer base is up 4x since January 2026, more than 30% of enterprise customers are actively using it, and roughly 90% of that usage runs through Claude. Those numbers explain the governance layer pretty well. Once dozens of people at a company can point an agent at a live site, unscoped write access at that scale is a liability.
+
+## What New Features Does Webflow MCP 2.0 Add?
+
+Four pieces, all governance-flavored. Your brand components and styles get wired straight into CMS data through the design-system integration. Agent instructions are simpler than the name suggests: somewhere to park the voice, tone, and legal rules you want an agent following, so you're not pasting them into a prompt every time. Nothing reaches production until you say so, because branch workflows hold changes in a dev environment first. Then there are granular access controls, with custom roles you define per site, per CMS collection, per page, or per locale.
+
+The audit trail is the piece that matters most once you're handing write access to more than one agent or person. Every change gets logged with AI attribution. You can see the specific agent or person behind an edit and the moment it happened. One caveat. Webflow hasn't published an itemized list of what the original 2025 server lacked in each of these areas, so treat MCP 2.0 as an addition and don't assume it closed any specific gap.
+
+## How Do You Connect an AI Agent to Webflow Using MCP?
+
+The server is hosted remotely, so connecting it looks like adding any other remote server to your client. Skip the local install step entirely, since there's no binary sitting on your machine to keep alive. In Claude, you add Webflow's MCP endpoint to your connector settings and authenticate with your Webflow account.
+
+```json
+{
+  "mcpServers": {
+    "webflow": {
+      "url": "https://mcp.webflow.com",
+      "type": "http"
+    }
+  }
+}
+```
+
+Once you're connected, the agent inherits whatever access your Webflow account already has, unless a workspace admin has scoped it down with MCP 2.0's role-based controls. MCPFind's own directory lists [Webflow's server](/servers/com-webflow-mcp) with 112 stars logged. Claude isn't your only option here either, since Webflow supports ChatGPT, Cursor, Slack, Postman, and Rovo as connection points, even though Claude accounts for most current usage. Exact pricing-tier gating for individual MCP 2.0 features wasn't independently confirmed for this guide, so go check your plan's feature list directly.
+
+## What Should You Watch Out for Before Turning On Agent Access?
+
+Giving an agent write access to a live site is a different proposition from giving it write access to staging, and Webflow's governance tools only help if somebody actually configures them. Branch workflows are the most useful default you can set. Route agent changes through an isolated dev branch first, and a mistake gets caught in a normal pull-request-style review before it reaches production.
+
+Access controls deserve the same attention as branching. Scope a role to a single CMS collection and it can't touch page structure or any other collection. That cap matters most when an agent gets misconfigured or a prompt runs broader than you intended. Skip that step, connect an agent with full account access, and you're leaning on the model's judgment a lot harder than Webflow's tooling was designed to require. So start narrow. Watching the audit trail for a few weeks costs a little patience and saves a lot of cleanup later. Widen access once you've seen the kinds of edits the agent actually makes.
+
+## Who Should Use Webflow's MCP Server?
+
+This one fits teams running a live marketing or content site who want an agent handling routine CMS updates without pulling a developer in for every change. That's a different audience from [MCPFind's Figma guide](/blog/figma-mcp-server-design-to-code). That guide covers a design-to-code workflow for developers translating mockups into components. Webflow's server assumes the site already exists. Its job is keeping content, brand, and structure consistent as more people and agents start touching it.
+
+If it's a small team with one person doing the edits, MCP 2.0's governance layer is overhead you probably don't need yet, and the original 2025-era feature set covers routine content updates fine on its own. It earns its keep the moment a second person or agent has write access and you need a record of who changed what.
+
+If you want the fundamentals before committing to any one vendor's server, [our plain-English guide to what MCP is](/blog/what-is-mcp) covers the background this post assumes. Webflow's listing sits in MCPFind's [devtools category](/categories/devtools) alongside 6,787 other developer-focused servers, including [Chrome DevTools MCP](/blog/chrome-devtools-mcp-server-guide) if you're also debugging the browser side of these same sites.
+
+## Frequently Asked Questions
+
+### Is Webflow's MCP server free to use?
+
+There's no separate charge for the MCP server itself beyond your existing Webflow plan. Which MCP 2.0 governance features you can actually use is a different question. Custom roles per CMS collection and similar controls may depend on your plan tier, so check your account's plan page before you assume a feature is available to you.
+
+### Does the Webflow MCP server work with tools other than Claude?
+
+Yes. Webflow lists ChatGPT, Cursor, Slack, Postman, and Rovo as supported integrations alongside Claude. Webflow's own adoption data still shows the large majority of current MCP users connecting through Claude specifically.
+
+### What happened to the original Webflow MCP server from 2025?
+
+Nothing happened to it. It's still the foundation. MCP 2.0 added governance and brand-control features on top of the April 2025 server instead of replacing it, so all the original content-editing and site-management tools are still there in the same server.
+
+### Can the Webflow MCP server undo a change an AI agent made?
+
+Not automatically. The audit trail in MCP 2.0 records who or what made a change and when it happened. Your team can use that record to track down an unwanted edit and undo it by hand. Rollback stays manual, so review the trail regularly if agents have write access.
+
+### Do agent instructions in MCP 2.0 apply to every agent connected to a site?
+
+Agent instructions live at the site level. Any agent connecting through that Webflow site picks up the same voice, tone, and legal rules by default, so you don't have to configure each agent separately.
