@@ -54,7 +54,7 @@ async function writeSyncLog(
 
   const { error: fallbackError } = await supabase.from('sync_log').update(payload).eq('id', logId);
   if (fallbackError) {
-    console.error(`[Sync Pipeline] sync_log UPDATE failed outright: ${fallbackError.message}`);
+    throw new Error(`sync_log terminal UPDATE failed: ${fallbackError.message}`);
   }
 }
 
@@ -144,126 +144,56 @@ export async function runSyncPipeline(): Promise<number> {
   let enriched = 0;
   let categorized = 0;
 
-  try {
-    // Stage 1: Registry Sync
-    console.log('[Stage 1] Syncing from registry...');
-    // onProgress keeps `synced` current per batch. Without it a throw from
-    // inside the stage — a 5xx partway through registry pagination is the
-    // likely shape of the 2026-09-05 failure — loses the count entirely,
-    // because the running total is a local the stage never returns.
-    synced = await syncFromRegistry(supabase, {
-      onProgress: total => {
-        synced = total;
-      },
-    });
-    console.log(`[Stage 1] Synced ${synced} servers`);
-
-    // Stage 1b: Community submissions.
-    //
-    // Runs after the registry so the registry-wins arbitration inside the
-    // stage is deciding against rows this run has already written, not against
-    // yesterday's snapshot. Runs before categorization so a newly ingested
-    // community server gets a category on the same night it lands rather than
-    // waiting 24 hours.
-    console.log('[Stage 1b] Ingesting community submissions...');
-    const community = await syncCommunitySubmissions(supabase);
-    communitySynced = community.ingested;
-    errors.push(...community.errors);
-    if (community.fatal) stageFailed = true;
-    console.log(
-      `[Stage 1b] Ingested ${communitySynced} community server(s) ` +
-        `(${community.registryOwned} deferred to the registry, ` +
-        `${community.skipped.length} not written, fatal=${community.fatal})`
-    );
-
-    // Stage 2: GitHub Enrichment
-    if (githubToken) {
-      console.log('[Stage 2] Enriching with GitHub data...');
-      const result = await enrichWithGitHub(supabase, githubToken);
-      enriched = result.enriched;
-      errors.push(...result.errors);
-      if (result.fatal) stageFailed = true;
-      console.log(
-        `[Stage 2] Enriched ${enriched} servers (${result.unchanged} unchanged, fatal=${result.fatal})`
-      );
-    } else {
-      console.warn('[Stage 2] Skipped — no enrichment token configured');
-      errors.push('GitHub enrichment skipped: no enrichment token configured');
+  // Each stage can make useful progress against the existing catalogue even
+  // when upstream registry pagination fails. All failures remain visible.
+  const stage = async (name: string, run: () => Promise<void>) => {
+    try {
+      await run();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      errors.push(message);
       stageFailed = true;
+      console.error(`[${name}] Failed: ${message}`);
     }
+  };
 
-    // Stage 3: Categorization
-    console.log('[Stage 3] Categorizing servers...');
-    categorized = await categorizeServers(supabase);
-    console.log(`[Stage 3] Categorized ${categorized} servers`);
+  await stage('Registry', async () => {
+    synced = await syncFromRegistry(supabase, {
+      onProgress: total => { synced = total; },
+      onIssue: message => { errors.push(message); stageFailed = true; },
+    });
+  });
+  await stage('Community', async () => {
+    const result = await syncCommunitySubmissions(supabase);
+    communitySynced = result.ingested;
+    errors.push(...result.errors);
+    stageFailed ||= result.fatal;
+  });
+  await stage('GitHub', async () => {
+    if (!githubToken) throw new Error('GitHub enrichment skipped: no enrichment token configured');
+    const result = await enrichWithGitHub(supabase, githubToken);
+    enriched = result.enriched;
+    errors.push(...result.errors);
+    stageFailed ||= result.fatal;
+  });
+  await stage('Categorization', async () => {
+    categorized = await categorizeServers(supabase, total => { categorized = total; });
+  });
 
-    // Update sync log first — mark the terminal status before refreshing
-    // caches so we never push a revalidation against an unconfirmed state.
-    //
-    // 'completed' is a claim about the whole pipeline, so a failed stage has
-    // to be able to withhold it. Otherwise `errors` is decorative: the row
-    // says completed, every watchdog reads status, and nobody reads errors.
-    await writeSyncLog(
-      supabase,
-      log.id,
-      {
-        status: stageFailed ? 'failed' : 'completed',
-        completed_at: new Date().toISOString(),
-        servers_synced: synced,
-        servers_enriched: enriched,
-        errors,
-      },
-      communitySynced
-    );
+  await writeSyncLog(supabase, log.id, {
+    status: stageFailed ? 'failed' : 'completed',
+    completed_at: new Date().toISOString(),
+    servers_synced: synced,
+    servers_enriched: enriched,
+    errors,
+  }, communitySynced);
 
-    if (stageFailed) {
-      console.error(
-        `[Sync Pipeline] FAILED — ${synced} synced, ${communitySynced} community, ` +
-          `${enriched} enriched, ${categorized} categorized; ` +
-          `${errors.length} error(s): ${errors.join(' | ')}`
-      );
-      // Non-zero exit so the scheduler and watchdog see a failure rather than
-      // a silent green run.
-      return 1;
-    }
-
-    console.log(
-      `[Sync Pipeline] Complete — ${synced} synced, ${communitySynced} community, ` +
-        `${enriched} enriched, ${categorized} categorized`
-    );
-
-    // Stage 4: Trigger site revalidation so cached counts refresh immediately.
-    // Runs after sync_log is committed so caches are refreshed against confirmed data.
-    console.log('[Stage 4] Triggering site cache revalidation...');
-    await triggerSiteRevalidation();
-  } catch (err) {
-    const errorMsg = err instanceof Error ? err.message : String(err);
-    errors.push(errorMsg);
-    console.error(`[Sync Pipeline] Failed:`, errorMsg);
-
-    // Same counters as the success path. A run that died is still a run that
-    // did something, and sync_log is the only place that record exists.
-    await writeSyncLog(
-      supabase,
-      log.id,
-      {
-        status: 'failed',
-        completed_at: new Date().toISOString(),
-        servers_synced: synced,
-        servers_enriched: enriched,
-        errors,
-      },
-      communitySynced
-    );
-
-    console.error(
-      `[Sync Pipeline] Partial run recorded — ${synced} synced, ${communitySynced} community, ` +
-        `${enriched} enriched, ${categorized} categorized before the failure.`
-    );
-
-    return 1;
-  }
-
-  return 0;
+  // Successful writes remain real even in a failed run. The Actions workflow
+  // performs targeted slug revalidation after either outcome; this optional
+  // local-run hook refreshes directory aggregate caches.
+  if (synced + communitySynced + enriched + categorized > 0) await triggerSiteRevalidation();
+  console.log(`[Sync Pipeline] ${stageFailed ? 'FAILED (partial)' : 'Complete'} — ` +
+    `${synced} registry changed, ${communitySynced} community changed, ` +
+    `${enriched} enriched, ${categorized} categorized; ${errors.length} error(s)`);
+  return stageFailed ? 1 : 0;
 }
-

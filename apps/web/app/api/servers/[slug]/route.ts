@@ -11,6 +11,7 @@ export async function GET(
     return NextResponse.json({ error: 'Invalid slug format' }, { status: 400 });
   }
 
+  try {
   const server = await getServerBySlug(slug);
   if (!server) {
     return NextResponse.json({ error: 'Server not found' }, { status: 404 });
@@ -21,4 +22,9 @@ export async function GET(
   return NextResponse.json(server, {
     headers: { 'Cache-Control': 'public, s-maxage=604800, stale-while-revalidate=86400' },
   });
+  } catch {
+    return NextResponse.json({ error: 'Directory temporarily unavailable. Please retry.' }, {
+      status: 503, headers: { 'Cache-Control': 'no-store', 'Retry-After': '30' },
+    });
+  }
 }

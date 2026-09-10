@@ -12,7 +12,7 @@ import { getAllPosts } from "@/lib/blog";
 import { getIndexableTopServers, getServerCount, listServers } from "@/lib/queries";
 import { getQualityStatus } from "@/lib/quality-status";
 import { CATEGORIES, CATEGORY_LABELS, SITE_URL, FALLBACK_SERVER_COUNT_DISPLAY } from "@mcpfind/shared";
-import type { Category, ServerListItem } from "@mcpfind/shared";
+import type { Category } from "@mcpfind/shared";
 import { HOME_FAQS } from "@/lib/home-faqs";
 import { ORGANIZATION_SAMEAS } from "@/lib/org";
 import { KNOWN_LANGUAGES } from "@/lib/filter-utils";
@@ -70,12 +70,7 @@ export const maxDuration = 15;
 // Static metadata — description uses a conservative number to avoid drift.
 // The live serverCount from Supabase is shown dynamically in the hero section.
 export async function generateMetadata(): Promise<Metadata> {
-  let serverCount = 0;
-  try {
-    serverCount = await getServerCount();
-  } catch {
-    // Supabase not available during build — fall back to empty (filtered out below)
-  }
+  const serverCount = await getServerCount();
   const countStr = serverCount > 0
     ? `${serverCount.toLocaleString()}+`
     : FALLBACK_SERVER_COUNT_DISPLAY;
@@ -182,12 +177,7 @@ async function FeaturedServersSection() {
   // link isIndexable() (gated) servers — getIndexableTopServers() is the
   // gated equivalent of getTopServers(), pre-filtered by the Slice 2 quality
   // bar so this never resurfaces a thin/non-gated server page.
-  let featuredServers: ServerListItem[] = [];
-  try {
-    featuredServers = await getIndexableTopServers(6);
-  } catch {
-    // Supabase not available
-  }
+  const featuredServers = await getIndexableTopServers(6);
   if (featuredServers.length === 0) return null;
   return (
     <section className="py-24 px-4 sm:px-6 lg:px-8">
@@ -198,7 +188,7 @@ async function FeaturedServersSection() {
               Featured Servers
             </h2>
             <p className="text-neutral-500">
-              Hand-picked, production-ready integrations
+              Popular servers with documentation signals
             </p>
           </div>
           <Link
@@ -223,13 +213,7 @@ async function FeaturedServersSection() {
 }
 
 async function RecentServersSection() {
-  let recentServers: ServerListItem[] = [];
-  try {
-    const result = await listServers({ sort: "updated", limit: 8 });
-    recentServers = result.servers;
-  } catch {
-    // Supabase not available
-  }
+  const { servers: recentServers } = await listServers({ sort: "updated", limit: 8 });
   if (recentServers.length === 0) return null;
   return (
     <section className="py-24 px-4 sm:px-6 lg:px-8 bg-neutral-950/50">
@@ -313,12 +297,7 @@ export default async function HomePage() {
   // Only await the lightweight count query here so the hero streams immediately.
   // Featured and Recently Updated sections fetch their data in child components
   // wrapped in <Suspense>, so they don't block the above-the-fold render.
-  let serverCount = 0;
-  try {
-    serverCount = await getServerCount();
-  } catch {
-    // Supabase not available (e.g., during build without credentials)
-  }
+  const serverCount = await getServerCount();
 
   const latestPosts = getAllPosts({ limit: 3 });
 
@@ -340,7 +319,7 @@ export default async function HomePage() {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
             </span>
-            Now featuring {serverCount > 0 ? `${serverCount.toLocaleString()}+` : FALLBACK_SERVER_COUNT_DISPLAY} indexed MCP servers
+            Now featuring {serverCount > 0 ? `${serverCount.toLocaleString()}+` : FALLBACK_SERVER_COUNT_DISPLAY} directory entries
           </div>
 
           {/* Headline */}
@@ -397,9 +376,9 @@ export default async function HomePage() {
             <div className="w-px h-12 bg-neutral-800 hidden sm:block self-center" />
             <div className="flex flex-col items-center">
               <span className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">
-                1M+
+                Free
               </span>
-              <span className="text-neutral-500 mt-1">Weekly Downloads</span>
+              <span className="text-neutral-500 mt-1">Open directory</span>
             </div>
             <div className="w-px h-12 bg-neutral-800 hidden sm:block self-center" />
             <div className="flex flex-col items-center">
@@ -412,6 +391,18 @@ export default async function HomePage() {
         </div>
       </AuroraBackground>
 
+      <section aria-labelledby="choose-task" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <h2 id="choose-task" className="text-2xl font-bold text-white mb-3">What would you like your AI to do?</h2>
+        <p className="text-neutral-400 mb-6">Start with a task, then choose your client and follow the maintainer’s setup.</p>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            ["Connect a calendar", "/blog/best-mcp-servers-productivity-calendar-tasks-notes"],
+            ["Work with a GitHub repository", "/blog/github-mcp-server-claude-code-tutorial"],
+            ["Connect tools in Cursor", "/blog/how-to-use-mcp-with-cursor"],
+            ["Run tools with Docker", "/blog/docker-mcp-gateway-setup"],
+          ].map(([label, href]) => <Link key={href} href={href!} className="rounded-xl border border-neutral-800 p-5 text-blue-300 hover:border-blue-500">{label}</Link>)}
+        </div>
+      </section>
       {/* ── 2. Features (Bento) ── */}
       <section className="py-24 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
@@ -434,7 +425,7 @@ export default async function HomePage() {
               </div>
               <h3 className="font-bold text-neutral-200 mb-2">Discover {serverCount > 0 ? `${serverCount.toLocaleString()}+` : "Thousands of"} MCP Servers</h3>
               <p className="text-neutral-400 text-sm leading-relaxed">
-                Browse a curated directory of official and community-built MCP servers across databases, developer tools, cloud services, and more. Filter by language, transport type, and category.
+                Browse a directory of official and community-built MCP servers across databases, developer tools, cloud services, and more. Filter by language, transport type, and category.
               </p>
             </div>
             <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-6">
@@ -443,16 +434,16 @@ export default async function HomePage() {
               </div>
               <h3 className="font-bold text-neutral-200 mb-2">One-Command Install</h3>
               <p className="text-neutral-400 text-sm leading-relaxed">
-                Every server comes with ready-to-use install commands and JSON config examples. Copy and paste directly into your Claude Desktop or AI client config.
+                Supported packages include configuration examples. Choose your AI client, check the maintainer’s requirements, and follow the setup instructions.
               </p>
             </div>
             <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-6">
               <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center mb-4">
                 <IconShieldCheck size={20} className="text-emerald-400" />
               </div>
-              <h3 className="font-bold text-neutral-200 mb-2">Live &amp; Working</h3>
+              <h3 className="font-bold text-neutral-200 mb-2">Check Before Connecting</h3>
               <p className="text-neutral-400 text-sm leading-relaxed">
-                Dead and unreachable servers are automatically removed from the directory. The install configs you copy here point to servers that are actually up and running.
+                Repository metadata and documentation help you evaluate a server. A listing is not a security audit or a guarantee of availability; check its permissions and current setup guide.
               </p>
             </div>
             <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-6">
@@ -461,7 +452,7 @@ export default async function HomePage() {
               </div>
               <h3 className="font-bold text-neutral-200 mb-2">Rich Tool Documentation</h3>
               <p className="text-neutral-400 text-sm leading-relaxed">
-                Each server entry lists every tool it exposes &mdash; from read_file to kubernetes_deploy &mdash; so you know exactly what capabilities you&apos;re adding to your AI. Complete with transport type, version history, and configuration examples.
+                Where provided by the source, entries list the tools they expose &mdash; from read_file to kubernetes_deploy &mdash; so you know exactly what capabilities you&apos;re adding to your AI. Complete with transport type, version history, and configuration examples.
               </p>
             </div>
           </div>

@@ -1,0 +1,50 @@
+name: Notify IndexNow of deployed content changes
+
+# Vercel reports success only after deployment; a push or an existing key file
+# does not establish that the changed article URLs have reached production.
+on:
+  deployment_status:
+
+permissions:
+  contents: read
+  deployments: read
+
+concurrency:
+  group: indexnow-content
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    if: >-
+      github.event.deployment_status.state == 'success' &&
+      github.event.deployment_status.environment == 'Production' &&
+      github.event.deployment.environment == 'Production' &&
+      github.event.deployment.creator.login == 'vercel[bot]' &&
+      github.event.deployment_status.creator.login == 'vercel[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.deployment.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify deployment and build changed URL payload
+        id: urls
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/indexnow-deployment.mjs
+      - name: Notify IndexNow
+        if: steps.urls.outputs.count != '0'
+        run: |
+          set -euo pipefail
+          # Additional ownership verification, never used as deployment proof.
+          key=441d971f3ef7aa26f8afe37dfc123a8f
+          if [ "$(curl -fsS --connect-timeout 5 --max-time 10 "https://mcpfind.org/${key}.txt")" != "$key" ]; then
+            echo '::error::IndexNow ownership verification failed'
+            exit 1
+          fi
+          curl --fail-with-body --connect-timeout 10 --max-time 30 --retry 2 --retry-delay 5 \
+            -X POST https://api.indexnow.org/indexnow \
+            -H 'Content-Type: application/json; charset=utf-8' \
+            --data-binary @/tmp/indexnow-payload.json

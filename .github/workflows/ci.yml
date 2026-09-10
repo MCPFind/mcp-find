@@ -70,12 +70,14 @@ jobs:
         run: pnpm type-check
 
   test:
-    name: Unit tests (vitest, 21 files / 348 tests)
+    name: Unit tests (vitest)
     needs: [guard]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -93,11 +95,15 @@ jobs:
       # failing test shows up at the top of the check and inline on the
       # changed file instead of only in the raw step log. The default
       # reporter is kept alongside it so the log stays readable.
+      - name: Check changed blog publication dates and sources
+        env:
+          BLOG_BASE_REF: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: node scripts/check-blog-release.mjs
       - name: Run test suite
         run: pnpm --filter @mcpfind/web test --reporter=default --reporter=github-actions
 
   build:
-    name: Next.js build
+    name: Next.js compile (no production data)
     # Gated on the cheap checks so a broken PR does not burn a full build.
     needs: [type-check, test]
     runs-on: ubuntu-latest
@@ -113,5 +119,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build @mcpfind/shared
         run: pnpm --filter @mcpfind/shared build
-      - name: Build
-        run: pnpm build
+      # Fork PRs must not receive database secrets. Compilation checks routes,
+      # modules and types without publishing fabricated empty catalog content.
+      # A credentialed full prerender build remains required before deployment.
+      - name: Compile Next.js without prerendering production data
+        run: pnpm --filter @mcpfind/web exec next build --experimental-build-mode compile

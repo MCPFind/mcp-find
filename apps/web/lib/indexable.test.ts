@@ -131,7 +131,7 @@ describe('isIndexable — signal counting', () => {
     expect(isIndexable(onlyName)).toBe(false);
   });
 
-  it('github_stars signal requires > 0, not just non-null', () => {
+  it('documented hosted setup can qualify without a local package', () => {
     const zeroStars = baseServer({
       readme_length: readmeLengthOf('x'.repeat(500)),
       has_tools: true,
@@ -148,7 +148,7 @@ describe('isIndexable — signal counting', () => {
     expect(isIndexable(withStars)).toBe(true);
   });
 
-  it('category signal is a simple presence check', () => {
+  it('source documentation and tools plus category can qualify', () => {
     const server = baseServer({
       readme_length: readmeLengthOf('x'.repeat(500)),
       has_tools: true,
@@ -242,8 +242,9 @@ describe('README signal — length parity with the old content-based predicate',
       const decided = isIndexable(
         baseServer({
           readme_length: readmeLengthOf(content),
+          package_name: 'documented-server',
+          package_type: 'npm',
           github_stars: 10,
-          category: 'developer-tools',
         })
       );
       expect(decided).toBe(legacyReadmeSignal(content));
@@ -259,7 +260,7 @@ describe('README signal — length parity with the old content-based predicate',
     expect(readmeLengthOf('\n\t x \r\n')).toBe(1);
   });
 
-  it('scores a null readme_length as no signal, exactly as null content did', () => {
+  it('does not substitute metadata or a tools flag for documentation', () => {
     // Three non-README signals present => indexable regardless of README.
     expect(
       isIndexable(
@@ -270,10 +271,22 @@ describe('README signal — length parity with the old content-based predicate',
           category: 'developer-tools',
         })
       )
-    ).toBe(true);
+    ).toBe(false);
     // Two non-README signals => the missing README is what keeps it out.
     expect(
       isIndexable(baseServer({ readme_length: null, github_stars: 3, category: 'developer-tools' }))
     ).toBe(false);
+  });
+});
+
+describe('documentation is required before metadata completeness', () => {
+  it('excludes the old metadata-only three-signal loophole', () => {
+    expect(isIndexable(baseServer({ package_name: 'foo', package_type: 'npm', github_stars: 100, category: 'databases' }))).toBe(false);
+  });
+  it('preserves documented hosted servers without a local package command', () => {
+    expect(isIndexable(baseServer({ readme_length: 1000, github_stars: 50, category: 'cloud' }))).toBe(true);
+  });
+  it('accepts actual tool evidence with setup and category', () => {
+    expect(isIndexable(baseServer({ package_name: 'foo', package_type: 'pypi', tool_count: 2, category: 'databases' }))).toBe(true);
   });
 });

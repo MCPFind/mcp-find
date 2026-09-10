@@ -1,13 +1,14 @@
+import { sitemapResponse } from '@/lib/sitemap-response';
 import { getServersSitemapPage } from '@/lib/queries';
 import { SITE_URL } from '@mcpfind/shared';
 import { notFound } from 'next/navigation';
-import { renderSitemapUrl, SITEMAP_CACHE_CONTROL } from '@/lib/sitemap-lastmod';
+import { renderSitemapUrl } from '@/lib/sitemap-lastmod';
 
 export const BATCH_SIZE = 5000;
 export const MAX_BATCHES = 10; // Safety cap — supports up to 50,000 servers
 
 export async function getServersSitemapBatch(batchIndex: number): Promise<Response> {
-  if (isNaN(batchIndex) || batchIndex < 0 || batchIndex >= MAX_BATCHES) {
+  if (!Number.isInteger(batchIndex) || batchIndex < 0 || batchIndex >= MAX_BATCHES) {
     notFound();
   }
 
@@ -36,10 +37,5 @@ export async function getServersSitemapBatch(batchIndex: number): Promise<Respon
 ${servers.map(s => renderUrl(s.slug, s.canonical_slug, s.lastmod)).join('\n')}
 </urlset>`;
 
-  return new Response(xml, {
-    headers: {
-      'Content-Type': 'application/xml',
-      'Cache-Control': SITEMAP_CACHE_CONTROL,
-    },
-  });
+  return sitemapResponse(xml);
 }

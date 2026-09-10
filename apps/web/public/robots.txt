@@ -8,6 +8,9 @@ Allow: /
 # bare /servers and every /servers/<slug> detail page remain fully
 # crawlable, and default pagination (page param alone, no other filters) is
 # allowed to a bounded depth instead of the full ~1,016-page tail.
+Disallow: /directory-search
+Disallow: /directory-page/
+Disallow: /servers?*category=
 Disallow: /servers?*q=
 Disallow: /servers?*sort=
 Disallow: /servers?*pkg=
@@ -81,6 +84,9 @@ Disallow: /
 User-agent: Amazonbot
 Crawl-delay: 10
 Allow: /
+Disallow: /directory-search
+Disallow: /directory-page/
+Disallow: /servers?*category=
 Disallow: /servers?*q=
 Disallow: /servers?*sort=
 Disallow: /servers?*pkg=
@@ -102,35 +108,8 @@ Allow: /servers?page=8$
 Allow: /servers?page=9$
 Allow: /servers?page=10$
 
-# ---------------------------------------------------------------------------
-# Welcomed AI and search crawlers. Deliberate GEO posture - unchanged.
-# Note (2026-09-07): each named group below overrides User-agent: * entirely,
-# so these six do NOT inherit the T3 query-param limits. That is the existing
-# behavior and is left as-is to avoid any discoverability risk during crawl
-# recovery. If their query-permutation volume later becomes a problem, copy
-# the Disallow/Allow block from the Amazonbot group into the offending group
-# rather than deleting the group.
-# Googlebot is intentionally not listed: with no named group it inherits
-# User-agent: * (Allow: / plus the T3 limits), which is the intended state.
-# ---------------------------------------------------------------------------
-
-User-agent: GPTBot
-Allow: /
-
-User-agent: ClaudeBot
-Allow: /
-
-User-agent: PerplexityBot
-Allow: /
-
-User-agent: Google-Extended
-Allow: /
-
-User-agent: Bingbot
-Allow: /
-
-User-agent: Applebot-Extended
-Allow: /
+# Search and AI crawlers use the wildcard rules, including query-space limits.
+# Canonical server details, categories and machine indexes remain available.
 
 # AI-readable content index: https://mcpfind.org/llms.txt
 # (kept as a comment - "llms.txt:" is not a robots.txt directive and no

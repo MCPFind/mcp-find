@@ -1,15 +1,16 @@
 import { NextResponse } from 'next/server';
-import { getServerCount, getTopServers } from '@/lib/queries';
+import { getServerCount, getIndexableTopServers } from '@/lib/queries';
 import { SITE_NAME, SITE_URL, CATEGORY_LABELS, CATEGORY_LLM_DESCRIPTIONS } from '@mcpfind/shared';
 import type { Category } from '@mcpfind/shared';
 import { getAllPosts } from '@/lib/blog';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 21600;
+export const maxDuration = 15;
 
 export async function GET() {
   const [count, topServers] = await Promise.all([
     getServerCount(),
-    getTopServers(20),
+    getIndexableTopServers(20),
   ]);
   const blogPosts = getAllPosts({ limit: 10 });
 
@@ -18,7 +19,7 @@ export async function GET() {
     .join('\n');
 
   const topServerLines = topServers
-    .map(s => `- [${s.name}](${SITE_URL}/servers/${s.slug}): ${(s.description || '').slice(0, 100)}`)
+    .map(s => `- [${s.name}](${SITE_URL}/servers/${s.canonical_slug ?? s.slug}): ${(s.description || '').slice(0, 100)}`)
     .join('\n');
 
   const blogLines = blogPosts
@@ -48,7 +49,7 @@ ${blogLines}
   return new NextResponse(content, {
     headers: {
       'Content-Type': 'text/plain; charset=utf-8',
-      'Cache-Control': 'public, max-age=86400',
+      'Cache-Control': 'public, max-age=3600, s-maxage=21600, stale-while-revalidate=86400',
     },
   });
 }

@@ -1,9 +1,12 @@
+import { serveSitemap, sitemapResponse } from '@/lib/sitemap-response';
 import { getStaticSitemapEntries } from '@/lib/sitemap-static-pages';
-import { renderSitemapUrl, SITEMAP_CACHE_CONTROL } from '@/lib/sitemap-lastmod';
+import { renderSitemapUrl } from '@/lib/sitemap-lastmod';
 
+// Never scan Supabase during build; successful XML is explicitly CDN-cached.
 export const dynamic = 'force-dynamic';
+export const maxDuration = 15;
 
-export async function GET() {
+async function renderSitemap() {
   // The URL list — and every lastmod on it — is built in lib/sitemap-static-pages.ts
   // so that sitemap.xml can advertise this shard's real max lastmod from the
   // same source. No page here gets a `today` fallback any more: `/`, `/servers`
@@ -16,10 +19,9 @@ export async function GET() {
 ${entries.map(entry => renderSitemapUrl(entry)).join('\n')}
 </urlset>`;
 
-  return new Response(xml, {
-    headers: {
-      'Content-Type': 'application/xml',
-      'Cache-Control': SITEMAP_CACHE_CONTROL,
-    },
-  });
+  return sitemapResponse(xml);
+}
+
+export async function GET() {
+  return serveSitemap(renderSitemap);
 }

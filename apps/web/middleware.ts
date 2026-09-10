@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { parseFilterParams, buildFilterUrl } from './lib/filter-utils';
 
 // NOTE: The static deleted-server-slugs.json 410 block was removed on 2026-06-01
 // (feat/curate-and-live-count). It over-blocked ~5,500 servers that were re-added
@@ -24,9 +25,25 @@ function getClientIp(request: NextRequest): string {
 }
 
 export function middleware(request: NextRequest) {
-  if (!request.nextUrl.pathname.startsWith('/api/')) {
-    return NextResponse.next();
+  // Keep arbitrary queries off the canonical ISR page without changing public URLs.
+  const browseQuery = request.nextUrl.pathname === '/servers' && request.nextUrl.search !== '';
+  let destination: URL | undefined;
+  if (browseQuery) {
+    const raw = Object.fromEntries(request.nextUrl.searchParams);
+    if ((raw.q?.length ?? 0) > 120 || (raw.page && (!/^\d+$/.test(raw.page) || Number(raw.page) > 100))) {
+      return NextResponse.json({ error: 'Search query or page exceeds the supported range' },
+        { status: 400, headers: { 'Cache-Control': 'no-store' } });
+    }
+    const filters = parseFilterParams(raw);
+    const normalized = new URL(buildFilterUrl(filters), request.url);
+    if (filters.page > 1) normalized.searchParams.set('page', String(filters.page));
+    if (normalized.search !== request.nextUrl.search) return NextResponse.redirect(normalized, 308);
+    destination = new URL(request.url);
+    destination.pathname = [...normalized.searchParams.keys()].every(key => key === 'page')
+      ? `/directory-page/${filters.page}` : '/directory-search';
   }
+  const proceed = () => destination ? NextResponse.rewrite(destination) : NextResponse.next();
+  if (!request.nextUrl.pathname.startsWith('/api/') && !browseQuery && request.nextUrl.pathname !== '/directory-search') return proceed();
 
   const ip = getClientIp(request);
   const now = Date.now();
@@ -34,8 +51,13 @@ export function middleware(request: NextRequest) {
 
   if (!entry || entry.resetAt < now) {
     // Lazy eviction: stale entry is replaced
+    // Bound memory even when many distinct clients arrive in one window.
+    if (rateMap.size >= 10000) {
+      for (const [key, value] of rateMap) if (value.resetAt < now) rateMap.delete(key);
+      if (rateMap.size >= 10000) rateMap.delete(rateMap.keys().next().value!);
+    }
     rateMap.set(ip, { count: 1, resetAt: now + WINDOW_MS });
-    return NextResponse.next();
+    return proceed();
   }
 
   entry.count++;
@@ -54,7 +76,7 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  return NextResponse.next();
+  return proceed();
 }
 
-export const config = { matcher: ['/api/:path*'] };
+export const config = { matcher: ['/api/:path*', '/servers', '/directory-search'] };

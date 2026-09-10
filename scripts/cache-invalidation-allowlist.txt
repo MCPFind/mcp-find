@@ -1,0 +1,41 @@
+# Blanket-tag revalidation acknowledgements — CHECK A of
+# scripts/check-cache-invalidation.mjs (D-2 / C-24a, task T9).
+#
+# Format, one entry per line:
+#   <repo-relative file>::<tag>::<fan-out cap>
+#
+# The fan-out cap is the number of `unstable_cache(..., { tags: [...] })`
+# call sites in apps/web/lib/queries.ts that declared this tag when the
+# exemption was granted. The guard fails if the live count EXCEEDS the cap
+# — that is how a merely-aggregate tag turns into a wave-wide one, and it
+# is the regression this list exists to catch. It also fails if a file/tag
+# pair calls revalidateTag() with no entry here at all.
+#
+# This file is a ONE-WAY RATCHET. Entries may be removed; a new entry, or a
+# raised cap, must land in a commit of its own, never in the same commit as
+# the change it excuses.
+#
+# Opened 2026-09-03 by task 32 (servers-listing invalidation audit). Before
+# this file existed, CHECK A exempted a blanket-tag call whenever ANY
+# narrower revalidateTag() call appeared elsewhere in the same file. Both
+# entries below were silently exempt under that rule: the per-slug
+# `server-${slug}` loop in route.ts satisfied the "narrow call present"
+# test, so neither aggregate call was ever examined.
+
+# The documented full-purge escape hatch, reachable only via an explicit
+# { full: true } payload (apps/web/app/api/revalidate/route.ts::POST). The
+# daily sync never sends it — .github/workflows/sync.yml's "Bust Vercel
+# cache" step uses it only as the fallback when the changed-slug query
+# fails. Wave-wide by design; that is the entire point of the escape hatch.
+apps/web/app/api/revalidate/route.ts::servers::13
+
+# The default-path aggregate tag. Fires on EVERY sync run (proven: sync 164,
+# 2026-09-03T11:18:23Z, response {"revalidated":true,"full":false,
+# "slugCount":251}). Intended scope is index/listing surfaces only, but the
+# tag is also declared on getIndexableServersByCategory, which the server
+# detail page renders through RelatedServersForCategory — so the tag graph
+# reaches /servers/[slug], which is the risk task 32 audited. Capped at
+# today's 10 call sites: if a future change declares 'servers-listing' on an
+# 11th unstable_cache site, this gate fails and the blast radius gets
+# re-reviewed instead of widening silently.
+apps/web/app/api/revalidate/route.ts::servers-listing::10

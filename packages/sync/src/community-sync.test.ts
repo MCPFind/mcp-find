@@ -112,8 +112,8 @@ function makeSupabase(existing: ExistingRow[] = []) {
     client: {
       from: (_table: string) => ({
         select: (_columns: string) => ({
-          in: async (_column: string, values: string[]) => ({
-            data: values.map(s => bySlug.get(s)).filter(Boolean),
+          in: async (column: string, values: string[]) => ({
+            data: values.map(s => column === 'id' ? written.get(s) : bySlug.get(s)).filter(Boolean),
             error: null,
           }),
         }),

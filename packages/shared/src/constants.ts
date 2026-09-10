@@ -76,10 +76,13 @@ export const CLIENT_CONFIGS: Record<ClientType, {
   'claude-code': {
     topLevelKey: 'mcpServers',
     filePath: {
-      macos: '~/.claude.json',
-      windows: '~/.claude.json',
-      linux: '~/.claude.json',
+      // Project scope accepts this standalone mcpServers object. User/local
+      // scopes in ~/.claude.json are managed by the CLI and contain other state.
+      // https://code.claude.com/docs/en/mcp#project-scope
+      macos: '.mcp.json',
+      windows: '.mcp.json',
+      linux: '.mcp.json',
     },
-    postInstall: 'Restart Claude Code for changes to take effect.',
+    postInstall: 'Save at the project root, then start Claude Code in that project and review the MCP server approval prompt. Keep real credentials out of shared files.',
   },
 };
