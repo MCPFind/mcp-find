@@ -23,7 +23,6 @@ import { CATEGORIES, CATEGORY_LABELS, CATEGORY_DESCRIPTIONS, SITE_URL, SITE_NAME
 import type { Category } from "@mcpfind/shared";
 import { IconServer, IconArrowRight } from "@tabler/icons-react";
 
-export const revalidate = 3600;
 
 export const metadata: Metadata = {
   title: `Browse MCP Server Categories | ${SITE_NAME}`,

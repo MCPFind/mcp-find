@@ -7,7 +7,10 @@ function request(path: string) { return new NextRequest(`https://mcpfind.org${pa
 
 describe('finite browse route separation', () => {
   it('leaves canonical browsing on its ISR page', () => {
-    expect(middleware(request('/servers')).headers.get('x-middleware-rewrite')).toBeNull();
+    expect(middleware(request('/servers')).headers.get('x-middleware-rewrite')).toBe('https://mcpfind.org/directory-root/servers');
+    expect(middleware(request('/')).headers.get('x-middleware-rewrite')).toBe('https://mcpfind.org/directory-root/home');
+    expect(middleware(request('/categories')).headers.get('x-middleware-rewrite')).toBe('https://mcpfind.org/directory-root/categories');
+    expect(middleware(request('/directory-root/home')).status).toBe(404);
   });
   it('rewrites default pagination to finite ISR pages without changing the public URL', () => {
     expect(middleware(request('/servers?page=2')).headers.get('x-middleware-rewrite')).toBe('https://mcpfind.org/directory-page/2?page=2');

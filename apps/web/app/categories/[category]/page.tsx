@@ -13,14 +13,8 @@ import type { Metadata } from 'next';
 
 export const revalidate = 3600;
 
-export function generateStaticParams() {
-  // Skip pre-building static category pages when Supabase credentials are absent (e.g., CI).
-  // Pages will be rendered on-demand at runtime.
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
-    return [];
-  }
-  return CATEGORIES.map((cat) => ({ category: cat }));
-}
+export const dynamicParams = true;
+export function generateStaticParams() { return []; }
 
 export async function generateMetadata({
   params,
