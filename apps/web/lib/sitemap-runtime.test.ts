@@ -1,3 +1,4 @@
+import { readdirSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const queries = vi.hoisted(() => ({ getIndexableServerCount: vi.fn(), getServersSitemapPage: vi.fn(),
   getSitemapShardLastmod: vi.fn(), getIndexableSitemapMaxLastmod: vi.fn(), getCategoryLastUpdated: vi.fn() }));
@@ -7,7 +8,22 @@ vi.mock('next/navigation', () => ({ notFound: () => { throw Object.assign(new Er
 import { SITEMAP_CACHE_CONTROL } from './sitemap-lastmod';
 import { getServersSitemapBatch } from './sitemap-servers';
 
-const routes = import.meta.glob('../app/sitemap*.xml/route.ts');
+// Explicit imports preserve inferred route types without adding Vite ambient types
+// to the production TypeScript project. The filesystem assertion detects omissions.
+const routes = {
+  'sitemap.xml': () => import('../app/sitemap.xml/route'),
+  'sitemap-static.xml': () => import('../app/sitemap-static.xml/route'),
+  'sitemap-servers-0.xml': () => import('../app/sitemap-servers-0.xml/route'),
+  'sitemap-servers-1.xml': () => import('../app/sitemap-servers-1.xml/route'),
+  'sitemap-servers-2.xml': () => import('../app/sitemap-servers-2.xml/route'),
+  'sitemap-servers-3.xml': () => import('../app/sitemap-servers-3.xml/route'),
+  'sitemap-servers-4.xml': () => import('../app/sitemap-servers-4.xml/route'),
+  'sitemap-servers-5.xml': () => import('../app/sitemap-servers-5.xml/route'),
+  'sitemap-servers-6.xml': () => import('../app/sitemap-servers-6.xml/route'),
+  'sitemap-servers-7.xml': () => import('../app/sitemap-servers-7.xml/route'),
+  'sitemap-servers-8.xml': () => import('../app/sitemap-servers-8.xml/route'),
+  'sitemap-servers-9.xml': () => import('../app/sitemap-servers-9.xml/route'),
+};
 beforeEach(() => {
   vi.clearAllMocks();
   queries.getIndexableServerCount.mockResolvedValue(955);
@@ -19,8 +35,12 @@ beforeEach(() => {
 describe('runtime sitemap transport', () => {
   it('all twelve handlers opt out of prerendering and importing them reads no database', async () => {
     expect(Object.keys(routes)).toHaveLength(12);
+    const sitemapDirectories = readdirSync(new URL('../app/', import.meta.url), { withFileTypes: true })
+      .filter(entry => entry.isDirectory() && /^sitemap.*\.xml$/.test(entry.name))
+      .map(entry => entry.name);
+    expect(Object.keys(routes).sort()).toEqual(sitemapDirectories.sort());
     for (const load of Object.values(routes)) {
-      const route = await load() as { dynamic: string };
+      const route = await load();
       expect(route.dynamic).toBe('force-dynamic');
     }
     for (const query of Object.values(queries)) expect(query).not.toHaveBeenCalled();
@@ -46,7 +66,7 @@ describe('runtime sitemap transport', () => {
     const staticQueries = await import('./sitemap-static-pages');
     vi.mocked(staticQueries.getStaticSitemapEntries).mockRejectedValueOnce(outage);
     for (const load of Object.values(routes)) {
-      const route = await load() as { GET: () => Promise<Response> };
+      const route = await load();
       const response = await route.GET();
       expect(response.status).toBe(503);
       expect(response.headers.get('Retry-After')).toBe('60');
