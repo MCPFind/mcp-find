@@ -1,0 +1,67 @@
+---
+title: "Webflow MCP Server: Connect Claude Code and Review CMS Access"
+description: "Connect Claude Code to Webflow’s documented MCP endpoint, authorize a site, and verify CMS access before editing or publishing."
+excerpt: "Use the current /mcp endpoint and inspect a known collection first. Learn when the Designer Bridge App is needed and how to review agent changes."
+date: "2026-09-10"
+updatedAt: "2026-09-10"
+author: "Adam Bush"
+authorUrl: "https://www.linkedin.com/in/adam-bush/"
+authorSameAs:
+  - "https://www.linkedin.com/in/adam-bush/"
+tags:
+  - "mcp"
+  - "developer"
+  - "devtools"
+  - "webflow"
+  - "cms"
+category: "devtools"
+focusKeyword: "webflow mcp server"
+draft: false
+cornerstone: false
+topic_source: "new_topic"
+faqItems:
+  - question: "What endpoint should I use?"
+    answer: "Webflow currently documents https://mcp.webflow.com/mcp. Follow the current client-specific installation page rather than assuming the bare domain is the endpoint."
+  - question: "Must the Designer stay open for all MCP operations?"
+    answer: "No. Webflow distinguishes Data API operations from capabilities that require a live Designer session and the MCP Bridge App."
+  - question: "Do agent instructions guarantee that unsafe changes cannot happen?"
+    answer: "No. Treat instructions as guidance, review granted permissions, and check actual changes. Instructions are not a substitute for access controls or review."
+---
+
+Start Webflow automation with a connection that can read a known CMS collection. Establish the authorized site and the available tools before requesting edits. Webflow's current documentation gives a specific remote endpoint and explains which operations need a live Designer session.
+
+Sources checked September 10, 2026. No site was authenticated, edited, or published for this article. This guide does not make adoption, pricing, or “MCP 2.0” release claims.
+
+## Connect Claude Code to the documented endpoint
+
+With Claude Code installed, run this command from the project folder you want to use:
+
+```bash
+claude mcp add --transport http webflow https://mcp.webflow.com/mcp
+```
+
+Start Claude Code, open `/mcp`, select Webflow, and complete the browser authorization flow for the sites you intend to expose. The server address includes `/mcp`; a bare `https://mcp.webflow.com` entry is not the documented configuration. [Webflow's Claude Code installation guide](https://developers.webflow.com/mcp/installing/claude-code).
+
+For another client, use Webflow's [getting-started page](https://developers.webflow.com/mcp/reference/getting-started) to select its installation instructions. Preserve existing server entries when modifying configuration.
+
+## Confirm the right site before making changes
+
+Choose a CMS collection you can inspect in Webflow, then ask:
+
+> Read the collections available on SITE NAME. Return their names and IDs. Do not edit items, change the design, or publish anything.
+
+Replace the site name and compare the result with Webflow. Next, request the field names for one known collection. This checks that the connection reaches the correct site and that the returned structure matches what you intend to edit.
+
+If access fails, inspect the selected account, authorized sites, and connection status. If a tool is unavailable, check whether the operation is supported in the current context instead of assuming the entire server is broken.
+
+## Know when the Bridge App is required
+
+Webflow distinguishes ordinary Data API work from operations tied to a live Designer session. Its architecture guide says the MCP Bridge App is installed during authorization and must be open and connected for capabilities such as visual snapshots and Designer selection or mode interaction. It does not require the Designer to stay open for every CMS operation. [How Webflow MCP works](https://developers.webflow.com/mcp/reference/how-it-works).
+
+## Review a small CMS change
+
+After reading works, choose a nonproduction item or another appropriately isolated example. Have the agent propose the exact field changes first. Compare the proposal with the source content, authorize the specific edit, and inspect the resulting item before any publishing action.
+
+Webflow documents role enforcement, site-level Agent Instructions, and an activity log for agent changes. Instructions guide an agent; do not treat them as a guarantee that a requested action will be safe or accurate. [Permissions and governance](https://developers.webflow.com/mcp/reference/how-it-works).
+
+Keep the first workflow narrow enough that you can inspect every result. Browse [development integrations](/categories/devtools) when a second tool serves a concrete need, and check the publisher's supported operations before granting it access to a live site.

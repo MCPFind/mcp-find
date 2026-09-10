@@ -1,0 +1,80 @@
+---
+title: "Brave Search MCP Server: Configure and Verify Web Search"
+description: "Configure the official Brave Search MCP server in VS Code with stdio and a prompted API key, then check source links and search results."
+excerpt: "Use Brave’s published package and an explicit stdio connection. Includes a complete VS Code example and practical checks for results and account limits."
+date: "2026-09-10"
+updatedAt: "2026-09-10"
+author: "Gus Marquez"
+authorUrl: "https://www.linkedin.com/in/gustavoamarquez"
+authorSameAs:
+  - "https://www.linkedin.com/in/gustavoamarquez"
+tags:
+  - "mcp"
+  - "developer"
+  - "search"
+  - "brave-search"
+  - "web-search"
+category: "search"
+focusKeyword: "brave search mcp server"
+draft: false
+cornerstone: false
+topic_source: "new_topic"
+faqItems:
+  - question: "Which Brave package does this example use?"
+    answer: "The official @brave/brave-search-mcp-server package from brave/brave-search-mcp-server."
+  - question: "Does this guide assume free API usage?"
+    answer: "No. Review the current Brave Search API plan, credits, quotas, and billing settings for your account."
+  - question: "Was this configuration authenticated for the article?"
+    answer: "No. The configuration was checked against Brave and VS Code documentation; use the included read-only test to verify your account."
+---
+
+Brave publishes an MCP server for its Search API. This guide connects its npm package to VS Code over stdio and gives you a small result-quality check before adding search to a larger workflow.
+
+Documentation reviewed September 10, 2026. No API key was used and no authenticated installation was performed for this article.
+
+## Prepare the account and runtime
+
+Obtain an API key through the [Brave Search API account setup](https://brave.com/search/api/). Review the current plan and usage limits there; this article does not promise a fixed free allowance or price.
+
+Install Node.js and npm so `npx` is available to the client. Brave's repository lists Node.js 22 or higher for development and documents the published package, API-key variable, and supported transports. The example below selects stdio explicitly. [Official server repository](https://github.com/brave/brave-search-mcp-server).
+
+## Add the VS Code configuration
+
+Create `.vscode/mcp.json` in your workspace, or merge the following entries into the file if it already exists:
+
+```json
+{
+  "inputs": [
+    {
+      "id": "brave-key",
+      "type": "promptString",
+      "description": "Enter your Brave Search API key",
+      "password": true
+    }
+  ],
+  "servers": {
+    "brave": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@brave/brave-search-mcp-server", "--transport", "stdio"],
+      "env": {
+        "BRAVE_API_KEY": "${input:brave-key}"
+      }
+    }
+  }
+}
+```
+
+The package, launch arguments, and key variable follow [Brave's setup documentation](https://github.com/brave/brave-search-mcp-server). The `servers` object, stdio type, and prompted input follow [VS Code's MCP reference](https://code.visualstudio.com/docs/agents/reference/mcp-configuration). Keep the actual key out of the repository.
+
+Inspect the server in VS Code's MCP interface and supply the key when requested. For another client, adapt its configuration format using that client's documentation; do not assume its top-level key or input interpolation matches VS Code.
+
+## Check one narrow search
+
+Ask the agent to use Brave Search to find the official installation documentation for a product you already know. Request page titles and source links, then open the results and compare them with the publisher's site.
+
+For a second check, ask a question where date matters and request the source's date alongside the answer. Search results identify candidate pages; they do not make every snippet current or substantiate an answer by themselves.
+
+If the process cannot start, inspect the `npx` path and server output. If authentication or quota fails, check the key and account limits before changing the search query. Keep errors separate from “no matching results” in any automation you build.
+
+Add a search integration when it improves a real task. Browse [search servers](/categories/search) to compare alternatives, and evaluate them on the same questions and source checks rather than an unsupported claim that one provider is always best.

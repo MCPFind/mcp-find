@@ -1,0 +1,82 @@
+---
+title: "BigQuery MCP Server: Set Up the Prebuilt Toolbox"
+description: "Connect Claude Code to BigQuery with the documented MCP Toolbox binary, Application Default Credentials, and a prebuilt configuration without a missing YAML file."
+excerpt: "A complete configuration path for BigQuery Toolbox: project prerequisites, credentials, binary selection, prebuilt arguments, and a read-first connection check."
+date: "2026-09-10"
+updatedAt: "2026-09-10"
+author: "Adam Bush"
+authorUrl: "https://www.linkedin.com/in/adam-bush/"
+authorSameAs:
+  - "https://www.linkedin.com/in/adam-bush/"
+tags:
+  - "mcp"
+  - "developer"
+  - "databases"
+  - "bigquery"
+  - "google-cloud"
+category: "databases"
+focusKeyword: "bigquery mcp server"
+draft: false
+cornerstone: false
+topic_source: "new_topic"
+faqItems:
+  - question: "Does this setup need a tools.yaml file?"
+    answer: "No. The example uses --prebuilt bigquery, selecting the built-in tool configuration rather than a custom YAML file."
+  - question: "Is connecting through MCP free of BigQuery charges?"
+    answer: "No. MCP does not remove Google Cloud billing or query costs. Review your project billing and query controls before executing SQL."
+  - question: "Was this setup tested against a live BigQuery project?"
+    answer: "No. This article was checked against Google documentation. It provides a verification procedure for your own authorized project."
+---
+
+The prebuilt BigQuery configuration in MCP Toolbox for Databases gives a local MCP client a documented route to BigQuery. This guide follows that route from credentials to a connection check. It does not compare tool counts with a separate managed service or assume that a hosted endpoint removes setup requirements.
+
+Sources checked September 10, 2026. No authenticated BigQuery installation or query was run for this article.
+
+## Prepare your Google Cloud project
+
+Use a project with billing enabled and the BigQuery API enabled. Ask the project administrator for the access needed for the intended datasets and operations; Google's guide identifies BigQuery User and Data Viewer roles or equivalent permissions. Configure Application Default Credentials for the environment running the client. [Google's BigQuery Toolbox guide](https://docs.cloud.google.com/bigquery/docs/pre-built-tools-with-mcp-toolbox).
+
+For local user credentials, Google's ADC setup documents the following command after installing the Google Cloud CLI:
+
+```bash
+gcloud auth application-default login
+```
+
+Follow the browser flow for the account with the intended access. ADC setup is separate from choosing a project in an application, so confirm which identity your local process will use. [Local ADC instructions](https://docs.cloud.google.com/docs/authentication/set-up-adc-local-dev-environment).
+
+## Install the Toolbox binary
+
+Use the download section in the [official setup guide](https://docs.cloud.google.com/bigquery/docs/pre-built-tools-with-mcp-toolbox) to select a release for your operating system and CPU architecture. Save the binary to a location you will keep. On macOS or Linux, make it executable and check its version from that directory:
+
+```bash
+chmod +x toolbox
+./toolbox --version
+```
+
+## Configure Claude Code
+
+Create or merge into `.mcp.json` in your project root:
+
+```json
+{
+  "mcpServers": {
+    "bigquery": {
+      "command": "/absolute/path/to/toolbox",
+      "args": ["--prebuilt", "bigquery", "--stdio"],
+      "env": {
+        "BIGQUERY_PROJECT": "YOUR_PROJECT_ID"
+      }
+    }
+  }
+}
+```
+
+Replace both placeholders. On Windows, supply the actual executable path using JSON-escaped backslashes or forward slashes. This example uses the prebuilt configuration, so there is no `tools.yaml` to create. Google's client section documents these arguments and the project environment variable. [Client configuration](https://docs.cloud.google.com/bigquery/docs/pre-built-tools-with-mcp-toolbox).
+
+## Verify access before querying data
+
+Start Claude Code in the project, inspect the server in `/mcp`, then ask it to list the datasets it can access without executing SQL or changing data. Compare the result with the Cloud console using the same account.
+
+If the process fails to start, check the executable path and permissions. If it starts but access fails, check ADC, the selected project, and IAM permissions. Record the first failing operation rather than replacing the configuration with an unrelated server.
+
+For the next test, use a dataset you understand and review the proposed SQL before execution. A successful connection does not establish that a generated query is correct, economical, or authorized. Browse [database integrations](/categories/databases) for discovery; use the publisher's setup documentation for each server you actually install.
