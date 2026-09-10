@@ -1,7 +1,8 @@
 import { getStaticSitemapEntries } from '@/lib/sitemap-static-pages';
 import { renderSitemapUrl, SITEMAP_CACHE_CONTROL } from '@/lib/sitemap-lastmod';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
+export const maxDuration = 15;
 
 export async function GET() {
   // The URL list — and every lastmod on it — is built in lib/sitemap-static-pages.ts

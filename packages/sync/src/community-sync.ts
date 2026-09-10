@@ -23,6 +23,7 @@
  * Silent drops are what cost this project five months of dead enrichment and
  * ~700 rows a sync; this file does not get to reintroduce that shape.
  */
+import { changedRows } from './write-changes';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -399,7 +400,7 @@ export async function syncCommunitySubmissions(
   // sourceFile is bookkeeping for the logs above, not a column on `servers`.
   const rows = toWrite.map(({ sourceFile: _sourceFile, ...row }) => row);
 
-  result.ingested = await upsertBatchWithBisect(supabase, rows, result.skipped, LOG_PREFIX);
+  result.ingested = await upsertBatchWithBisect(supabase, await changedRows(supabase, rows), result.skipped, LOG_PREFIX);
 
   reportSkipped(result.skipped, LOG_PREFIX);
   if (result.skipped.length > 0) {

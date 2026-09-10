@@ -162,7 +162,9 @@ export default async function BlogPostPage({
               "prose-pre:p-0 prose-pre:bg-transparent prose-pre:rounded-none prose-pre:border-0 prose-pre:shadow-none",
             ].join(" ")}
           >
-            {content}
+            <BlogConversionTracker blogSlug={post.slug} category={post.frontmatter.category}>
+              {content}
+            </BlogConversionTracker>
           </article>
 
           {/* Sidebar */}

@@ -5,11 +5,15 @@ import { IconBook, IconArrowRight } from "@tabler/icons-react";
 interface RelatedArticlesProps {
   serverCategory: string | null | undefined;
   maxPosts?: number;
+  serverName?: string;
+  serverDescription?: string | null;
 }
 
 export async function RelatedArticles({
   serverCategory,
   maxPosts = 3,
+  serverName = "",
+  serverDescription = "",
 }: RelatedArticlesProps) {
   const allPosts = getAllPosts();
 
@@ -27,17 +31,12 @@ export async function RelatedArticles({
       })
     : [];
 
-  // Fall back to general/devtools posts if no category match
-  const posts =
-    matched.length > 0
-      ? matched.slice(0, maxPosts)
-      : allPosts
-          .filter((p) =>
-            ["general", "devtools"].includes(
-              p.frontmatter.category?.toLowerCase() ?? ""
-            )
-          )
-          .slice(0, maxPosts);
+  // Prefer the actual task over a potentially stale broad category.
+  const isCalendar = /\b(?:calendars?|gcal|ical|caldav)\b/i.test(`${serverName} ${serverDescription}`);
+  const taskPosts = isCalendar
+    ? allPosts.filter(p => /calendar/.test(`${p.slug} ${p.frontmatter.tags.join(" ")}`))
+    : [];
+  const posts = (taskPosts.length ? taskPosts : matched).slice(0, maxPosts);
 
   if (posts.length === 0) return null;
 

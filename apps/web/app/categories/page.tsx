@@ -41,17 +41,9 @@ export const metadata: Metadata = {
 };
 
 export default async function CategoriesIndexPage() {
-  // Gated (isIndexable()) count per category — degrades to 0 per-category
-  // rather than failing the whole page if Supabase is unavailable (CI/build).
+  // Fail regeneration atomically so ISR keeps the previous complete overview.
   const counts = await Promise.all(
-    CATEGORIES.map(async (cat) => {
-      try {
-        const servers = await getIndexableServersByCategory(cat);
-        return [cat, servers.length] as const;
-      } catch {
-        return [cat, 0] as const;
-      }
-    })
+    CATEGORIES.map(async (cat) => [cat, (await getIndexableServersByCategory(cat)).length] as const)
   );
   const countMap = new Map(counts);
 

@@ -1,3 +1,4 @@
+import { ClientConfigChooser } from "@/components/ClientConfigChooser";
 import { getServerBySlug, getIndexableServerSlugs } from "@/lib/queries";
 import { generateServerMetadata, generateServerJsonLd } from "@/lib/metadata";
 import { getQualityStatus } from "@/lib/quality-status";
@@ -211,7 +212,7 @@ export default async function ServerDetailPage({
   let claudeConfig: string | null = null;
   let installCommand: string | null = null;
 
-  if (server.package_name && server.package_type) {
+  if (server.package_name && server.package_type && ["npm", "pypi", "docker"].includes(server.package_type)) {
     try {
       const config = generateConfig(
         {
@@ -443,31 +444,19 @@ export default async function ServerDetailPage({
                   Installation
                 </h2>
                 <p className="text-neutral-500 text-sm mb-4">
-                  Run this command to install the server:
+                  Source-derived launch command. Check the maintainer’s required arguments and credentials before running:
                 </p>
-                <CodeBlock code={installCommand} language="bash" />
+                <CodeBlock code={installCommand} language="bash" copyContext={{ server_slug: server.canonical_slug ?? server.slug, client: "terminal", format: "command" }} />
               </section>
             )}
 
-            {/* Configuration */}
-            {claudeConfig && (
-              <section>
-                <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                  <IconSettings size={20} className="text-orange-400" />
-                  Configuration
-                </h2>
-                <p className="text-neutral-500 text-sm mb-4">
-                  Add this to your Claude Desktop{" "}
-                  <code className="text-neutral-400 bg-neutral-900 px-1.5 py-0.5 rounded font-mono text-xs">
-                    claude_desktop_config.json
-                  </code>{" "}
-                  or MCP client configuration:
-                </p>
-                <CodeBlock
-                  code={claudeConfig}
-                  language="json"
-                  showLineNumbers
-                />
+            {/* Client-specific setup; unsupported packages never get invented commands. */}
+            {claudeConfig && server.package_name && server.package_type ? (
+              <ClientConfigChooser serverSlug={server.canonical_slug ?? server.slug} packageName={server.package_name} packageType={server.package_type} />
+            ) : (
+              <section className="rounded-xl border border-neutral-800 p-5">
+                <h2 className="font-semibold text-white mb-2">Setup from the maintainer</h2>
+                <p className="text-sm text-neutral-400">This listing does not have a supported local package template. Use the maintainer’s documentation for its hosted endpoint, authentication, and client-specific setup. No install command has been inferred.</p>
               </section>
             )}
 
@@ -539,7 +528,7 @@ export default async function ServerDetailPage({
             )}
 
             {/* Related Articles */}
-            <RelatedArticles serverCategory={server.category} />
+            <RelatedArticles serverCategory={server.category} serverName={server.name} serverDescription={server.description} />
           </div>
 
           {/* Right: Sidebar */}

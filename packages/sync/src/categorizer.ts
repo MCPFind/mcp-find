@@ -15,7 +15,7 @@ function matchesKeyword(text: string, keyword: string): boolean {
   return pattern.test(text);
 }
 
-function categorizeServer(
+export function categorizeServer(
   name: string,
   description: string | null,
   tags: string[],
@@ -31,6 +31,11 @@ function categorizeServer(
       return category;
     }
   }
+
+  // Specific product names outweigh incidental terms in a description (a
+  // calendar integration mentioning search or files is still productivity).
+  const identity = `${name} ${packageName || ''}`.toLowerCase();
+  if (/\b(?:google[- _]?calendar|gcalendar|gcal|todoist|trello|asana)\b/.test(identity)) return 'productivity';
 
   // 2. Keyword matching on name + description
   for (const category of CATEGORIES) {
@@ -68,45 +73,33 @@ type ServerRow = {
 
 export async function categorizeServers(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: SupabaseClient<any, any, any>
+  supabase: SupabaseClient<any, any, any>,
+  onProgress?: (total: number) => void
 ): Promise<number> {
-  // Only fetch uncategorized servers to avoid re-processing already-categorized ones
-  const { data: rawServers, error } = await supabase
-    .from('servers')
-    .select('id, name, description, registry_tags, package_name, category')
-    .is('category', null);
-
-  if (error || !rawServers) {
-    console.error('Failed to fetch servers for categorization:', error?.message);
-    return 0;
-  }
-
-  const servers = rawServers as ServerRow[];
   let categorized = 0;
-
-  // Fix 2: Group servers by new category and issue one update per category
-  const updates: Map<string, string[]> = new Map();
-  for (const server of servers) {
-    const newCategory = categorizeServer(
-      server.name,
-      server.description,
-      server.registry_tags || [],
-      server.package_name
-    );
-
-    const ids = updates.get(newCategory) || [];
-    ids.push(server.id);
-    updates.set(newCategory, ids);
+  // Requery the first bounded page: successful updates leave the null set.
+  // Offsetting a shrinking result would silently skip entries.
+  for (;;) {
+    const { data, error } = await supabase.from('servers')
+      .select('id,name,description,registry_tags,package_name,category')
+      .is('category', null).order('id').limit(500);
+    if (error || !data) throw new Error(`Categorization read failed: ${error?.message ?? 'missing data'}`);
+    const servers = data as ServerRow[];
+    if (!servers.length) return categorized;
+    const updates = new Map<Category, string[]>();
+    for (const server of servers) {
+      const category = categorizeServer(server.name, server.description, server.registry_tags || [], server.package_name);
+      updates.set(category, [...(updates.get(category) || []), server.id]);
+    }
+    for (const [category, ids] of updates) {
+      for (let offset = 0; offset < ids.length; offset += 200) {
+        const batch = ids.slice(offset, offset + 200);
+        const { error } = await supabase.from('servers')
+          .update({ category, updated_at: new Date().toISOString() }).in('id', batch);
+        if (error) throw new Error(`Categorization write failed: ${error.message}`);
+        categorized += batch.length;
+        onProgress?.(categorized);
+      }
+    }
   }
-
-  for (const [category, ids] of updates) {
-    const { error } = await supabase
-      .from('servers')
-      .update({ category })
-      .in('id', ids);
-
-    if (!error) categorized += ids.length;
-  }
-
-  return categorized;
 }

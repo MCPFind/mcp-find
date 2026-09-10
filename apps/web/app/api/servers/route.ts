@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { parseFilterParams } from '@/lib/filter-utils';
 import { listServers } from '@/lib/queries';
 import { CATEGORIES } from '@mcpfind/shared';
 import type { Category, SortOption } from '@mcpfind/shared';
@@ -7,10 +8,10 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
 
   const q = searchParams.get('q') || undefined;
-  const page = parseInt(searchParams.get('page') || '1', 10);
-  let limit = parseInt(searchParams.get('limit') || '24', 10);
+  const page = Number(searchParams.get('page') || '1');
+  let limit = Number(searchParams.get('limit') || '24');
 
-  if (isNaN(page) || isNaN(limit) || page < 1 || limit < 1) {
+  if (!Number.isInteger(page) || !Number.isInteger(limit) || page < 1 || page > 100 || limit < 1 || (q?.length ?? 0) > 120) {
     return NextResponse.json({ error: 'Invalid page or limit' }, { status: 400 });
   }
 
@@ -37,7 +38,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const result = await listServers({ q, category, sort, page, limit, status });
+    const filters = parseFilterParams(Object.fromEntries(searchParams));
+    const result = await listServers({ ...filters, q, category, sort, page, limit, status });
     // CDN cache: matches listServers' own 6h unstable_cache window (see
     // lib/queries.ts) so repeat identical query strings are served from
     // Vercel's edge without invoking this function or touching Supabase.
@@ -46,6 +48,8 @@ export async function GET(request: NextRequest) {
     });
   } catch (err) {
     console.error('listServers error:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Directory temporarily unavailable. Please retry.' }, {
+      status: 503, headers: { 'Cache-Control': 'no-store', 'Retry-After': '30' },
+    });
   }
 }

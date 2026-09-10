@@ -8,6 +8,13 @@ import type { Server, ServerListItem, ServerWithTools, ServerListParams, ServerL
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@mcpfind/shared';
 import { isIndexable, readmeLengthOf, type IndexableServerInput } from './indexable';
 import { maxLastmod } from './sitemap-lastmod';
+import { normalizeListParams } from './filter-utils';
+
+// All sequential detail reads share one deadline; leave room for rendering under 15s.
+const QUERY_TIMEOUT_MS = 6000;
+function assertAvailable(error: { message?: string } | null | undefined): void {
+  if (error) throw new Error('Directory temporarily unavailable');
+}
 
 // Excludes readme_content and search_vector to avoid pulling large blobs in list queries.
 // canonical_slug is included so route generation (sitemap, links) can use the stable URL column.
@@ -84,9 +91,9 @@ async function _listServers(params: ServerListParams): Promise<ServerListRespons
     case 'downloads': query = query.order('npm_weekly_downloads', { ascending: false }); break;
   }
 
-  // 8s abort timeout — prevents a hung/slow Supabase upstream from holding
+  // Six-second abort timeout — prevents a hung/slow Supabase upstream from holding
   // the render open until the platform's function-duration ceiling.
-  query = query.range(offset, offset + limit - 1).abortSignal(AbortSignal.timeout(8000));
+  query = query.range(offset, offset + limit - 1).abortSignal(AbortSignal.timeout(QUERY_TIMEOUT_MS));
 
   const [{ data, error }, total] = await Promise.all([
     query,
@@ -135,7 +142,7 @@ async function _getFilteredCount(params: ServerListParams): Promise<number> {
   if (params.isOfficial) query = query.eq('is_official', true);
   if (params.featured) query = query.eq('featured', true);
 
-  query = query.abortSignal(AbortSignal.timeout(8000));
+  query = query.abortSignal(AbortSignal.timeout(QUERY_TIMEOUT_MS));
 
   const { count, error } = await query;
   if (error) throw new Error(`Count query failed: ${error.message}`);
@@ -158,63 +165,22 @@ const getFilteredCount = cache(
       params.featured ? '1' : '',
       params.status ?? '',
     ].join('\x00');
-    try {
-      return await unstable_cache(
-        () => _getFilteredCount(params),
-        ['filtered-count', countCacheKey],
-        // Narrow 'servers-listing' aggregate tag (T1) in addition to the
-        // blanket 'servers' tag — see app/api/revalidate/route.ts::POST.
-        { tags: ['servers', 'servers-listing'], revalidate: 21600 }
-      )();
-    } catch (err) {
-      console.error('getFilteredCount: upstream failed, returning 0', err);
-      return 0;
-    }
+    return unstable_cache(
+      () => _getFilteredCount(params),
+      ['filtered-count-v2', countCacheKey],
+      { tags: ['servers', 'servers-listing'], revalidate: 21600 }
+    )();
   }
 );
 
 export const listServers = cache(
   async (params: ServerListParams): Promise<ServerListResponse> => {
-    const cacheKey = [
-      params.category ?? '',
-      params.q ?? '',
-      String(params.page ?? 1),
-      String(params.limit ?? DEFAULT_PAGE_SIZE),
-      params.sort ?? '',
-      (params.packageTypes ?? []).join(','),
-      (params.languages ?? []).join(','),
-      params.hasTools ? '1' : '',
-      params.hasResources ? '1' : '',
-      params.hasPrompts ? '1' : '',
-      params.isOfficial ? '1' : '',
-      params.featured ? '1' : '',
-    ].join('\x00');
-    try {
-      return await unstable_cache(
-        () => _listServers(params),
-        ['list-servers', cacheKey],
-        // 6h — was 1h. The directory changes slowly; a longer window means
-        // repeat crawler hits on the same filter/sort/page combo reuse the
-        // cached result instead of re-querying Supabase.
-        // 'servers-listing' (T1, 2026-08-25) is the narrow aggregate tag
-        // /api/revalidate busts by default now — 'servers' stays as the
-        // blanket tag, only busted on an explicit full-purge opt-in.
-        { tags: ['servers', 'servers-listing'], revalidate: 21600 }
-      )();
-    } catch (err) {
-      // Upstream failed or hit the 8s abort timeout — degrade to an empty
-      // list instead of hanging/500ing the render. The try/catch sits
-      // OUTSIDE unstable_cache, so only successful results ever get
-      // persisted into the 1h cache; a bad upstream moment isn't cached.
-      console.error('listServers: upstream failed, returning empty result', err);
-      return {
-        servers: [],
-        total: 0,
-        page: params.page || 1,
-        limit: params.limit || DEFAULT_PAGE_SIZE,
-        totalPages: 0,
-      };
-    }
+    const normalized = normalizeListParams(params);
+    return unstable_cache(
+      () => _listServers(normalized),
+      ['list-servers-v2', JSON.stringify(normalized)],
+      { tags: ['servers', 'servers-listing'], revalidate: 21600 }
+    )();
   }
 );
 
@@ -222,18 +188,18 @@ export const listServers = cache(
 // Resolves by canonical_slug first (stable URL column), then falls back to slug
 // so this is safe to deploy before migration 005_canonical_slug.sql is applied.
 async function _getServerBySlug(slug: string): Promise<ServerWithTools | null> {
+  const signal = AbortSignal.timeout(QUERY_TIMEOUT_MS);
   // Try canonical_slug first (populated after migration 005 runs).
   // If no match, fall back to the mutable slug column (pre-migration or community servers).
-  // 8s abort timeout on every Supabase call below — same rationale as
-  // _listServers: fail fast instead of hanging until the function's
-  // maxDuration ceiling.
+  // The same signal covers all lookups, including the legacy fallback.
   let { data: server, error } = await supabase
     .from('servers')
     .select(SERVER_DETAIL_COLUMNS)
     .eq('canonical_slug', slug)
-    .abortSignal(AbortSignal.timeout(8000))
+    .abortSignal(signal)
     .maybeSingle();
 
+  assertAvailable(error);
   if (!server) {
     // Defensive fallback: resolve by the mutable slug column.
     // This path is hit before migration 005 is applied, or for rows where
@@ -242,13 +208,14 @@ async function _getServerBySlug(slug: string): Promise<ServerWithTools | null> {
       .from('servers')
       .select(SERVER_DETAIL_COLUMNS)
       .eq('slug', slug)
-      .abortSignal(AbortSignal.timeout(8000))
+      .abortSignal(signal)
       .maybeSingle();
     server = result.data;
     error = result.error;
   }
 
-  if (error || !server) return null;
+  assertAvailable(error);
+  if (!server) return null;
 
   // Skip the tools fetch for deprecated rows — the page will call notFound() immediately,
   // so the tools data is never used. Return early with an empty tools array.
@@ -256,12 +223,13 @@ async function _getServerBySlug(slug: string): Promise<ServerWithTools | null> {
     return { ...server, tools: [] } as ServerWithTools;
   }
 
-  const { data: tools } = await supabase
+  const { data: tools, error: toolsError } = await supabase
     .from('server_tools')
     .select('*')
     .eq('server_id', server.id)
-    .abortSignal(AbortSignal.timeout(8000));
+    .abortSignal(signal);
 
+  assertAvailable(toolsError);
   return { ...server, tools: tools || [] } as ServerWithTools;
 }
 
@@ -269,25 +237,11 @@ async function _getServerBySlug(slug: string): Promise<ServerWithTools | null> {
 // across requests and supports tag-based on-demand revalidation.
 export const getServerBySlug = cache(
   async (slug: string): Promise<ServerWithTools | null> => {
-    try {
-      return await unstable_cache(
-        () => _getServerBySlug(slug),
-        ['server-by-slug', slug],
-        // 7 days — was 24h. This is the primary lever against the Supabase
-        // Disk IO/egress overage: it applies to every /servers/[slug]
-        // render, prerendered or on-demand (including long-tail slugs that
-        // resolve to notFound() — that render gets cached too), so a
-        // repeat crawl of the same URL within the window never re-queries.
-        { tags: ['servers', `server-${slug}`], revalidate: 604800 }
-      )();
-    } catch (err) {
-      // Upstream failed or hit the 8s abort timeout — fall through to null
-      // so the page takes the existing notFound() path instead of
-      // hanging/500ing. Not cached: this try/catch sits outside
-      // unstable_cache, same reasoning as listServers above.
-      console.error(`getServerBySlug(${slug}): upstream failed, returning null`, err);
-      return null;
-    }
+    return unstable_cache(
+      () => _getServerBySlug(slug),
+      ['server-by-slug-v2', slug],
+      { tags: ['servers', `server-${slug}`], revalidate: 604800 }
+    )();
   }
 );
 
@@ -295,13 +249,15 @@ export const getServerCount = cache(
   (): Promise<number> =>
     unstable_cache(
       async () => {
-        const { count } = await supabase
+        const { count, error } = await supabase
           .from('servers')
           .select('*', { count: 'exact', head: true })
-          .eq('registry_status', 'active');
+          .eq('registry_status', 'active')
+          .abortSignal(AbortSignal.timeout(QUERY_TIMEOUT_MS));
+        assertAvailable(error);
         return count || 0;
       },
-      ['server-count'],
+      ['server-count-v2'],
       { tags: ['servers', 'servers-listing'], revalidate: 21600 }
     )()
 );
@@ -310,15 +266,17 @@ export const getTopServers = cache(
   (limit: number): Promise<ServerListItem[]> =>
     unstable_cache(
       async () => {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('servers')
           .select(SERVER_LIST_COLUMNS)
           .eq('registry_status', 'active')
           .order('github_stars', { ascending: false })
-          .limit(limit);
+          .limit(Math.min(1000, Math.max(1, limit)))
+          .abortSignal(AbortSignal.timeout(QUERY_TIMEOUT_MS));
+        assertAvailable(error);
         return (data || []) as ServerListItem[];
       },
-      ['top-servers', String(limit)],
+      ['top-servers-v2', String(limit)],
       { tags: ['servers', 'servers-listing'], revalidate: 21600 }
     )()
 );
@@ -383,7 +341,8 @@ async function selectIndexableSignalWindow<T extends ReadmeSignalRow>(
   if (_readmeLengthColumnAvailable !== false) {
     const { data, error } = await run(columns.lean);
     if (!isMissingReadmeLengthColumn(error)) {
-      if (!error) _readmeLengthColumnAvailable = true;
+      assertAvailable(error);
+      _readmeLengthColumnAvailable = true;
       return data as T[] | null;
     }
     _readmeLengthColumnAvailable = false;
@@ -394,7 +353,8 @@ async function selectIndexableSignalWindow<T extends ReadmeSignalRow>(
     );
   }
 
-  const { data } = await run(columns.legacy);
+  const { data, error } = await run(columns.legacy);
+  assertAvailable(error);
   if (!data) return null;
   return (data as T[]).map(row => ({
     ...row,
@@ -426,6 +386,7 @@ export const getIndexableTopServers = cache(
   (limit: number): Promise<ServerListItem[]> =>
     unstable_cache(
       async () => {
+        const signal = AbortSignal.timeout(QUERY_TIMEOUT_MS);
         const SUPABASE_MAX = 1000;
         const results: ServerListItem[] = [];
         for (let offset = 0; results.length < limit; offset += SUPABASE_MAX) {
@@ -435,8 +396,12 @@ export const getIndexableTopServers = cache(
                 .from('servers')
                 .select(columns)
                 .eq('registry_status', 'active')
+                // Necessary documentation condition only; isIndexable stays authoritative.
+                .or('readme_content.not.is.null,tool_count.gt.0')
                 .order('github_stars', { ascending: false })
-                .range(offset, offset + SUPABASE_MAX - 1),
+                .order('id', { ascending: true })
+                .range(offset, offset + SUPABASE_MAX - 1)
+                .abortSignal(signal),
             INDEXABLE_LIST_COLUMNS
           );
           if (!data || data.length === 0) break;
@@ -450,7 +415,7 @@ export const getIndexableTopServers = cache(
         }
         return results.slice(0, limit);
       },
-      ['indexable-top-servers', String(limit)],
+      ['indexable-top-servers-v2', String(limit)],
       { tags: ['servers', 'servers-listing'], revalidate: 21600 }
     )()
 );
@@ -510,6 +475,7 @@ const _getIndexableSitemapRows = cache(
   (): Promise<SitemapUrlRow[]> =>
     unstable_cache(
       async () => {
+        const signal = AbortSignal.timeout(QUERY_TIMEOUT_MS);
         const SUPABASE_MAX = 1000;
         const results: SitemapUrlRow[] = [];
         for (let offset = 0; ; offset += SUPABASE_MAX) {
@@ -519,8 +485,12 @@ const _getIndexableSitemapRows = cache(
                 .from('servers')
                 .select(columns)
                 .eq('registry_status', 'active')
+                // Necessary documentation condition only; isIndexable stays authoritative.
+                .or('readme_content.not.is.null,tool_count.gt.0')
                 .order('github_stars', { ascending: false })
-                .range(offset, offset + SUPABASE_MAX - 1),
+                .order('id', { ascending: true })
+                .range(offset, offset + SUPABASE_MAX - 1)
+                .abortSignal(signal),
             SITEMAP_SIGNAL_COLUMNS
           );
           if (!data || data.length === 0) break;
@@ -537,7 +507,7 @@ const _getIndexableSitemapRows = cache(
         }
         return results;
       },
-      ['indexable-sitemap-rows'],
+      ['indexable-sitemap-rows-v2'],
       { tags: ['servers'], revalidate: 3600 }
     )()
 );
@@ -611,6 +581,7 @@ export const getIndexableServerSlugs = cache(
   (limit: number): Promise<string[]> =>
     unstable_cache(
       async () => {
+        const signal = AbortSignal.timeout(QUERY_TIMEOUT_MS);
         const SUPABASE_MAX = 1000;
         const allRows: IndexableSlugRow[] = [];
         const results: string[] = [];
@@ -621,8 +592,12 @@ export const getIndexableServerSlugs = cache(
                 .from('servers')
                 .select(columns)
                 .eq('registry_status', 'active')
+                // Necessary documentation condition only; isIndexable stays authoritative.
+                .or('readme_content.not.is.null,tool_count.gt.0')
                 .order('github_stars', { ascending: false })
-                .range(offset, offset + SUPABASE_MAX - 1),
+                .order('id', { ascending: true })
+                .range(offset, offset + SUPABASE_MAX - 1)
+                .abortSignal(signal),
             INDEXABLE_SLUG_COLUMNS
           );
           if (!data || data.length === 0) break;
@@ -637,7 +612,7 @@ export const getIndexableServerSlugs = cache(
         }
         return results.slice(0, limit);
       },
-      ['indexable-server-slugs', String(limit)],
+      ['indexable-server-slugs-v2', String(limit)],
       { tags: ['servers'], revalidate: 3600 }
     )()
 );
@@ -647,16 +622,18 @@ export const getServersByCategory = cache(
   (category: string): Promise<ServerListItem[]> =>
     unstable_cache(
       async () => {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('servers')
           .select(SERVER_LIST_COLUMNS)
           .eq('category', category)
           .eq('registry_status', 'active')
           .order('github_stars', { ascending: false })
-          .limit(200);
+          .limit(200)
+          .abortSignal(AbortSignal.timeout(QUERY_TIMEOUT_MS));
+        assertAvailable(error);
         return (data || []) as ServerListItem[];
       },
-      ['servers-by-category', category],
+      ['servers-by-category-v2', category],
       { tags: ['servers', 'servers-listing', `category-${category}`], revalidate: 21600 }
     )()
 );
@@ -676,6 +653,7 @@ export const getIndexableServersByCategory = cache(
   (category: string): Promise<ServerListItem[]> =>
     unstable_cache(
       async () => {
+        const signal = AbortSignal.timeout(QUERY_TIMEOUT_MS);
         const SUPABASE_MAX = 1000;
         const results: ServerListItem[] = [];
         for (let offset = 0; ; offset += SUPABASE_MAX) {
@@ -686,8 +664,12 @@ export const getIndexableServersByCategory = cache(
                 .select(columns)
                 .eq('category', category)
                 .eq('registry_status', 'active')
+                // Necessary documentation condition only; isIndexable stays authoritative.
+                .or('readme_content.not.is.null,tool_count.gt.0')
                 .order('github_stars', { ascending: false })
-                .range(offset, offset + SUPABASE_MAX - 1),
+                .order('id', { ascending: true })
+                .range(offset, offset + SUPABASE_MAX - 1)
+                .abortSignal(signal),
             INDEXABLE_LIST_COLUMNS
           );
           if (!data || data.length === 0) break;
@@ -700,7 +682,7 @@ export const getIndexableServersByCategory = cache(
         }
         return results;
       },
-      ['indexable-servers-by-category', category],
+      ['indexable-servers-by-category-v2', category],
       { tags: ['servers', 'servers-listing', `category-${category}`], revalidate: 21600 }
     )()
 );
@@ -714,14 +696,16 @@ export const getCategoryCount = cache(
   (category: string): Promise<number> =>
     unstable_cache(
       async () => {
-        const { count } = await supabase
+        const { count, error } = await supabase
           .from('servers')
           .select('*', { count: 'exact', head: true })
           .eq('category', category)
-          .eq('registry_status', 'active');
+          .eq('registry_status', 'active')
+          .abortSignal(AbortSignal.timeout(QUERY_TIMEOUT_MS));
+        assertAvailable(error);
         return count || 0;
       },
-      ['category-count', category],
+      ['category-count-v2', category],
       { tags: ['servers', 'servers-listing', `category-${category}`], revalidate: 21600 }
     )()
 );
@@ -739,12 +723,14 @@ export const getCategoryLastUpdated = cache(
         // is the max over the most-recently-updated rows, not a whole-table
         // MAX(). Every value returned is still a real timestamp belonging to
         // a real row in that category — it can under-report, never invent.
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('servers')
           .select('category, updated_at, registry_updated_at')
           .eq('registry_status', 'active')
-          .order('updated_at', { ascending: false });
+          .order('updated_at', { ascending: false })
+          .abortSignal(AbortSignal.timeout(QUERY_TIMEOUT_MS));
 
+        assertAvailable(error);
         const result: Record<string, string> = {};
         for (const row of data || []) {
           if (!row.category) continue;
@@ -755,7 +741,7 @@ export const getCategoryLastUpdated = cache(
         }
         return result;
       },
-      ['category-last-updated'],
+      ['category-last-updated-v2'],
       { tags: ['servers', 'servers-listing'], revalidate: 21600 }
     )()
 );
@@ -764,16 +750,18 @@ export const getLastSyncTime = cache(
   (): Promise<string | null> =>
     unstable_cache(
       async () => {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('sync_log')
           .select('completed_at')
           .eq('status', 'completed')
           .order('completed_at', { ascending: false })
           .limit(1)
-          .single();
+          .abortSignal(AbortSignal.timeout(QUERY_TIMEOUT_MS))
+          .maybeSingle();
+        assertAvailable(error);
         return data?.completed_at || null;
       },
-      ['last-sync-time'],
+      ['last-sync-time-v2'],
       { tags: ['servers', 'servers-listing'], revalidate: 21600 }
     )()
 );

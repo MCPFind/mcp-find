@@ -50,19 +50,22 @@ export function assertNoPii(payload: Record<string, unknown>): void {
   }
 }
 
-function guardPii(payload: Record<string, unknown>): void {
+function guardPii(payload: Record<string, unknown>): boolean {
   if (process.env.NODE_ENV !== "production") {
     // Throw in dev and test environments so violations surface immediately
     assertNoPii(payload);
+    return true;
   } else {
     try {
       assertNoPii(payload);
+      return true;
     } catch (err) {
       // Log violation (event name + key) but never the offending value — strip anything
       // that looks like an email or literal value from the message before logging.
       const raw = err instanceof Error ? err.message : String(err);
       const sanitized = raw.replace(/"[^"]*@[^"]*"/g, '"<redacted>"').replace(/: "[^"]+"\./g, ': "<redacted>".');
       console.error("[analytics] PII violation suppressed in prod:", sanitized);
+      return false;
     }
   }
 }
@@ -72,7 +75,7 @@ function guardPii(payload: Record<string, unknown>): void {
 // ---------------------------------------------------------------------------
 
 function fireEvent(eventName: string, payload: Record<string, unknown>): void {
-  guardPii(payload);
+  if (!guardPii(payload)) return;
   if (typeof window === "undefined") return;
   if (typeof (window as typeof window & { gtag?: unknown }).gtag !== "function") return;
   (window as typeof window & { gtag: (...args: unknown[]) => void }).gtag(
@@ -172,5 +175,14 @@ export function trackDirectorySearchUsed(
   fireEvent("directory_search_used", {
     category: payload.category,
     results_count: payload.results_count,
+  });
+}
+
+/** Successful copy only. Never transmit the copied configuration or credentials. */
+export function trackConfigCopied(payload: { server_slug: string; client: string; format: "config" | "command" }): void {
+  fireEvent("config_copied", {
+    server_slug: payload.server_slug,
+    client: payload.client,
+    format: payload.format,
   });
 }

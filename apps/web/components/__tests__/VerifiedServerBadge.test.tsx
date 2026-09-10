@@ -18,96 +18,6 @@ import { StaleServerBadge } from "../StaleServerBadge";
 import type { QualityStatus } from "@mcpfind/shared";
 
 // ---------------------------------------------------------------------------
-// Mirror the component's render condition for unit testing without jsdom
-// ---------------------------------------------------------------------------
-
-/**
- * Simulates whether VerifiedServerBadge renders visible content.
- * This mirrors the exact guard in VerifiedServerBadge.tsx:
- *   if (qualityStatus !== "HEALTHY") return null;
- */
-function shouldRenderVerifiedBadge(qualityStatus: QualityStatus | undefined): boolean {
-  return qualityStatus === "HEALTHY";
-}
-
-/**
- * Simulates XSS safety of the badge.
- *
- * The badge renders text via React children only — never dangerouslySetInnerHTML.
- * Tooltip is a static constant, not derived from server.description.
- */
-function getTooltipContent(): string {
-  return "Verified active: maintained within the last 12 months, has GitHub stars, and a documented README.";
-}
-
-function isSafeTextContent(content: string): boolean {
-  return !content.includes("<script") && !content.includes("onerror=") && !content.includes("javascript:");
-}
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
-describe("VerifiedServerBadge render condition", () => {
-  it("renders for HEALTHY", () => {
-    expect(shouldRenderVerifiedBadge("HEALTHY")).toBe(true);
-  });
-
-  it("is hidden for STALE", () => {
-    expect(shouldRenderVerifiedBadge("STALE")).toBe(false);
-  });
-
-  it("is hidden for BROKEN", () => {
-    expect(shouldRenderVerifiedBadge("BROKEN")).toBe(false);
-  });
-
-  it("is hidden for LOW-CREDIBILITY", () => {
-    expect(shouldRenderVerifiedBadge("LOW-CREDIBILITY")).toBe(false);
-  });
-
-  it("is hidden for undefined (server not in manifest)", () => {
-    expect(shouldRenderVerifiedBadge(undefined)).toBe(false);
-  });
-});
-
-describe("VerifiedServerBadge XSS safety", () => {
-  it("tooltip content is static text — no dynamic server data injected", () => {
-    const tooltip = getTooltipContent();
-    expect(tooltip).toContain("Verified active");
-    expect(typeof tooltip).toBe("string");
-  });
-
-  it("tooltip content contains no executable HTML", () => {
-    const tooltip = getTooltipContent();
-    expect(isSafeTextContent(tooltip)).toBe(true);
-  });
-
-  it("XSS attempt via malicious description does not reach badge tooltip", () => {
-    const maliciousDescription = '<img src=x onerror=alert(1)><script>alert("xss")</script>';
-    const tooltip = getTooltipContent();
-    expect(tooltip).not.toContain(maliciousDescription);
-    expect(tooltip).not.toContain("<script");
-    expect(tooltip).not.toContain("onerror");
-    expect(isSafeTextContent(tooltip)).toBe(true);
-  });
-});
-
-describe("VerifiedServerBadge — all non-HEALTHY statuses are hidden", () => {
-  const nonHealthyStatuses: Array<QualityStatus | undefined> = [
-    "STALE",
-    "BROKEN",
-    "LOW-CREDIBILITY",
-    undefined,
-  ];
-
-  for (const status of nonHealthyStatuses) {
-    it(`returns null for qualityStatus="${String(status)}"`, () => {
-      expect(shouldRenderVerifiedBadge(status)).toBe(false);
-    });
-  }
-});
-
-// ---------------------------------------------------------------------------
 // Real DOM render tests — XSS defense and WCAG id uniqueness
 // ---------------------------------------------------------------------------
 
@@ -172,7 +82,7 @@ describe("StaleServerBadge + VerifiedServerBadge mutual exclusion", () => {
     // VerifiedServerBadge button should be present
     const buttons = container.querySelectorAll("button");
     expect(buttons).toHaveLength(1);
-    expect(buttons[0]?.getAttribute("aria-label")).toMatch(/verified active/i);
+    expect(buttons[0]?.getAttribute("aria-label")).toMatch(/Documentation and repository signals/i);
   });
 
   it("STALE status: StaleServerBadge renders, VerifiedServerBadge does not", () => {
@@ -215,7 +125,7 @@ describe("StaleServerBadge + VerifiedServerBadge mutual exclusion", () => {
 
     const labels = buttons.map((b) => b.getAttribute("aria-label") ?? "");
     const hasStale = labels.some((l) => /may be outdated/i.test(l));
-    const hasVerified = labels.some((l) => /verified active/i.test(l));
+    const hasVerified = labels.some((l) => /Documentation and repository signals/i.test(l));
     expect(hasStale).toBe(true);
     expect(hasVerified).toBe(true);
   });

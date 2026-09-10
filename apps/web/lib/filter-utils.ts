@@ -1,5 +1,5 @@
 import { CATEGORIES } from "@mcpfind/shared";
-import type { Category, PackageType, SortOption } from "@mcpfind/shared";
+import type { Category, PackageType, SortOption, ServerListParams } from "@mcpfind/shared";
 
 const SORT_ALLOWLIST = ["stars", "updated", "name", "downloads"] as const;
 const PACKAGE_TYPE_ALLOWLIST = ["npm", "pypi", "docker", "other"] as const;
@@ -38,12 +38,14 @@ export function parseFilterParams(
       (PACKAGE_TYPE_ALLOWLIST as readonly string[]).includes(v)
   );
 
-  const languages = searchParams.lang?.split(",").filter(Boolean) ?? [];
+  const languages = [...new Set(searchParams.lang?.split(",").filter(
+    value => (KNOWN_LANGUAGES as readonly string[]).includes(value)
+  ) ?? [])].sort();
 
   return {
-    q: searchParams.q ?? "",
+    q: (searchParams.q ?? "").trim().replace(/\s+/g, " ").slice(0, 120),
     category: validCategory,
-    packageTypes,
+    packageTypes: [...new Set(packageTypes)].sort(),
     languages,
     hasTools: searchParams.tools === "1",
     hasResources: searchParams.resources === "1",
@@ -51,7 +53,7 @@ export function parseFilterParams(
     isOfficial: searchParams.official === "1",
     featured: searchParams.featured === "1",
     sort: validSort,
-    page: searchParams.page ? parseInt(searchParams.page, 10) : 1,
+    page: Math.min(100, Math.max(1, Number(searchParams.page) || 1)) | 0,
   };
 }
 
@@ -111,4 +113,21 @@ export function getActiveFilterCount(filters: ParsedFilters): number {
   if (filters.isOfficial) count++;
   if (filters.featured) count++;
   return count;
+}
+
+/** One canonical cache key shape for every caller, including the public API. */
+export function normalizeListParams(params: ServerListParams): ServerListParams {
+  const filters = parseFilterParams({
+    q: params.q, category: params.category, sort: params.sort,
+    page: String(params.page ?? 1), pkg: params.packageTypes?.join(','),
+    lang: params.languages?.join(','), tools: params.hasTools ? '1' : undefined,
+    resources: params.hasResources ? '1' : undefined,
+    prompts: params.hasPrompts ? '1' : undefined,
+    official: params.isOfficial ? '1' : undefined, featured: params.featured ? '1' : undefined,
+  });
+  return {
+    ...filters, category: filters.category || undefined,
+    limit: Math.min(100, Math.max(1, Math.floor(params.limit || 24))),
+    status: params.status === 'deprecated' ? 'deprecated' : 'active',
+  };
 }

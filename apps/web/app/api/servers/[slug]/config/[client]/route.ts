@@ -19,20 +19,28 @@ export async function GET(
     return NextResponse.json({ error: 'Invalid client' }, { status: 400 });
   }
 
-  const server = await getServerBySlug(slug);
+  let server;
+  try {
+    server = await getServerBySlug(slug);
+  } catch {
+    return NextResponse.json(
+      { error: 'Server data temporarily unavailable' },
+      { status: 503, headers: { 'Cache-Control': 'no-store', 'Retry-After': '60' } }
+    );
+  }
   if (!server) {
     return NextResponse.json({ error: 'Server not found' }, { status: 404 });
   }
 
-  if (!server.package_name) {
-    return NextResponse.json({ error: 'Server has no package information' }, { status: 400 });
+  if (!server.package_name?.trim() || !server.package_type || !['npm', 'pypi', 'docker'].includes(server.package_type)) {
+    return NextResponse.json({ error: 'No supported local configuration; use the maintainer documentation' }, { status: 422, headers: { 'Cache-Control': 'no-store' } });
   }
 
   const config = generateConfig(
     {
       slug: server.slug,
-      packageName: server.package_name,
-      packageType: (server.package_type || 'npm') as PackageType,
+      packageName: server.package_name.trim(),
+      packageType: server.package_type as PackageType,
     },
     client as ClientType
   );

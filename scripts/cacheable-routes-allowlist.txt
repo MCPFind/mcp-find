@@ -31,3 +31,8 @@ apps/web/app/sitemap-static.xml/route.ts
 apps/web/app/llms.txt/route.ts
 apps/web/app/llms-full.txt/route.ts
 apps/web/app/blog/feed.xml/route.ts
+
+# Canonical and finite browse routes are cacheable; arbitrary interactive search
+# lives separately at directory-search and intentionally stays dynamic.
+apps/web/app/servers/page.tsx
+apps/web/app/directory-page/[page]/page.tsx

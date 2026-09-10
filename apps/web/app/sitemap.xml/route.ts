@@ -4,7 +4,8 @@ import { BATCH_SIZE, MAX_BATCHES } from '@/lib/sitemap-servers';
 import { getStaticSitemapLastmod } from '@/lib/sitemap-static-pages';
 import { renderSitemapIndexEntry, SITEMAP_CACHE_CONTROL } from '@/lib/sitemap-lastmod';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
+export const maxDuration = 15;
 
 export async function GET() {
   // Shard count is derived from the INDEXABLE count, not the raw server

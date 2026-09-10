@@ -1,9 +1,9 @@
 ---
 title: "How to Use the GitHub MCP Server with Claude Code"
-description: "Configure the official GitHub MCP server with Claude Code for AI-assisted issue management, PR reviews, and code search. Full setup guide with config examples."
-excerpt: "The official GitHub MCP server gives Claude Code protocol-level access to your repositories, exposing tools for issues, pull requests, and code search. We cover the full configuration, permission scoping, and how it differs from the gh CLI workflow that most Claude Code users already rely on."
+description: "Connect the official GitHub MCP server to Claude Code using a remote endpoint and project configuration, then verify a read-only repository task."
+excerpt: "Use the official GitHub server rather than the older community npm package. Includes a project configuration with an environment-based token reference."
 date: "2026-05-07"
-updatedAt: "2026-05-28"
+updatedAt: "2026-09-10"
 author: "Gus Marquez"
 authorUrl: "https://www.linkedin.com/in/gustavoamarquez"
 authorSameAs:
@@ -19,92 +19,62 @@ focusKeyword: "GitHub MCP server Claude Code"
 draft: false
 cornerstone: false
 faqItems:
-  - question: "Does the GitHub MCP server require a GitHub Apps installation or just a personal access token?"
-    answer: "The personal access token path works for most individual and team setups. For organization-wide deployments, GitHub also supports a GitHub Apps installation that provides fine-grained repository access without exposing a user token. Either authentication method works with the MCP server."
-  - question: "Can the GitHub MCP server access private repositories?"
-    answer: "Yes. Scope your personal access token to include `repo` (for private repos), or use a GitHub App with the `Contents` read permission. The MCP server will access whatever repositories the token or app installation covers."
-  - question: "Does the GitHub MCP server work in Cursor and Windsurf, or only Claude Code?"
-    answer: "The GitHub MCP server works in any MCP-compatible client, including Claude Desktop, Cursor, Windsurf, and VS Code with the MCP extension. Claude Code is the most natural fit because its agentic workflow aligns with the server's issue and PR tools."
-  - question: "Is the GitHub MCP server rate-limited to the standard GitHub API limits?"
-    answer: "Yes. All calls go through the GitHub REST API, which limits authenticated requests to 5,000 per hour for personal access tokens and 15,000 per hour for GitHub Apps. In practice, interactive use stays well below these limits; automated batch workflows may hit them."
+  - question: "Is @modelcontextprotocol/server-github the current official GitHub server?"
+    answer: "No. Use github/github-mcp-server and its installation documentation for the official server."
+  - question: "Where does a shared Claude Code MCP configuration go?"
+    answer: "A project configuration belongs in .mcp.json at the project root. Keep actual token values out of that file."
+  - question: "How should I verify access?"
+    answer: "Inspect the MCP connection, then request one known issue from a repository you can access and compare its title and link with GitHub."
 ---
 
-The official GitHub MCP server gives Claude Code protocol-level access to your repositories. Instead of switching to a browser to check an issue or copying a PR diff into a prompt, Claude can query your repository directly through the MCP tool layer. We looked at the MCPFind devtools category, which indexes 3,463 servers averaging 31.23 stars each, and the GitHub MCP server stands out as the reference integration for developer workflow automation. This guide covers configuration, tool capabilities, permission scoping, and how it compares to the gh CLI approach most Claude Code users already use.
+Use [GitHub's official MCP server](https://github.com/github/github-mcp-server) to connect Claude Code to repository tools. The old `@modelcontextprotocol/server-github` npm example in earlier versions of this guide is not the current official implementation.
 
-## What Tools Does the Official GitHub MCP Server Expose?
+Source review: September 10, 2026. This is a documented configuration example, not a claim that an authenticated installation was tested for this article.
 
-The GitHub MCP server exposes a set of tools organized around the core GitHub object model. Issue tools let Claude read, create, comment on, and close issues. Pull request tools cover listing open PRs, reading diff content, leaving review comments, and merging when checks pass. Code search tools allow querying files by content or path within a specific repository.
+## Choose a supported connection
 
-Repository tools handle basic metadata: reading branch lists, getting file contents at a specific ref, and checking workflow run status. The server does not expose GitHub Actions workflow definitions as editable resources, but it can read the most recent run outcomes and logs.
+GitHub documents a hosted server and local deployment options. This guide uses the hosted endpoint with a personal access token, following [GitHub's Claude installation guide](https://github.com/github/github-mcp-server/blob/main/docs/installation-guides/install-claude.md). Check that guide for local Docker or binary setup and account-specific requirements.
 
-All tools map to underlying GitHub REST API calls. When Claude calls `list_issues`, the server issues a `GET /repos/{owner}/{repo}/issues` request and returns the structured results. This means the quality of Claude's output depends on the same data you would see through the GitHub API, with no transformation or summarization on the server side. What you get is accurate, current repository state.
+Create a token with access to the repository and only the operations you intend to use. Have your shell or secret manager provide it as `GITHUB_TOKEN` before starting Claude Code. Do not paste the actual token into this example or a committed file.
 
-## How Do You Configure the GitHub MCP Server in Claude Code?
+## Add a project configuration
 
-Add the GitHub MCP server to Claude Code using the `claude mcp add` command or by editing the config file directly. The server is available as an npm package.
+Save the following as `.mcp.json` at your project root. If it already exists, merge the `github` entry into its existing `mcpServers` object rather than replacing other entries.
 
 ```json
 {
   "mcpServers": {
     "github": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"],
-      "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_yourtoken"
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${GITHUB_TOKEN}"
       }
     }
   }
 }
 ```
 
-Generate a fine-grained personal access token in GitHub under Settings > Developer settings. For read-heavy workflows, grant `Issues: Read`, `Pull requests: Read`, and `Contents: Read`. Add `Write` permissions only for the specific operations you want Claude to perform. Fine-grained tokens scoped to a single repository are safer than classic tokens with broad `repo` scope.
+Claude Code documents project scope in `.mcp.json` and environment expansion in headers. Start it from this project and review any server approval request. User and local scope use different storage; do not replace `~/.claude.json` with this standalone object. [Claude Code MCP configuration](https://code.claude.com/docs/en/mcp).
 
-After configuration, restart Claude Code and type `/mcp` to confirm the GitHub server appears in the active server list. A quick test: ask Claude to list the last five open issues in a repository you own. If it returns real issue titles, the connection is working.
+## Verify one repository operation
 
-## How Does GitHub MCP Differ From Using the gh CLI in Claude?
+In a terminal, inspect the configuration:
 
-Claude Code already has access to the `gh` CLI in most setups. The difference is where processing happens. When Claude uses `gh`, it runs a shell command and receives text output it must parse. When Claude uses the GitHub MCP server, it calls typed tools and receives structured JSON that maps directly to the object model.
+```bash
+claude mcp get github
+```
 
-In practice, this matters for chained operations. Asking Claude to "find the issue that caused this bug and link the PR" is harder via the CLI because Claude must parse multiple text outputs and manually correlate them. With MCP, Claude makes API calls that return typed objects with consistent field names, making multi-step workflows more reliable.
+Within Claude Code, open `/mcp` and inspect the connection. Then use a known issue as the check:
 
-The gh CLI has an advantage for operations the MCP server does not currently support, such as running workflow dispatches, managing releases, or performing bulk repository operations. We recommend using both: MCP for interactive query-heavy workflows and the gh CLI for scripted operations.
+> Read issue 12 from OWNER/REPOSITORY using the GitHub MCP tools. Return its title, state, and link. Do not write comments or modify anything.
 
-## What GitHub Data Can the MCP Server Read Without Extra Permissions?
+Replace the repository and number with an issue you can verify yourself. A connected status tests the connection; matching the issue tests the account, repository access, and tool result.
 
-With a token that has only public repository read access, the GitHub MCP server can see all public repository content, issues, PRs, and commits for any public GitHub repository. This is useful for researching a dependency's changelog, reading an open-source project's issue history, or checking the test results of a referenced library.
+If authentication fails, confirm that the environment variable exists in the process launching Claude Code. If the connection succeeds but a repository request fails, check the token's selected repositories, permissions, and organization restrictions before broadening access.
 
-For private repositories, the token needs explicit repository access. Organization repositories may require the owner to authorize the token in the organization's settings, especially when SSO is enforced. If Claude returns an authentication error on an organization repository, check whether the token has been authorized for that organization under the token's settings page on GitHub.
+## Keep the workflow small
 
-The [MCPFind devtools category](/categories/devtools) indexes 3,463 servers, and the GitHub MCP server is among the most practically useful for teams working in an AI-native development environment. For broader context on MCP protocol design, see [what is MCP](/blog/what-is-mcp).
+Start with issue lookup or pull-request reading. Add write permissions only after identifying a task that needs them. If your existing `gh` workflow already handles a job well, there is no requirement to replace it; evaluate MCP against the same known repository task.
 
-## How Do You Scope GitHub MCP Permissions for Production Safety?
-
-Broad token permissions create risk. If a prompt injection attack tricks Claude into calling a destructive tool, wide permissions amplify the damage. The GitHub MCP server supports granular scoping, and using it correctly limits the blast radius.
-
-Start with read-only permissions for all scopes. Add write permissions only after you have used the server for a few days and understand which operations Claude actually needs. For most code review and issue tracking workflows, read-only access covers 90% of use cases.
-
-Fine-grained tokens with repository-level scope are safer than classic tokens. A fine-grained token scoped to a single repository cannot touch any other repository, even if the token is leaked. Classic tokens with `repo` scope access every private repository your account can access.
-
-For team environments, consider GitHub Apps over personal access tokens. A GitHub App installation can be scoped to specific repositories in an organization and uses short-lived credentials that rotate automatically. This eliminates the human error of forgetting to rotate a long-lived token.
-
-Review your active MCP servers periodically. Unused servers with write permissions represent unnecessary risk. If you add the GitHub MCP server for a one-time workflow, remove it from your config when you are done, the same way you would revoke an API key after a project ends. The [MCPFind devtools category](/categories/devtools) lists 3,463 servers; knowing which ones are active in your environment is basic hygiene.
-
-Pair the GitHub MCP server with the [Figma MCP server](/blog/figma-mcp-server-design-to-code) for a complete design-to-ship pipeline, and check out [Best MCP Servers for DevOps and CI/CD](/blog/best-mcp-servers-devops-cicd) for the full stack of tools used in AI-native engineering teams. For a curated list of the top devtools servers that complement the GitHub MCP server, see [the best devtools MCP servers for code review](/blog/best-devtools-mcp-servers-code-review).
-
-## Frequently Asked Questions
-
-### Does the GitHub MCP server require a GitHub Apps installation or just a personal access token?
-
-The personal access token path works for most individual and team setups. For organization-wide deployments, GitHub also supports a GitHub Apps installation that provides fine-grained repository access without exposing a user token. Either authentication method works with the MCP server.
-
-### Can the GitHub MCP server access private repositories?
-
-Yes. Scope your personal access token to include `repo` (for private repos), or use a GitHub App with the `Contents` read permission. The MCP server will access whatever repositories the token or app installation covers.
-
-### Does the GitHub MCP server work in Cursor and Windsurf, or only Claude Code?
-
-The GitHub MCP server works in any MCP-compatible client, including Claude Desktop, Cursor, Windsurf, and VS Code with the MCP extension. Claude Code is the most natural fit because its agentic workflow aligns with the server's issue and PR tools.
-
-### Is the GitHub MCP server rate-limited to the standard GitHub API limits?
-
-Yes. All calls go through the GitHub REST API, which limits authenticated requests to 5,000 per hour for personal access tokens and 15,000 per hour for GitHub Apps. In practice, interactive use stays well below these limits; automated batch workflows may hit them.
+For a different client, see the [Cursor guide](/blog/how-to-use-mcp-with-cursor). For platform choice, use the [GitHub versus GitLab comparison](/blog/github-vs-gitlab-mcp-server).

@@ -1,4 +1,5 @@
 "use client";
+import { trackConfigCopied } from "@/lib/analytics";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { IconCopy, IconCheck } from "@tabler/icons-react";
@@ -8,6 +9,7 @@ interface CodeBlockProps {
   language?: string;
   className?: string;
   showLineNumbers?: boolean;
+  copyContext?: { server_slug: string; client: string; format: "config" | "command" };
 }
 
 export function CodeBlock({
@@ -15,13 +17,21 @@ export function CodeBlock({
   language = "bash",
   className,
   showLineNumbers = false,
+  copyContext,
 }: CodeBlockProps) {
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopyFailed(false);
+      setCopied(true);
+      if (copyContext) trackConfigCopied(copyContext);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopyFailed(true);
+    }
   };
 
   const lines = code.split("\n");
@@ -62,6 +72,7 @@ export function CodeBlock({
         </button>
       </div>
 
+      {copyFailed && <p role="status" className="px-4 pt-3 text-sm text-amber-300">Copy unavailable. Select and copy the code below.</p>}
       <div className="overflow-x-auto">
         <pre className="p-4 text-sm font-mono leading-relaxed">
           {showLineNumbers ? (
