@@ -1,14 +1,13 @@
-name: Notify IndexNow of content changes
+name: Notify IndexNow of deployed content changes
 
+# Vercel reports success only after deployment; a push or an existing key file
+# does not establish that the changed article URLs have reached production.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'apps/web/content/blog/**.mdx'
-  workflow_dispatch:
+  deployment_status:
 
 permissions:
   contents: read
+  deployments: read
 
 concurrency:
   group: indexnow-content
@@ -16,56 +15,35 @@ concurrency:
 
 jobs:
   notify:
+    if: >-
+      github.event.deployment_status.state == 'success' &&
+      github.event.deployment_status.environment == 'Production' &&
+      github.event.deployment.environment == 'Production' &&
+      github.event.deployment.creator.login == 'vercel[bot]' &&
+      github.event.deployment_status.creator.login == 'vercel[bot]'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
-      - name: Build changed URL list
+          ref: ${{ github.event.deployment.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify deployment and build changed URL payload
         id: urls
         env:
-          BEFORE_SHA: ${{ github.event.before }}
-          CURRENT_SHA: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          base="$BEFORE_SHA"
-          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
-            base="${CURRENT_SHA}^"
-          fi
-          git diff --name-only --diff-filter=ACMDR "$base" "$CURRENT_SHA" -- 'apps/web/content/blog/*.mdx' \
-            | sed -E 's#^apps/web/content/blog/(.+)\.mdx$#https://mcpfind.org/blog/\1#' \
-            | sort -u > /tmp/indexnow-urls.txt
-          if [ -s /tmp/indexnow-urls.txt ]; then
-            printf '%s\n' 'https://mcpfind.org/blog' >> /tmp/indexnow-urls.txt
-            sort -u -o /tmp/indexnow-urls.txt /tmp/indexnow-urls.txt
-            echo "count=$(wc -l < /tmp/indexnow-urls.txt | tr -d ' ')" >> "$GITHUB_OUTPUT"
-          else
-            echo "count=0" >> "$GITHUB_OUTPUT"
-          fi
-      - name: Wait for IndexNow key verification file
-        if: steps.urls.outputs.count != '0'
-        run: |
-          set -euo pipefail
-          for attempt in $(seq 1 12); do
-            if [ "$(curl -fsS --connect-timeout 5 --max-time 10 https://mcpfind.org/441d971f3ef7aa26f8afe37dfc123a8f.txt || true)" = "441d971f3ef7aa26f8afe37dfc123a8f" ]; then
-              exit 0
-            fi
-            sleep 10
-          done
-          echo "::error::IndexNow key verification file did not become available"
-          exit 1
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/indexnow-deployment.mjs
       - name: Notify IndexNow
         if: steps.urls.outputs.count != '0'
-        env:
-          INDEXNOW_KEY: 441d971f3ef7aa26f8afe37dfc123a8f
         run: |
           set -euo pipefail
-          jq -Rn \
-            --arg key "$INDEXNOW_KEY" \
-            --arg keyLocation "https://mcpfind.org/${INDEXNOW_KEY}.txt" \
-            '{host:"mcpfind.org", key:$key, keyLocation:$keyLocation, urlList:[inputs]}' \
-            < /tmp/indexnow-urls.txt > /tmp/indexnow-payload.json
+          # Additional ownership verification, never used as deployment proof.
+          key=441d971f3ef7aa26f8afe37dfc123a8f
+          if [ "$(curl -fsS --connect-timeout 5 --max-time 10 "https://mcpfind.org/${key}.txt")" != "$key" ]; then
+            echo '::error::IndexNow ownership verification failed'
+            exit 1
+          fi
           curl --fail-with-body --connect-timeout 10 --max-time 30 --retry 2 --retry-delay 5 \
             -X POST https://api.indexnow.org/indexnow \
             -H 'Content-Type: application/json; charset=utf-8' \
