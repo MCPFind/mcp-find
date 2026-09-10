@@ -1,13 +1,15 @@
+import { serveSitemap, sitemapResponse } from '@/lib/sitemap-response';
 import { getIndexableServerCount, getSitemapShardLastmod } from '@/lib/queries';
 import { SITE_URL } from '@mcpfind/shared';
 import { BATCH_SIZE, MAX_BATCHES } from '@/lib/sitemap-servers';
 import { getStaticSitemapLastmod } from '@/lib/sitemap-static-pages';
-import { renderSitemapIndexEntry, SITEMAP_CACHE_CONTROL } from '@/lib/sitemap-lastmod';
+import { renderSitemapIndexEntry } from '@/lib/sitemap-lastmod';
 
-export const revalidate = 3600;
+// Never scan Supabase during build; successful XML is explicitly CDN-cached.
+export const dynamic = 'force-dynamic';
 export const maxDuration = 15;
 
-export async function GET() {
+async function renderSitemap() {
   // Shard count is derived from the INDEXABLE count, not the raw server
   // count — otherwise the index advertises shards that the isIndexable()
   // gate empties out downstream, and those shards 404 (see
@@ -49,10 +51,9 @@ export async function GET() {
 ${sitemaps.map(s => renderSitemapIndexEntry(s.loc, s.lastmod)).join('\n')}
 </sitemapindex>`;
 
-  return new Response(xml, {
-    headers: {
-      'Content-Type': 'application/xml',
-      'Cache-Control': SITEMAP_CACHE_CONTROL,
-    },
-  });
+  return sitemapResponse(xml);
+}
+
+export async function GET() {
+  return serveSitemap(renderSitemap);
 }

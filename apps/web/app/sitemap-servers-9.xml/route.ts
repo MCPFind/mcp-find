@@ -1,8 +1,10 @@
+import { serveSitemap } from '@/lib/sitemap-response';
 import { getServersSitemapBatch } from '@/lib/sitemap-servers';
 
-export const revalidate = 3600;
+// Never scan Supabase during build, including unadvertised future shards.
+export const dynamic = 'force-dynamic';
 export const maxDuration = 15;
 
 export async function GET() {
-  return getServersSitemapBatch(9);
+  return serveSitemap(() => getServersSitemapBatch(9));
 }

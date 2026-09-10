@@ -74,6 +74,7 @@
  * Exit code: 0 = pass, 1 = fail (one or more violations).
  */
 
+import { CDN_SITEMAP_ROUTES, sitemapCacheViolations } from './sitemap-cache-contract.mjs';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -475,13 +476,16 @@ function getPriorCommittedBaseline() {
 }
 
 function checkB() {
-  const violations = [];
+  // Sitemap handlers use explicit CDN caching instead of build-time ISR.
+  // Preserve a narrow executable cache contract, not a blanket exemption.
+  const violations = sitemapCacheViolations(repoRoot);
   const allowlist = readListFile(ALLOWLIST_FILE);
   const baselineWorking = new Set(readListFile(BASELINE_FILE));
 
   const currentForceDynamic = new Set();
   const detail = [];
   for (const rel of allowlist) {
+    if (CDN_SITEMAP_ROUTES.includes(rel)) continue;
     const full = join(repoRoot, rel);
     if (!existsSync(full)) continue; // route file removed entirely — nothing to flag
     const lines = readFileSync(full, 'utf8').split('\n');
@@ -575,6 +579,7 @@ function main() {
   console.log('');
   console.log('--- CHECK B: stale force-dynamic ratchet (C-24b) ---');
   console.log(`  cacheable-routes allowlist: scripts/cacheable-routes-allowlist.txt (${b.allowlistCount} routes)`);
+  console.log(`  sitemap routes: ${CDN_SITEMAP_ROUTES.length} explicit CDN/cache contracts verified separately`);
   console.log(`  baseline (known Wave-2 debt, owned by task T7): ${BASELINE_REL} (${b.baseline.length} routes)`);
   console.log(`  currently force-dynamic among allowlisted routes: ${b.currentForceDynamic.length ? b.currentForceDynamic.join(', ') : 'none'}`);
   if (!b.priorBaselineKnown) {

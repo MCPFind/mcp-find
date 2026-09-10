@@ -1,8 +1,11 @@
+# Sitemap routes remain cacheable through explicit CDN headers and a shared
+# cached query, not build-time ISR. Check B enforces sitemap-cache-contract.mjs
+# for these exact routes; all others retain the force-dynamic debt ratchet.
 # cacheable-routes-allowlist.txt
 #
 # The 15 routes criteria.md C-18 (sprint 2026-08-25-cache-and-indexing)
-# classifies as cacheable — none of them need force-dynamic. Used by
-# check-cache-invalidation.mjs Check B to scope the D-2 stale-force-dynamic
+# classifies as cacheable. Sitemap handlers use the CDN contract above;
+# other routes use check-cache-invalidation.mjs Check B's stale-force-dynamic
 # ratchet: only routes listed here are checked against
 # force-dynamic-baseline.txt. Routes outside this list (e.g.
 # apps/web/app/api/csp-report/route.ts, a POST report sink with no cacheable
