@@ -40,7 +40,7 @@ vi.mock('react', async (importOriginal) => {
 // the final await, which resolves via a configurable `__result`.
 function makeSupabaseQueryMock(result: { data: unknown[] | null }) {
   const chain: Record<string, unknown> = {};
-  const methods = ['from', 'select', 'eq', 'order', 'range'];
+  const methods = ['from', 'select', 'eq', 'order', 'range', 'abortSignal', 'or'];
   for (const m of methods) {
     chain[m] = vi.fn(() => chain);
   }
@@ -270,7 +270,7 @@ function makeRecordingSupabase(
     data: [],
   };
   const chain: Record<string, unknown> = {};
-  for (const m of ['from', 'eq', 'order', 'range']) {
+  for (const m of ['from', 'eq', 'order', 'range', 'abortSignal', 'or']) {
     chain[m] = vi.fn(() => chain);
   }
   chain.select = vi.fn((columns: string) => {
@@ -406,9 +406,7 @@ describe('indexable scans — degrade correctly when migration 010 is not applie
     vi.doMock('./supabase', () => ({ supabase: chain }));
 
     const { getServersSitemapPage } = await import('./queries');
-    const rows = await getServersSitemapPage(0, 1000);
-
-    expect(rows).toEqual([]);
+    await expect(getServersSitemapPage(0, 1000)).rejects.toThrow('temporarily unavailable');
     expect(selects).toHaveLength(1);
     expect(selects[0]).not.toContain('readme_content');
   });

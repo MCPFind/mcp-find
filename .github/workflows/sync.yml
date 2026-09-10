@@ -4,6 +4,9 @@ on:
     - cron: '0 6 * * *'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: daily-sync
   cancel-in-progress: false
@@ -20,23 +23,15 @@ jobs:
           node-version: 22
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build
-      # T1 fix (2026-08-25): captured BEFORE the sync run so the
-      # "Determine changed slugs" step below can ask Supabase for every row
-      # whose updated_at moved at/after this timestamp — i.e. the rows this
-      # run's registry-sync/github-enrichment stages actually touched, not
-      # every synced row. last_synced_at is bumped on every upsert
-      # regardless of real change (see packages/sync/src/registry-sync.ts);
-      # updated_at is only set by github-enrichment.ts on rows it re-enriches
-      # (packages/sync/src/github-enrichment.ts:125), which is itself a
-      # rotating, rate-limited subset (line 22's staleness/star-zero filter)
-      # — not the full ~24k table on every run. That makes updated_at the
-      # correct "changed" signal for this step, sourced entirely from
-      # existing sync.yml/Supabase secrets without touching packages/sync.
+      - run: pnpm --filter @mcpfind/sync... build
+      # Only actual source/enrichment/category changes advance updated_at.
+      # Capture before writes so partial runs invalidate their successful rows.
       - name: Capture sync start timestamp
         id: sync_start
         run: echo "ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
-      - run: pnpm --filter @mcpfind/sync run start
+      - name: Run sync pipeline
+        id: sync
+        run: pnpm --filter @mcpfind/sync run start
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -50,7 +45,7 @@ jobs:
       # revalidation entirely.
       - name: Determine changed slugs since sync start
         id: changed_slugs
-        if: success()
+        if: ${{ !cancelled() && steps.sync.outcome != 'skipped' && steps.sync_start.outputs.ts != '' }}
         continue-on-error: true
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -64,11 +59,11 @@ jobs:
           while [ "$page" -lt 20 ]; do
             start=$((page * 1000))
             end=$((start + 999))
-            if ! curl -sf \
+            if ! curl -sf --connect-timeout 10 --max-time 30 \
               -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
               -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
               -H "Range: ${start}-${end}" \
-              "${SUPABASE_URL}/rest/v1/servers?select=slug&updated_at=gte.${SYNC_START}" \
+              "${SUPABASE_URL}/rest/v1/servers?select=slug,canonical_slug&order=id&updated_at=gte.${SYNC_START}" \
               -o "${pages_dir}/${page}.json"; then
               ok=false
               break
@@ -79,8 +74,9 @@ jobs:
             fi
             page=$((page + 1))
           done
+          if [ "$page" -ge 20 ]; then ok=false; fi
           if [ "$ok" = "true" ]; then
-            jq -s '[.[][] | .slug]' "${pages_dir}"/*.json > "${pages_dir}/all-slugs.json"
+            jq -s '[.[][] | (.canonical_slug // .slug)] | unique' "${pages_dir}"/*.json > "${pages_dir}/all-slugs.json"
             echo "ok=true" >> "$GITHUB_OUTPUT"
             echo "file=${pages_dir}/all-slugs.json" >> "$GITHUB_OUTPUT"
             echo "count=$(jq 'length' "${pages_dir}/all-slugs.json")" >> "$GITHUB_OUTPUT"
@@ -88,18 +84,60 @@ jobs:
             echo "ok=false" >> "$GITHUB_OUTPUT"
           fi
       - name: Bust Vercel cache
-        if: success()
-        continue-on-error: true
+        if: ${{ !cancelled() && steps.sync.outcome != 'skipped' && steps.sync_start.outputs.ts != '' }}
+        env:
+          REVALIDATE_TOKEN: ${{ secrets.REVALIDATE_TOKEN }}
+          SLUGS_OK: ${{ steps.changed_slugs.outputs.ok }}
+          SLUGS_FILE: ${{ steps.changed_slugs.outputs.file }}
         run: |
-          if [ "${{ steps.changed_slugs.outputs.ok }}" = "true" ]; then
-            payload=$(jq -n --slurpfile slugs "${{ steps.changed_slugs.outputs.file }}" '{slugs: $slugs[0]}')
+          set -euo pipefail
+          revalidate() {
+            curl -sf --connect-timeout 10 --max-time 30 --retry 2 --retry-delay 5 \
+              -X POST https://mcpfind.org/api/revalidate \
+              -H "Content-Type: application/json" \
+              -H "x-revalidate-token: ${REVALIDATE_TOKEN}" \
+              -d "$1"
+          }
+          if [ "$SLUGS_OK" = "true" ]; then
+            count=$(jq 'length' "$SLUGS_FILE")
+            # The API accepts at most 5,000 slugs. Split rather than silently
+            # letting it truncate a larger initial repair run. Zero changes
+            # leaves all aggregate and detail caches warm.
+            offset=0
+            while [ "$offset" -lt "$count" ]; do
+              payload=$(jq --argjson offset "$offset" '{slugs: .[$offset:($offset + 5000)]}' "$SLUGS_FILE")
+              revalidate "$payload"
+              offset=$((offset + 5000))
+            done
           else
-            # Documented, explicit fallback (see apps/web/app/api/revalidate/
-            # route.ts::POST) — used ONLY when the changed-slug query above
-            # failed, never on the default happy path.
-            payload='{"full": true}'
+            # Explicit recovery fallback if the changed-row scan failed or
+            # exceeded its ceiling; never publish a truncated changed set.
+            revalidate '{"full": true}'
           fi
-          curl -sf --retry 2 --retry-delay 5 -X POST https://mcpfind.org/api/revalidate \
-            -H "Content-Type: application/json" \
-            -H "x-revalidate-token: ${{ secrets.REVALIDATE_TOKEN }}" \
-            -d "$payload"
+      # IndexNow is change-driven: notify Bing and other participating engines
+      # only about canonical detail URLs whose source data changed. A failed
+      # discovery notification is visible in the workflow but must not turn a
+      # successfully persisted registry sync into a failed data run.
+      - name: Notify IndexNow of changed server URLs
+        if: ${{ !cancelled() && steps.changed_slugs.outputs.ok == 'true' && steps.changed_slugs.outputs.count != '0' }}
+        continue-on-error: true
+        env:
+          INDEXNOW_KEY: 441d971f3ef7aa26f8afe37dfc123a8f
+          SLUGS_FILE: ${{ steps.changed_slugs.outputs.file }}
+        run: |
+          set -euo pipefail
+          count=$(jq 'length' "$SLUGS_FILE")
+          offset=0
+          while [ "$offset" -lt "$count" ]; do
+            jq \
+              --arg key "$INDEXNOW_KEY" \
+              --arg keyLocation "https://mcpfind.org/${INDEXNOW_KEY}.txt" \
+              --argjson offset "$offset" \
+              '{host:"mcpfind.org", key:$key, keyLocation:$keyLocation, urlList:map("https://mcpfind.org/servers/" + .)[$offset:($offset + 10000)]}' \
+              "$SLUGS_FILE" > /tmp/indexnow-payload.json
+            curl --fail-with-body --connect-timeout 10 --max-time 30 --retry 2 --retry-delay 5 \
+              -X POST https://api.indexnow.org/indexnow \
+              -H 'Content-Type: application/json; charset=utf-8' \
+              --data-binary @/tmp/indexnow-payload.json
+            offset=$((offset + 10000))
+          done

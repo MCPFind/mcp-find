@@ -24,7 +24,7 @@ interface VerifiedServerBadgeProps {
 }
 
 export const TOOLTIP_TEXT =
-  "Verified active: maintained within the last 12 months, has GitHub stars, and a documented README.";
+  "Documentation and repository signals recorded in the May 2026 audit. This is not a live availability, installation, or security check.";
 
 export function VerifiedServerBadge({ qualityStatus, className }: VerifiedServerBadgeProps) {
   const [tooltipVisible, setTooltipVisible] = useState(false);
@@ -59,7 +59,7 @@ export function VerifiedServerBadge({ qualityStatus, className }: VerifiedServer
         onBlur={hideTooltip}
       >
         <IconShieldCheckFilled size={12} aria-hidden="true" />
-        <span>Verified</span>
+        <span>Documented · May 2026</span>
       </button>
 
       {/* Tooltip — text-only, no dangerouslySetInnerHTML */}

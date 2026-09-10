@@ -72,6 +72,14 @@ export async function upsertBatchWithBisect(
   const { error } = await supabase.from('servers').upsert(rows, { onConflict: 'id' });
   if (!error) return rows.length;
 
+  // A service outage or permissions failure cannot be isolated to one row.
+  // Do not amplify it into 2N-1 failing writes. Only constraints warrant bisect.
+  const isConstraint = error.code?.startsWith('23') || /constraint|duplicate key/i.test(error.message);
+  if (!isConstraint) {
+    for (const row of rows) skipped.push({ id: row.id, slug: row.slug, reason: error.message });
+    console.error(`${logPrefix} Batch not written: ${error.message}`);
+    return 0;
+  }
   if (rows.length === 1) {
     const row = rows[0]!;
     skipped.push({ id: row.id, slug: row.slug, reason: error.message });

@@ -21,17 +21,20 @@ function buildCommand(packageName: string, packageType: PackageType, additionalA
     case 'docker':
       return { command: 'docker', args: ['run', '-i', '--rm', packageName, ...additionalArgs] };
     default:
-      // Use stderr to avoid corrupting MCP stdio transport
-      console.error(`Unknown package type: ${packageType}, defaulting to npm`);
-      return { command: 'npx', args: ['-y', packageName, ...additionalArgs] };
+      throw new Error(`Automatic configuration is unavailable for package type: ${packageType}. Follow the publisher's setup instructions.`);
   }
 }
 
 export function generateConfig(input: ConfigInput, client: ClientType): ConfigOutput {
+  if (!input.packageName.trim()) throw new Error('A published package name is required to generate configuration.');
   const clientConfig = CLIENT_CONFIGS[client];
   const { command, args } = buildCommand(input.packageName, input.packageType, input.additionalArgs);
 
-  const serverEntry: Record<string, unknown> = { command, args };
+  // VS Code's MCP configuration reference requires the stdio discriminator:
+  // https://code.visualstudio.com/docs/agents/reference/mcp-configuration
+  const serverEntry: Record<string, unknown> = client === 'vscode'
+    ? { type: 'stdio', command, args }
+    : { command, args };
 
   // Add environment variables if present
   if (input.envVars && input.envVars.length > 0) {

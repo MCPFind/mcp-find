@@ -17,23 +17,27 @@ import { trackBlogToServersClick } from "@/lib/analytics";
 
 interface BlogConversionTrackerProps {
   children: ReactNode;
+  blogSlug?: string;
+  category?: string;
 }
 
-export function BlogConversionTracker({ children }: BlogConversionTrackerProps) {
+export function BlogConversionTracker({ children, blogSlug = "", category = "" }: BlogConversionTrackerProps) {
   const handleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    const target = e.target as HTMLElement;
-    // Walk up to find the nearest [data-conversion] wrapper
-    const conversionEl = target.closest<HTMLElement>(
-      "[data-conversion='blog_to_servers_click']"
-    );
-    if (!conversionEl) return;
-
-    const blogSlug = conversionEl.dataset["source"] ?? "";
-    const serverSlug = conversionEl.dataset["target"] ?? "";
-    const category = conversionEl.dataset["category"] ?? "";
-
-    trackBlogToServersClick({ blog_slug: blogSlug, server_slug: serverSlug, category });
-  }, []);
+    if (!(e.target instanceof Element)) return;
+    const target = e.target;
+    const conversionEl = target.closest<HTMLElement>("[data-conversion='blog_to_servers_click']");
+    const anchor = target.closest<HTMLAnchorElement>("a[href]");
+    if (!anchor) return;
+    const url = new URL(anchor.href, window.location.href);
+    if (url.origin !== window.location.origin) return;
+    const match = /^\/servers\/([a-z0-9][a-z0-9-]*)\/?$/.exec(url.pathname);
+    if (!match?.[1]) return;
+    trackBlogToServersClick({
+      blog_slug: conversionEl?.dataset["source"] || blogSlug,
+      server_slug: conversionEl?.dataset["target"] || match[1],
+      category: conversionEl?.dataset["category"] || category,
+    });
+  }, [blogSlug, category]);
 
   return (
     <div onClick={handleClick}>

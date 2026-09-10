@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server';
-import { getServerCount, getTopServers } from '@/lib/queries';
+import { getServerCount, getIndexableTopServers } from '@/lib/queries';
 import { SITE_NAME, SITE_URL, CATEGORIES, CATEGORY_LABELS } from '@mcpfind/shared';
 import { getAllPosts } from '@/lib/blog';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 21600;
+export const maxDuration = 15;
 
 export async function GET() {
   const count = await getServerCount();
-  // Fetch all servers in one query, then group by category in code
-  const allServers = await getTopServers(10000);
+  // Bounded documented subset, regenerated atomically through ISR.
+  const allServers = await getIndexableTopServers(200);
   const blogPosts = getAllPosts();
 
   const byCategory = new Map<string, typeof allServers>();
@@ -19,8 +20,8 @@ export async function GET() {
     byCategory.set(cat, bucket);
   }
 
-  let content = `# ${SITE_NAME} — Full Server Index\n\n`;
-  content += `> Complete index of ${count}+ MCP servers and ${blogPosts.length} blog posts. Updated daily.\n\n`;
+  let content = `# ${SITE_NAME} — Popular Documented Server Index\n\n`;
+  content += `> ${allServers.length} popular documented entries from a directory of ${count} active MCP servers, plus ${blogPosts.length} blog posts. This is a selected index, not the complete catalog. Cached for up to six hours; use the directory/API for search.\n\n`;
 
   for (const category of CATEGORIES) {
     if (category === 'other') continue;
@@ -30,7 +31,7 @@ export async function GET() {
 
     content += `## ${label}\n\n`;
     for (const s of servers) {
-      content += `### [${s.name}](${SITE_URL}/servers/${s.slug})\n`;
+      content += `### [${s.name}](${SITE_URL}/servers/${s.canonical_slug ?? s.slug})\n`;
       content += `${s.description || 'No description.'}\n`;
       content += `- Stars: ${s.github_stars}\n- License: ${s.github_license || 'Unknown'}\n- Package: ${s.package_type || 'Unknown'}\n\n`;
     }
@@ -41,7 +42,7 @@ export async function GET() {
   if (otherServers.length > 0) {
     content += `## Other\n\n`;
     for (const s of otherServers) {
-      content += `### [${s.name}](${SITE_URL}/servers/${s.slug})\n`;
+      content += `### [${s.name}](${SITE_URL}/servers/${s.canonical_slug ?? s.slug})\n`;
       content += `${s.description || 'No description.'}\n`;
       content += `- Stars: ${s.github_stars}\n- License: ${s.github_license || 'Unknown'}\n- Package: ${s.package_type || 'Unknown'}\n\n`;
     }
@@ -63,7 +64,7 @@ export async function GET() {
   return new NextResponse(content, {
     headers: {
       'Content-Type': 'text/plain; charset=utf-8',
-      'Cache-Control': 'public, max-age=86400',
+      'Cache-Control': 'public, max-age=3600, s-maxage=21600, stale-while-revalidate=86400',
     },
   });
 }

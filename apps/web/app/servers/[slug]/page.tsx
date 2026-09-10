@@ -1,4 +1,5 @@
-import { getServerBySlug, getIndexableServerSlugs } from "@/lib/queries";
+import { ClientConfigChooser } from "@/components/ClientConfigChooser";
+import { getServerBySlug } from "@/lib/queries";
 import { generateServerMetadata, generateServerJsonLd } from "@/lib/metadata";
 import { getQualityStatus } from "@/lib/quality-status";
 import { isIndexable, readmeLengthOf } from "@/lib/indexable";
@@ -79,7 +80,7 @@ import { ServerOutboundLink } from "@/components/ServerOutboundLink";
 export const revalidate = 604800;
 
 // Backstop: cap the function at 15s so a hung Supabase upstream (queries now
-// carry their own 8s abort timeout, see lib/queries.ts) can never hold the
+// share a 6s deadline, see lib/queries.ts) can never hold the
 // render open until the platform's default 300s ceiling.
 export const maxDuration = 15;
 
@@ -102,32 +103,15 @@ const compatibilityClients = (Object.keys(CLIENT_CONFIGS) as ClientType[]).map(
   })
 );
 
-// Pre-render cap for the isIndexable() core. If the gated core is at or below
-// this size, every indexable server is pre-rendered at build time; if it's
-// larger, we pre-render the top INDEXABLE_PRERENDER_CAP by github_stars and
-// let the remainder serve via ISR (revalidate = 604800 above) on first request.
-//
-// 2026-07-20 egress/IO investigation: measured the actual isIndexable()
-// population directly against Supabase (~457 of 16,751 active/non-archived
-// rows clear the quality bar) — well under this cap, so every indexable
-// server is ALREADY fully pre-rendered at build time. Raising this number
-// would add build time for zero additional static coverage; it isn't the
-// lever for the egress/Disk IO issue. The real long-tail traffic driver is
-// crawls of *non-indexable* slugs (which correctly 404 via notFound() after
-// a live lookup) — the revalidate bump above is what caches those repeat
-// hits instead of the prerender cap.
-const INDEXABLE_PRERENDER_CAP = 1200;
-
-export async function generateStaticParams() {
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
-    return [];
-  }
-  // Pre-render the gated core (isIndexable() servers, capped and ordered by
-  // github_stars) instead of a flat top-200 — see lib/indexable.ts and
-  // lib/queries.ts#getIndexableServerSlugs. getIndexableServerSlugs already
-  // resolves canonical_slug ?? slug per row.
-  const slugs = await getIndexableServerSlugs(INDEXABLE_PRERENDER_CAP);
-  return slugs.map((slug) => ({ slug }));
+// Prewarm no directory detail routes at build time. Enumerating the gated
+// core scans the database until the cap is filled, and legacy schemas must
+// transfer full README bodies to do so. That optional optimization must not
+// turn a cold/temporarily unavailable database into a failed code release.
+// Empty params retain on-demand ISR: first requests receive server-rendered
+// content and the same live indexability checks, cached for revalidate above.
+export const dynamicParams = true;
+export function generateStaticParams(): { slug: string }[] {
+  return [];
 }
 
 export async function generateMetadata({
@@ -166,8 +150,8 @@ export async function generateMetadata({
 
   // Noindex thin pages: source-data quality gate (lib/indexable.ts), independent
   // of the manifest-driven BROKEN check above. This is the same predicate used
-  // by the sitemap and generateStaticParams — a server must clear this bar in
-  // all three places or none (single source of truth, see lib/indexable.ts).
+  // by the sitemap — on-demand rendering never bypasses the indexability
+  // decision (single source of truth, see lib/indexable.ts).
   // The detail page already holds the README body (it renders it), so it
   // derives the length locally instead of reading the generated column —
   // readmeLengthOf() is the same expression Postgres computes for
@@ -211,7 +195,7 @@ export default async function ServerDetailPage({
   let claudeConfig: string | null = null;
   let installCommand: string | null = null;
 
-  if (server.package_name && server.package_type) {
+  if (server.package_name && server.package_type && ["npm", "pypi", "docker"].includes(server.package_type)) {
     try {
       const config = generateConfig(
         {
@@ -443,31 +427,19 @@ export default async function ServerDetailPage({
                   Installation
                 </h2>
                 <p className="text-neutral-500 text-sm mb-4">
-                  Run this command to install the server:
+                  Source-derived launch command. Check the maintainer’s required arguments and credentials before running:
                 </p>
-                <CodeBlock code={installCommand} language="bash" />
+                <CodeBlock code={installCommand} language="bash" copyContext={{ server_slug: server.canonical_slug ?? server.slug, client: "terminal", format: "command" }} />
               </section>
             )}
 
-            {/* Configuration */}
-            {claudeConfig && (
-              <section>
-                <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                  <IconSettings size={20} className="text-orange-400" />
-                  Configuration
-                </h2>
-                <p className="text-neutral-500 text-sm mb-4">
-                  Add this to your Claude Desktop{" "}
-                  <code className="text-neutral-400 bg-neutral-900 px-1.5 py-0.5 rounded font-mono text-xs">
-                    claude_desktop_config.json
-                  </code>{" "}
-                  or MCP client configuration:
-                </p>
-                <CodeBlock
-                  code={claudeConfig}
-                  language="json"
-                  showLineNumbers
-                />
+            {/* Client-specific setup; unsupported packages never get invented commands. */}
+            {claudeConfig && server.package_name && server.package_type ? (
+              <ClientConfigChooser serverSlug={server.canonical_slug ?? server.slug} packageName={server.package_name} packageType={server.package_type} />
+            ) : (
+              <section className="rounded-xl border border-neutral-800 p-5">
+                <h2 className="font-semibold text-white mb-2">Setup from the maintainer</h2>
+                <p className="text-sm text-neutral-400">This listing does not have a supported local package template. Use the maintainer’s documentation for its hosted endpoint, authentication, and client-specific setup. No install command has been inferred.</p>
               </section>
             )}
 
@@ -539,7 +511,7 @@ export default async function ServerDetailPage({
             )}
 
             {/* Related Articles */}
-            <RelatedArticles serverCategory={server.category} />
+            <RelatedArticles serverCategory={server.category} serverName={server.name} serverDescription={server.description} />
           </div>
 
           {/* Right: Sidebar */}

@@ -85,10 +85,12 @@ export default function RootLayout({
         />
         <Script id="ga4-init" strategy="lazyOnload">
           {`
+            if (['mcpfind.org', 'www.mcpfind.org'].includes(window.location.hostname)) {
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}
             gtag('js', new Date());
             gtag('config', 'G-LLD1VR2K5Z');
+            }
           `}
         </Script>
         {/* Microsoft Clarity — lazyOnload reduces TBT vs afterInteractive */}

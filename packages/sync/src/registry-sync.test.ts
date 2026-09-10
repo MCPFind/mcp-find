@@ -27,6 +27,7 @@ interface CapturedRecord {
 function makeSupabase(captured: CapturedRecord[]) {
   return {
     from: () => ({
+      select: () => ({ in: async () => ({ data: [], error: null }) }),
       upsert: async (rows: CapturedRecord[]) => {
         captured.push(...rows);
         return { error: null };
@@ -200,6 +201,7 @@ function makeSlugConstrainedSupabase(options: { existingSlugs?: string[] } = {})
     attempts,
     client: {
       from: () => ({
+        select: () => ({ in: async (_key: string, ids: string[]) => ({ data: ids.map(id => written.get(id)).filter(Boolean), error: null }) }),
         upsert: async (rows: Array<{ id: string; slug: string }>) => {
           attempts.push({ rows });
           // Postgres evaluates the statement atomically: one violation and
@@ -365,5 +367,19 @@ describe('duplicate-slug handling', () => {
 
     expect(synced).toBe(1);
     expect(db.written.size).toBe(1);
+  });
+});
+
+describe('registry incremental runs', () => {
+  it('requests latest versions and writes nothing on an identical second run', async () => {
+    const db = makeSlugConstrainedSupabase();
+    const fetch = vi.fn(async (_url: string) => ({ ok: true, status: 200, json: async () => makeRegistryResponse({ identifier: 'thing', registryType: 'npm' }) }));
+    vi.stubGlobal('fetch', fetch);
+    expect(await syncFromRegistry(db.client as never)).toBe(1);
+    const written = [...db.written.values()];
+    expect(await syncFromRegistry(db.client as never)).toBe(0);
+    expect(db.attempts).toHaveLength(1);
+    expect([...db.written.values()]).toEqual(written);
+    expect(new URL(fetch.mock.calls[0]![0] as string).searchParams.get('version')).toBe('latest');
   });
 });

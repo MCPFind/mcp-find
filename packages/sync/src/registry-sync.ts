@@ -1,3 +1,5 @@
+import { changedRows } from './write-changes';
+import { fetchWithRetry } from './retry';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { REGISTRY_API_BASE, REGISTRY_SERVERS_ENDPOINT, REGISTRY_PAGE_SIZE, OFFICIAL_SCOPES } from '@mcpfind/shared';
 // Slug minting, run-wide slug arbitration and the bisecting upsert live in
@@ -93,6 +95,7 @@ export interface RegistrySyncOptions {
    * legible.
    */
   onProgress?: (totalSynced: number) => void;
+  onIssue?: (message: string) => void;
 }
 
 // Main sync function - paginate through registry
@@ -109,118 +112,133 @@ export async function syncFromRegistry(
   const slugOwner = new Map<string, string>();
   const skipped: SkippedRow[] = [];
 
-  do {
-    const url = new URL(`${REGISTRY_API_BASE}${REGISTRY_SERVERS_ENDPOINT}`);
-    url.searchParams.set('limit', String(REGISTRY_PAGE_SIZE));
-    if (cursor) url.searchParams.set('cursor', cursor);
+  const seenCursors = new Set<string>();
+  try {
+    do {
+      const url = new URL(`${REGISTRY_API_BASE}${REGISTRY_SERVERS_ENDPOINT}`);
+      url.searchParams.set('limit', String(REGISTRY_PAGE_SIZE));
+      // Official list filter: avoid replaying older versions over the latest row.
+      url.searchParams.set('version', 'latest');
+      if (cursor) url.searchParams.set('cursor', cursor);
 
-    const response = await fetch(url.toString());
-    if (!response.ok) throw new Error(`Registry API error: ${response.status}`);
+      const response = await fetchWithRetry(url.toString());
+      if (!response.ok) throw new Error(`Registry API error: ${response.status}`);
 
-    const data = await response.json();
-    // v0.1 API: items are { server, _meta } objects; pagination is under data.metadata.nextCursor
-    const items: RegistryItem[] = data.servers || data.items || [];
-    cursor = data.metadata?.nextCursor || data.nextCursor || data.cursor;
-
-    const records = [];
-    for (const item of items) {
-      const server = item.server;
-      const officialMeta = item._meta?.['io.modelcontextprotocol.registry/official'];
-
-      // name is the unique identifier in v0.1 (e.g. "agency.lona/trading")
-      if (!server.name) {
-        console.warn('Skipping server with no name');
-        continue;
+      const data = await response.json();
+      // v0.1 API: items are { server, _meta } objects; pagination is under data.metadata.nextCursor
+      const items: RegistryItem[] = data.servers ?? data.items;
+      if (!Array.isArray(items)) throw new Error('Registry response missing servers array');
+      cursor = data.metadata?.nextCursor || data.nextCursor || data.cursor;
+      if (cursor) {
+        if (seenCursors.has(cursor)) throw new Error('Registry repeated pagination cursor');
+        seenCursors.add(cursor);
       }
 
-      // Extract package info from the packages array (may not exist in v0.1)
-      const pkg = server.packages?.[0] || null;
-      const packageName = packageIdentifier(pkg);
-      const packageType = detectPackageType(pkg);
-      const packageUrl = packageRegistryUrl(pkg);
+      const records = [];
+      for (const item of items) {
+        const server = item.server;
+        const officialMeta = item._meta?.['io.modelcontextprotocol.registry/official'];
 
-      // Extract capabilities
-      const capabilities = server.capabilities || {};
+        // name is the unique identifier in v0.1 (e.g. "agency.lona/trading")
+        if (!server.name) {
+          console.warn('Skipping server with no name');
+        options.onIssue?.('Registry returned a server without a name');
+          continue;
+        }
 
-      // Extract GitHub URL from repository or packages
-      const githubUrl = extractGithubUrl(server);
+        // Extract package info from the packages array (may not exist in v0.1)
+        const pkg = server.packages?.[0] || null;
+        const packageName = packageIdentifier(pkg);
+        const packageType = detectPackageType(pkg);
+        const packageUrl = packageRegistryUrl(pkg);
 
-      const record = {
-        id: server.name,
-        slug: generateSlug(server.name),
-        // canonical_slug is intentionally EXCLUDED from this record.
-        // It is set once per server via a post-upsert backfill (see below) and
-        // never touched again — guaranteeing URL stability even if upstream renames a server.
-        name: server.title || server.name,
-        description: server.description || null,
-        version: server.version || pkg?.version || null,
-        source: 'registry' as const,
-        package_name: packageName,
-        package_type: packageType,
-        package_url: packageUrl,
-        has_tools: Boolean(capabilities.tools),
-        has_resources: Boolean(capabilities.resources),
-        has_prompts: Boolean(capabilities.prompts),
-        tool_count: Array.isArray(capabilities.tools) ? capabilities.tools.length : 0,
-        github_url: githubUrl,
-        is_official: isOfficial(packageName),
-        registry_status: (() => {
-          const s = officialMeta?.status;
-          const valid = ['active', 'deprecated'] as const;
-          type ValidStatus = typeof valid[number];
-          const isValid = (v: string | undefined): v is ValidStatus => valid.includes(v as ValidStatus);
-          if (s && !isValid(s)) {
-            console.warn(`Unrecognized registry status "${s}" for server ${server.name}, defaulting to "active"`);
-          }
-          return isValid(s) ? s : 'active';
-        })(),
-        registry_published_at: officialMeta?.publishedAt || null,
-        registry_updated_at: officialMeta?.updatedAt || null,
-        registry_tags: officialMeta?.tags || [],
-        last_synced_at: new Date().toISOString(),
-      };
+        // Extract capabilities
+        const capabilities = server.capabilities || {};
 
-      records.push(record);
+        // Extract GitHub URL from repository or packages
+        const githubUrl = extractGithubUrl(server);
+
+        const record = {
+          id: server.name,
+          slug: generateSlug(server.name),
+          // canonical_slug is intentionally EXCLUDED from this record.
+          // It is set once per server via a post-upsert backfill (see below) and
+          // never touched again — guaranteeing URL stability even if upstream renames a server.
+          name: server.title || server.name,
+          description: server.description || null,
+          version: server.version || pkg?.version || null,
+          source: 'registry' as const,
+          package_name: packageName,
+          package_type: packageType,
+          package_url: packageUrl,
+          has_tools: Boolean(capabilities.tools),
+          has_resources: Boolean(capabilities.resources),
+          has_prompts: Boolean(capabilities.prompts),
+          tool_count: Array.isArray(capabilities.tools) ? capabilities.tools.length : 0,
+          github_url: githubUrl,
+          is_official: isOfficial(packageName),
+          registry_status: (() => {
+            const s = officialMeta?.status;
+            const valid = ['active', 'deprecated'] as const;
+            type ValidStatus = typeof valid[number];
+            const isValid = (v: string | undefined): v is ValidStatus => valid.includes(v as ValidStatus);
+            if (s && !isValid(s)) {
+              console.warn(`Unrecognized registry status "${s}" for server ${server.name}, defaulting to "active"`);
+            }
+            return isValid(s) ? s : 'active';
+          })(),
+          registry_published_at: officialMeta?.publishedAt || null,
+          registry_updated_at: officialMeta?.updatedAt || null,
+          registry_tags: officialMeta?.tags || [],
+          last_synced_at: new Date().toISOString(),
+        };
+
+        records.push(record);
+      }
+
+      // Deduplicate within batch — keep last occurrence of each id
+      const deduped = Object.values(
+        records.reduce((acc, r) => { acc[r.id] = r; return acc; }, {} as Record<string, typeof records[0]>)
+      );
+
+      // Deduplicate on SLUG as well, run-wide. `slugOwner` is carried across
+      // iterations of this loop, so the arbitration is run-wide rather than
+      // per-batch. See admitBySlug in slug-upsert.ts for why the loser is
+      // skipped rather than suffixed.
+      const admitted = admitBySlug(deduped, slugOwner, skipped, LOG_PREFIX);
+
+      if (admitted.length > 0) {
+        // canonical_slug is NOT in the upsert payload — it is never touched here.
+        // Invariant: once a server has a canonical_slug it is immutable.
+        // New rows will have canonical_slug = NULL after this upsert; the backfill
+        // below sets it from slug immediately after all batches complete.
+        //
+        // totalSynced counts rows that were actually written, so a partial batch
+        // reports as a partial batch rather than as zero or as a full one.
+        totalSynced += await upsertBatchWithBisect(supabase, await changedRows(supabase, admitted), skipped, LOG_PREFIX);
+      }
+
+      options.onProgress?.(totalSynced);
+
+      console.log(`Synced batch: ${items.length} servers (total: ${totalSynced})`);
+    } while (cursor);
+  } finally {
+    // Even a partial run may have inserted rows needing their stable URL.
+    if (totalSynced > 0) {
+      const { error: backfillError } = await supabase.rpc('backfill_canonical_slug');
+      if (backfillError) {
+        console.warn('canonical_slug backfill skipped (migration may not be applied yet):', backfillError.message);
+      }
     }
-
-    // Deduplicate within batch — keep last occurrence of each id
-    const deduped = Object.values(
-      records.reduce((acc, r) => { acc[r.id] = r; return acc; }, {} as Record<string, typeof records[0]>)
-    );
-
-    // Deduplicate on SLUG as well, run-wide. `slugOwner` is carried across
-    // iterations of this loop, so the arbitration is run-wide rather than
-    // per-batch. See admitBySlug in slug-upsert.ts for why the loser is
-    // skipped rather than suffixed.
-    const admitted = admitBySlug(deduped, slugOwner, skipped, LOG_PREFIX);
-
-    if (admitted.length > 0) {
-      // canonical_slug is NOT in the upsert payload — it is never touched here.
-      // Invariant: once a server has a canonical_slug it is immutable.
-      // New rows will have canonical_slug = NULL after this upsert; the backfill
-      // below sets it from slug immediately after all batches complete.
-      //
-      // totalSynced counts rows that were actually written, so a partial batch
-      // reports as a partial batch rather than as zero or as a full one.
-      totalSynced += await upsertBatchWithBisect(supabase, admitted, skipped, LOG_PREFIX);
+    reportSkipped(skipped, LOG_PREFIX);
+    for (const row of skipped) {
+      // Stable, deliberately coalesced duplicates are an expected exclusion,
+      // not a reason for every otherwise healthy daily run to fail forever.
+      if (!row.reason.startsWith('slug already claimed by id')) {
+        options.onIssue?.(`Registry row not written: ${row.id}: ${row.reason}`);
+      }
     }
-
-    options.onProgress?.(totalSynced);
-
-    console.log(`Synced batch: ${items.length} servers (total: ${totalSynced})`);
-  } while (cursor);
-
-  // Backfill canonical_slug for any row that doesn't have one yet (new inserts from this
-  // sync run, or rows that existed before migration 005 ran).
-  // Invariant: rows that already have a canonical_slug are never touched.
-  const { error: backfillError } = await supabase.rpc('backfill_canonical_slug');
-  if (backfillError) {
-    // Non-fatal: the column may not exist yet (pre-migration environment).
-    // The next sync after migration 005 is applied will complete the backfill.
-    console.warn('canonical_slug backfill skipped (migration may not be applied yet):', backfillError.message);
   }
-
-  reportSkipped(skipped, LOG_PREFIX);
 
   return totalSynced;
 }

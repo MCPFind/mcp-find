@@ -40,6 +40,7 @@ const updates: SyncLogUpdate[] = [];
  * PostgREST does before its migration is applied. Reset per test.
  */
 let rejectUnknownColumn: string | null = null;
+let rejectAllUpdates = false;
 
 /** Minimal Supabase double: records every sync_log UPDATE payload. */
 function makeSupabase() {
@@ -51,7 +52,7 @@ function makeSupabase() {
         }),
       }),
       update: (payload: SyncLogUpdate) => {
-        if (rejectUnknownColumn && rejectUnknownColumn in payload) {
+        if (rejectAllUpdates || (rejectUnknownColumn && rejectUnknownColumn in payload)) {
           return {
             eq: async () => ({
               error: { message: `Could not find the '${rejectUnknownColumn}' column of 'sync_log'` },
@@ -92,6 +93,7 @@ const ORIGINAL_ENV = { ...process.env };
 beforeEach(() => {
   updates.length = 0;
   rejectUnknownColumn = null;
+  rejectAllUpdates = false;
   syncFromRegistry.mockReset();
   syncCommunitySubmissions.mockReset();
   enrichWithGitHub.mockReset();
@@ -308,4 +310,52 @@ describe('sync_log — community ingest', () => {
     expect(update.servers_synced).toBe(17282);
     expect(update).not.toHaveProperty('servers_community');
   });
+});
+
+
+describe('independent stages and cache freshness', () => {
+  it('finishes downstream stages and revalidates successful changes after registry failure', async () => {
+    syncFromRegistry.mockImplementation(async (_db, options) => {
+      options.onProgress(10);
+      throw new Error('registry unavailable');
+    });
+    syncCommunitySubmissions.mockResolvedValue({ ingested: 2, registryOwned: 0, skipped: [], errors: [], fatal: false });
+    enrichWithGitHub.mockResolvedValue({ enriched: 3, unchanged: 0, errors: [], fatal: false });
+    categorizeServers.mockResolvedValue(4);
+    process.env.REVALIDATE_TOKEN = 'test-token';
+    const fetch = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal('fetch', fetch);
+    try {
+      const { runSyncPipeline } = await import('./pipeline');
+      expect(await runSyncPipeline()).toBe(1);
+      expect(syncCommunitySubmissions).toHaveBeenCalledTimes(1);
+      expect(enrichWithGitHub).toHaveBeenCalledTimes(1);
+      expect(categorizeServers).toHaveBeenCalledTimes(1);
+      expect(terminalUpdate()).toMatchObject({ servers_synced: 10, servers_community: 2, servers_enriched: 3, status: 'failed' });
+      expect(fetch).toHaveBeenCalledTimes(1);
+    } finally { vi.unstubAllGlobals(); }
+  });
+  it('does not invalidate caches when no stage changed data', async () => {
+    syncFromRegistry.mockResolvedValue(0);
+    enrichWithGitHub.mockResolvedValue({ enriched: 0, unchanged: 5, errors: [], fatal: false });
+    categorizeServers.mockResolvedValue(0);
+    process.env.REVALIDATE_TOKEN = 'test-token';
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    try {
+      const { runSyncPipeline } = await import('./pipeline');
+      expect(await runSyncPipeline()).toBe(0);
+      expect(fetch).not.toHaveBeenCalled();
+    } finally { vi.unstubAllGlobals(); }
+  });
+});
+
+
+it('rejects a run when both terminal log writes fail rather than claiming completion', async () => {
+  syncFromRegistry.mockResolvedValue(1);
+  enrichWithGitHub.mockResolvedValue({ enriched: 0, unchanged: 0, errors: [], fatal: false });
+  categorizeServers.mockResolvedValue(0);
+  rejectAllUpdates = true;
+  const { runSyncPipeline } = await import('./pipeline');
+  await expect(runSyncPipeline()).rejects.toThrow('sync_log terminal UPDATE failed');
 });

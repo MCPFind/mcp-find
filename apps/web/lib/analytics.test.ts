@@ -270,6 +270,7 @@ describe("guardPii — production sanitizer", () => {
 
     // console.error must have been called (violation was detected and logged)
     expect(consoleErrorSpy).toHaveBeenCalled();
+    expect(gtagMock).not.toHaveBeenCalled();
 
     // console.error is called as: console.error("<static prefix>", sanitizedPayload)
     // The sanitized payload is the SECOND argument (index 1), not the static prefix.
