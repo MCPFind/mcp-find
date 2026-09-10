@@ -1,13 +1,14 @@
+import { directoryUnavailable } from '@/lib/directory-response';
 import { NextResponse } from 'next/server';
 import { getServerCount, getIndexableTopServers } from '@/lib/queries';
 import { SITE_NAME, SITE_URL, CATEGORY_LABELS, CATEGORY_LLM_DESCRIPTIONS } from '@mcpfind/shared';
 import type { Category } from '@mcpfind/shared';
 import { getAllPosts } from '@/lib/blog';
 
-export const revalidate = 21600;
+export const dynamic = 'force-dynamic';
 export const maxDuration = 15;
 
-export async function GET() {
+async function render() {
   const [count, topServers] = await Promise.all([
     getServerCount(),
     getIndexableTopServers(20),
@@ -50,6 +51,12 @@ ${blogLines}
     headers: {
       'Content-Type': 'text/plain; charset=utf-8',
       'Cache-Control': 'public, max-age=3600, s-maxage=21600, stale-while-revalidate=86400',
+      'CDN-Cache-Control': 'public, s-maxage=21600, stale-while-revalidate=86400',
+      'Vercel-CDN-Cache-Control': 'public, s-maxage=21600, stale-while-revalidate=86400',
     },
   });
+}
+
+export async function GET() {
+  try { return await render(); } catch { return directoryUnavailable(); }
 }

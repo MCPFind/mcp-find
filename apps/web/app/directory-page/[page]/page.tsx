@@ -9,9 +9,8 @@ export const metadata: Metadata = {
   title: `Browse MCP Servers | ${SITE_NAME}`,
   alternates: { canonical: `${SITE_URL}/servers` },
 };
-export function generateStaticParams() {
-  return Array.from({ length: 9 }, (_, index) => ({ page: String(index + 2) }));
-}
+export const dynamicParams = true;
+export function generateStaticParams() { return []; }
 export default async function DirectoryPage({ params }: { params: { page: string } }) {
   if (!/^\d+$/.test(params.page) || Number(params.page) < 2 || Number(params.page) > 100) notFound();
   return renderServers({ page: params.page });

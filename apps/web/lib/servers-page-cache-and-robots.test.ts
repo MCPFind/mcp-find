@@ -43,7 +43,7 @@ describe('T3 — /servers page cache', () => {
     // Pre-fix (6818cb5) this module has no `revalidate` export at all —
     // `mod.revalidate` is `undefined`, so `typeof mod.revalidate === 'number'`
     // is false and this assertion fails.
-    const mod = await import('../app/servers/page');
+    const mod = await import('../app/directory-root/[surface]/page');
     expect(typeof mod.revalidate).toBe('number');
     expect(mod.revalidate).toBeGreaterThan(0);
   });

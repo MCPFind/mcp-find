@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'nod
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { CDN_SITEMAP_ROUTES, sitemapCacheViolations } from '../sitemap-cache-contract.mjs';
+import { CDN_SITEMAP_ROUTES, sitemapCacheViolations, CDN_DIRECTORY_TEXT_ROUTES, directoryTextCacheViolations } from '../sitemap-cache-contract.mjs';
 const root = fileURLToPath(new URL('../../', import.meta.url));
 describe('D-2 sitemap CDN contract', () => {
   it('accepts the explicit dynamic/shared-cache design', () => expect(sitemapCacheViolations(root)).toEqual([]));
@@ -19,6 +19,20 @@ describe('D-2 sitemap CDN contract', () => {
       expect(sitemapCacheViolations(temp)).toHaveLength(3);
       writeFileSync(join(temp, CDN_SITEMAP_ROUTES[0]), 'export const revalidate = 3600;');
       expect(sitemapCacheViolations(temp).some(x => x.file === CDN_SITEMAP_ROUTES[0])).toBe(true);
+    } finally { rmSync(temp, { recursive: true, force: true }); }
+  });
+});
+
+describe('D-2 LLM text CDN contract', () => {
+  it('retains shared runtime caching and explicit failures', () => expect(directoryTextCacheViolations(root)).toEqual([]));
+  it('rejects prerendering or missing response caching', () => {
+    const temp = mkdtempSync(join(tmpdir(), 'text-cache-contract-'));
+    try {
+      for (const file of CDN_DIRECTORY_TEXT_ROUTES) {
+        mkdirSync(dirname(join(temp, file)), { recursive: true });
+        writeFileSync(join(temp, file), readFileSync(join(root, file), 'utf8').replace("export const dynamic = 'force-dynamic'", 'export const revalidate = 21600').replace("'Vercel-CDN-Cache-Control'", "'Removed'"));
+      }
+      expect(directoryTextCacheViolations(temp)).toHaveLength(4);
     } finally { rmSync(temp, { recursive: true, force: true }); }
   });
 });

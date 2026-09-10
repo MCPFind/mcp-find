@@ -28,3 +28,15 @@ export function sitemapCacheViolations(root) {
   }
   return errors;
 }
+
+export const CDN_DIRECTORY_TEXT_ROUTES = ['llms.txt', 'llms-full.txt'].map(route => `apps/web/app/${route}/route.ts`);
+export function directoryTextCacheViolations(root) {
+  const errors = [];
+  for (const file of CDN_DIRECTORY_TEXT_ROUTES) {
+    const source = readFileSync(join(root, file), 'utf8');
+    for (const fragment of ["export const dynamic = 'force-dynamic'", 'return directoryUnavailable()', "'CDN-Cache-Control': 'public, s-maxage=21600", "'Vercel-CDN-Cache-Control': 'public, s-maxage=21600"]) {
+      if (!source.includes(fragment)) errors.push({ file, message: `Missing runtime text cache/error contract: ${fragment}` });
+    }
+  }
+  return errors;
+}

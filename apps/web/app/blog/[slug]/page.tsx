@@ -1,4 +1,4 @@
-import { getPostBySlug, getPostSlugs, getRelatedPosts } from "@/lib/blog";
+import { getPostBySlug, getRelatedPosts } from "@/lib/blog";
 import { generateBlogPostJsonLd } from "@/lib/blog-jsonld";
 import { safeJsonLd } from "@/lib/json-ld";
 import { SITE_URL } from "@mcpfind/shared";
@@ -19,9 +19,8 @@ import { BlogConversionTracker } from "@/components/BlogConversionTracker";
 
 export const revalidate = 86400;
 
-export function generateStaticParams() {
-  return getPostSlugs().map((slug) => ({ slug }));
-}
+export const dynamicParams = true;
+export function generateStaticParams() { return []; }
 
 export async function generateMetadata({
   params,

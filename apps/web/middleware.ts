@@ -27,7 +27,14 @@ function getClientIp(request: NextRequest): string {
 export function middleware(request: NextRequest) {
   // Keep arbitrary queries off the canonical ISR page without changing public URLs.
   const browseQuery = request.nextUrl.pathname === '/servers' && request.nextUrl.search !== '';
+  // Internal ISR entry points are not independent public URLs.
+  if (request.nextUrl.pathname.startsWith('/directory-root/')) return new NextResponse(null, { status: 404 });
+  const surfaces: Record<string, string> = { '/': 'home', '/servers': 'servers', '/categories': 'categories' };
   let destination: URL | undefined;
+  if (surfaces[request.nextUrl.pathname]) {
+    destination = new URL(request.url);
+    destination.pathname = `/directory-root/${surfaces[request.nextUrl.pathname]}`;
+  }
   if (browseQuery) {
     const raw = Object.fromEntries(request.nextUrl.searchParams);
     if ((raw.q?.length ?? 0) > 120 || (raw.page && (!/^\d+$/.test(raw.page) || Number(raw.page) > 100))) {
@@ -79,4 +86,4 @@ export function middleware(request: NextRequest) {
   return proceed();
 }
 
-export const config = { matcher: ['/api/:path*', '/servers', '/directory-search'] };
+export const config = { matcher: ['/', '/categories', '/api/:path*', '/servers', '/directory-search', '/directory-root/:path*'] };
