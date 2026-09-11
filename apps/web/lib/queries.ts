@@ -12,6 +12,54 @@ import { normalizeListParams } from './filter-utils';
 
 // All sequential detail reads share one deadline; leave room for rendering under 15s.
 const QUERY_TIMEOUT_MS = 6000;
+const DETAIL_QUERY_SLOW_MS = 1000;
+
+type DetailQueryStage = 'canonical' | 'slug_fallback' | 'tools';
+type ObservedQueryResult = { error?: { code?: string; message?: string } | null };
+
+/**
+ * Records only operational metadata. Deliberately excludes the requested slug,
+ * query URL, response data and upstream error message so logs cannot capture
+ * credentials, README content, or identifiers from request paths.
+ */
+async function observeDetailQuery<T extends ObservedQueryResult>(
+  stage: DetailQueryStage,
+  signal: AbortSignal,
+  query: PromiseLike<T>
+): Promise<T> {
+  const startedAt = performance.now();
+  try {
+    const result = await query;
+    const durationMs = Math.round(performance.now() - startedAt);
+    if (result.error) {
+      console.error('[queries] server detail query failed', {
+        event: 'server_detail_query_error',
+        stage,
+        duration_ms: durationMs,
+        error_code: result.error.code ?? 'unknown',
+        aborted: signal.aborted,
+      });
+    } else if (durationMs >= DETAIL_QUERY_SLOW_MS) {
+      console.warn('[queries] server detail query slow', {
+        event: 'server_detail_query_slow',
+        stage,
+        duration_ms: durationMs,
+      });
+    }
+    return result;
+  } catch (error) {
+    const durationMs = Math.round(performance.now() - startedAt);
+    console.error('[queries] server detail query failed', {
+      event: 'server_detail_query_error',
+      stage,
+      duration_ms: durationMs,
+      error_code: error instanceof Error ? error.name : 'unknown',
+      aborted: signal.aborted,
+    });
+    throw error;
+  }
+}
+
 function assertAvailable(error: { message?: string } | null | undefined): void {
   if (error) throw new Error('Directory temporarily unavailable');
 }
@@ -192,24 +240,32 @@ async function _getServerBySlug(slug: string): Promise<ServerWithTools | null> {
   // Try canonical_slug first (populated after migration 005 runs).
   // If no match, fall back to the mutable slug column (pre-migration or community servers).
   // The same signal covers all lookups, including the legacy fallback.
-  let { data: server, error } = await supabase
-    .from('servers')
-    .select(SERVER_DETAIL_COLUMNS)
-    .eq('canonical_slug', slug)
-    .abortSignal(signal)
-    .maybeSingle();
+  let { data: server, error } = await observeDetailQuery(
+    'canonical',
+    signal,
+    supabase
+      .from('servers')
+      .select(SERVER_DETAIL_COLUMNS)
+      .eq('canonical_slug', slug)
+      .abortSignal(signal)
+      .maybeSingle()
+  );
 
   assertAvailable(error);
   if (!server) {
     // Defensive fallback: resolve by the mutable slug column.
     // This path is hit before migration 005 is applied, or for rows where
     // canonical_slug has not yet been backfilled.
-    const result = await supabase
-      .from('servers')
-      .select(SERVER_DETAIL_COLUMNS)
-      .eq('slug', slug)
-      .abortSignal(signal)
-      .maybeSingle();
+    const result = await observeDetailQuery(
+      'slug_fallback',
+      signal,
+      supabase
+        .from('servers')
+        .select(SERVER_DETAIL_COLUMNS)
+        .eq('slug', slug)
+        .abortSignal(signal)
+        .maybeSingle()
+    );
     server = result.data;
     error = result.error;
   }
@@ -217,17 +273,25 @@ async function _getServerBySlug(slug: string): Promise<ServerWithTools | null> {
   assertAvailable(error);
   if (!server) return null;
 
-  // Skip the tools fetch for deprecated rows — the page will call notFound() immediately,
-  // so the tools data is never used. Return early with an empty tools array.
-  if (server.registry_status === 'deprecated') {
+  // Skip the tools fetch when authoritative row fields prove it cannot return
+  // anything. The exact comparisons are deliberate: legacy/unknown states
+  // still query server_tools and therefore cannot hide tool documentation.
+  if (
+    server.registry_status === 'deprecated' ||
+    (server.has_tools === false && server.tool_count === 0)
+  ) {
     return { ...server, tools: [] } as ServerWithTools;
   }
 
-  const { data: tools, error: toolsError } = await supabase
-    .from('server_tools')
-    .select('*')
-    .eq('server_id', server.id)
-    .abortSignal(signal);
+  const { data: tools, error: toolsError } = await observeDetailQuery(
+    'tools',
+    signal,
+    supabase
+      .from('server_tools')
+      .select('*')
+      .eq('server_id', server.id)
+      .abortSignal(signal)
+  );
 
   assertAvailable(toolsError);
   return { ...server, tools: tools || [] } as ServerWithTools;

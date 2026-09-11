@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 type Result = { data: unknown; count?: number; error?: { message: string; code?: string } | null };
 const state = vi.hoisted(() => ({
@@ -36,11 +36,16 @@ vi.mock('./supabase', () => ({ supabase: {
 import { getServerBySlug, listServers, getServersSitemapPage, __resetReadmeLengthProbe } from './queries';
 const outage: Result = { data: null, error: { message: 'timeout', code: '57014' } };
 const server = { id: 'one', slug: 'one', canonical_slug: 'one', registry_status: 'active' };
+let errorLog: ReturnType<typeof vi.spyOn>;
+let warnLog: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
   state.results = []; state.signals = []; state.reads = 0; state.cache.clear();
   __resetReadmeLengthProbe();
+  errorLog = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  warnLog = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 });
+afterEach(() => vi.restoreAllMocks());
 
 describe('directory failures do not become persistent content', () => {
   it('fails a canonical lookup promptly without hiding its error behind legacy lookup, then recovers', async () => {
@@ -58,6 +63,24 @@ describe('directory failures do not become persistent content', () => {
     expect(state.signals).toHaveLength(3);
     expect(new Set(state.signals).size).toBe(1);
   });
+  it('skips the tools read only when both authoritative fields prove there are none', async () => {
+    const noTools = { ...server, has_tools: false, tool_count: 0 };
+    state.results.push({ data: noTools });
+    expect(await getServerBySlug('no-tools')).toMatchObject({ ...noTools, tools: [] });
+    expect(state.reads).toBe(1);
+    expect(await getServerBySlug('no-tools')).toMatchObject({ tools: [] });
+    expect(state.reads).toBe(1);
+  });
+  it.each([
+    { has_tools: true, tool_count: 0 },
+    { has_tools: false, tool_count: 1 },
+    { has_tools: undefined, tool_count: undefined },
+  ])('queries tools when tool state is positive or unknown: %o', async toolState => {
+    const slug = `state-${String(toolState.has_tools)}-${String(toolState.tool_count)}`;
+    state.results.push({ data: { ...server, ...toolState } }, { data: [{ id: 1 }] });
+    expect((await getServerBySlug(slug))?.tools).toHaveLength(1);
+    expect(state.reads).toBe(2);
+  });
   it('only treats two successful absent lookups as missing', async () => {
     state.results.push({ data: null }, outage);
     await expect(getServerBySlug('missing')).rejects.toThrow();
@@ -67,8 +90,32 @@ describe('directory failures do not become persistent content', () => {
   it('does not cache lost tool documentation as an empty tools list', async () => {
     state.results.push({ data: server }, outage);
     await expect(getServerBySlug('one')).rejects.toThrow();
+    expect(errorLog).toHaveBeenCalledWith(
+      '[queries] server detail query failed',
+      expect.objectContaining({ event: 'server_detail_query_error', stage: 'tools' })
+    );
     state.results.push({ data: server }, { data: [{ name: 'query' }] });
     expect((await getServerBySlug('one'))?.tools).toHaveLength(1);
+  });
+  it('logs a structured failing stage without upstream messages or identifiers', async () => {
+    state.results.push({ data: null, error: { message: 'secret upstream URL', code: '57014' } });
+    await expect(getServerBySlug('private-request-slug')).rejects.toThrow('temporarily unavailable');
+    expect(errorLog).toHaveBeenCalledWith(
+      '[queries] server detail query failed',
+      expect.objectContaining({
+        event: 'server_detail_query_error', stage: 'canonical', error_code: '57014',
+      })
+    );
+    expect(JSON.stringify(errorLog.mock.calls)).not.toContain('secret upstream URL');
+    expect(JSON.stringify(errorLog.mock.calls)).not.toContain('private-request-slug');
+  });
+  it('logs a structured slow stage with duration', async () => {
+    vi.spyOn(performance, 'now').mockReturnValueOnce(0).mockReturnValueOnce(1001);
+    state.results.push({ data: { ...server, has_tools: false, tool_count: 0 } });
+    await getServerBySlug('slow');
+    expect(warnLog).toHaveBeenCalledWith('[queries] server detail query slow', {
+      event: 'server_detail_query_slow', stage: 'canonical', duration_ms: 1001,
+    });
   });
   it('does not cache listing with a failed count as a successful zero result', async () => {
     state.results.push(outage, { data: [server] });

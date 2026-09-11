@@ -55,9 +55,10 @@
 --
 -- APPLYING
 -- --------
--- NOT APPLIED as of this commit. Adding a STORED generated column rewrites
--- the table, which will detoast and re-read every README once — a one-time
--- cost, but a real one on the current instance. Apply it in a quiet window.
+-- Applied to the production mcp-find project on 2026-09-11 through the linked
+-- Supabase CLI. The pre-apply JS signal count and post-apply generated-column
+-- count both returned 1,429 active rows; the boundary parity check inspected
+-- 3 rows and found 0 eligibility disagreements. IF NOT EXISTS keeps reruns safe.
 --
 -- Deploy order is NOT load-bearing: apps/web/lib/queries.ts probes for this
 -- column and falls back to selecting readme_content (the old behaviour, and
