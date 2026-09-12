@@ -31,11 +31,21 @@ jobs:
         run: echo "ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
       - name: Run sync pipeline
         id: sync
-        run: pnpm --filter @mcpfind/sync run start
+        # Leave enough of the job budget for ledger repair, cache invalidation,
+        # and IndexNow even if the process itself stalls.
+        run: timeout --signal=TERM --kill-after=30s 24m pnpm --filter @mcpfind/sync run start
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           GH_ENRICHMENT_TOKEN: ${{ secrets.GH_ENRICHMENT_TOKEN }}
+          GH_ENRICHMENT_STAGE_TIMEOUT_MS: 900000
+      - name: Ensure sync ledger is terminal
+        if: ${{ always() && !cancelled() && steps.sync_start.outputs.ts != '' }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SYNC_START: ${{ steps.sync_start.outputs.ts }}
+        run: pnpm --filter @mcpfind/sync exec tsx src/ensure-terminal.ts
       # Determines the real changed-slug set for the cache-bust step below.
       # Paginated via PostgREST's Range header (default page size cap),
       # bounded at 20 pages / 20,000 rows as a safety ceiling for one

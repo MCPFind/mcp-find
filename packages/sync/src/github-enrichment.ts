@@ -4,6 +4,84 @@ import { GITHUB_API_BASE, GITHUB_RATE_DELAY_MS } from '@mcpfind/shared';
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+const DEFAULT_REQUEST_TIMEOUT_MS = 10_000;
+const DEFAULT_STAGE_TIMEOUT_MS = 15 * 60_000;
+const MAX_RETRIES = 3;
+
+function positiveEnv(name: string, fallback: number, allowZero = false): number {
+  const parsed = Number(process.env[name]);
+  return Number.isFinite(parsed) && (allowZero ? parsed >= 0 : parsed > 0)
+    ? Math.floor(parsed)
+    : fallback;
+}
+
+function rateDelayMs(): number {
+  return positiveEnv('GH_ENRICHMENT_RATE_DELAY_MS', GITHUB_RATE_DELAY_MS, true);
+}
+
+function isRateLimited(response: Response): boolean {
+  return response.status === 429 || (
+    response.status === 403 && (
+      response.headers.get('retry-after') !== null ||
+      response.headers.get('x-ratelimit-remaining') === '0'
+    )
+  );
+}
+
+function isTransient(response: Response): boolean {
+  return isRateLimited(response) || response.status >= 500;
+}
+
+function retryDelayMs(response: Response | null, attempt: number): number {
+  const retryAfter = response?.headers.get('retry-after');
+  const seconds = retryAfter ? Number(retryAfter) : NaN;
+  const dateDelay = retryAfter ? Date.parse(retryAfter) - Date.now() : NaN;
+  const requested = Number.isFinite(seconds) ? seconds * 1000 : dateDelay;
+  const base = positiveEnv('GH_ENRICHMENT_RETRY_BASE_MS', 1_000, true) * (2 ** attempt);
+  const jitter = positiveEnv('GH_ENRICHMENT_RETRY_JITTER_MS', 250, true) * Math.random();
+  return Math.min(10_000, Math.max(base, Number.isFinite(requested) ? requested : 0) + jitter);
+}
+
+class StageDeadlineError extends Error {}
+
+async function fetchGitHub(
+  url: string,
+  init: RequestInit,
+  deadline: number,
+): Promise<Response> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) throw new StageDeadlineError('GitHub enrichment stage deadline exceeded');
+    try {
+      const response = await fetch(url, {
+        ...init,
+        signal: AbortSignal.timeout(Math.min(
+          positiveEnv('GH_ENRICHMENT_REQUEST_TIMEOUT_MS', DEFAULT_REQUEST_TIMEOUT_MS),
+          remaining,
+        )),
+      });
+      if (deadline - Date.now() <= 0) {
+        await response.body?.cancel();
+        throw new StageDeadlineError('GitHub enrichment stage deadline exceeded');
+      }
+      if (!isTransient(response) || attempt === MAX_RETRIES - 1) return response;
+      await response.body?.cancel();
+      const delay = Math.min(retryDelayMs(response, attempt), Math.max(0, deadline - Date.now()));
+      if (delay > 0) await sleep(delay);
+    } catch (error) {
+      lastError = error;
+      if (error instanceof StageDeadlineError || deadline - Date.now() <= 0) {
+        throw new StageDeadlineError('GitHub enrichment stage deadline exceeded');
+      }
+      if (attempt === MAX_RETRIES - 1) throw error;
+      const delay = Math.min(retryDelayMs(null, attempt), Math.max(0, deadline - Date.now()));
+      if (delay > 0) await sleep(delay);
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('GitHub retry budget exhausted');
+}
+
 /**
  * Outcome of one enrichment stage. Returned rather than logged so the caller
  * can put real failures into `sync_log.errors` — see `fatal` below.
@@ -29,6 +107,10 @@ interface RenderedContent {
   github_license?: string | null;
   github_language?: string | null;
   readme_content?: string | null;
+}
+
+interface StoredContent extends RenderedContent {
+  github_contributors?: number | null;
 }
 
 /**
@@ -76,17 +158,24 @@ function renderedContentHash(fields: RenderedContent): string {
 }
 
 /**
- * Share of attempted repos that may fail before the stage is called a
- * failure. A per-repo 404 is routine; two thirds of the run failing is an
- * outage wearing a routine costume — which is precisely how a 401 on every
- * call passed for a successful sync for five months.
+ * Share of normalized repositories that may fail transiently before the stage
+ * is called a failure. Permanent 404/410 misses are reported separately.
  */
 const MAX_FAILURE_RATE = 0.5;
 
-function parseGithubUrl(url: string): { owner: string; repo: string } | null {
-  const match = url.match(/github\.com\/([^/]+)\/([^/]+)/);
-  if (!match) return null;
-  return { owner: match[1]!, repo: match[2]!.replace(/\.git$/, '') };
+function parseGithubUrl(raw: string): { owner: string; repo: string; key: string } | null {
+  try {
+    const sshMatch = raw.match(/^git@github\.com:([^/]+)\/([^/]+?)(?:\.git)?$/i);
+    const url = sshMatch ? new URL(`https://github.com/${sshMatch[1]}/${sshMatch[2]}`) :
+      new URL(raw.replace(/^git\+/, ''));
+    if (!['github.com', 'www.github.com'].includes(url.hostname.toLowerCase())) return null;
+    const [owner, rawRepo] = url.pathname.split('/').filter(Boolean);
+    const repo = rawRepo?.replace(/\.git$/i, '');
+    if (!owner || !repo) return null;
+    return { owner, repo, key: `${owner}/${repo}`.toLowerCase() };
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -181,73 +270,104 @@ export async function enrichWithGitHub(
   console.log(
     `[Enrichment] Claimed ${servers.length} candidates (limit ${limit}, ordered by ${cursorColumn} ASC)`
   );
+  const deadline = Date.now() + positiveEnv(
+    'GH_ENRICHMENT_STAGE_TIMEOUT_MS',
+    DEFAULT_STAGE_TIMEOUT_MS,
+  );
   let enriched = 0;
   let unchanged = 0;
-  let attempted = 0;
-  let failed = 0;
+  let attemptedRepos = 0;
+  let successfulRepos = 0;
+  let unavailableRepos = 0;
+  const transientRepoKeys = new Set<string>();
+  let invalidUrls = 0;
+  let writeFailures = 0;
   const errors: string[] = [];
   const headers = {
     Authorization: `Bearer ${githubToken}`,
     Accept: 'application/vnd.github.v3+json',
   };
 
+  // A registry can contain many server records for one repository. Fetch each
+  // normalized owner/repo once, then apply the result to every associated row.
+  const groups = new Map<string, {
+    owner: string;
+    repo: string;
+    servers: Array<{ id: string; github_url: string }>;
+  }>();
+  const invalidServers: Array<{ id: string; github_url: string }> = [];
   for (const server of servers) {
     const parsed = parseGithubUrl(server.github_url);
-    if (!parsed) continue;
+    if (!parsed) {
+      invalidUrls++;
+      invalidServers.push(server);
+      continue;
+    }
+    const group = groups.get(parsed.key);
+    if (group) group.servers.push(server);
+    else groups.set(parsed.key, { owner: parsed.owner, repo: parsed.repo, servers: [server] });
+  }
 
-    attempted++;
+  const markChecked = async (rows: Array<{ id: string }>): Promise<boolean> => {
+    if (!useCheckedAt) return true;
+    const now = new Date().toISOString();
+    let ok = true;
+    for (let offset = 0; offset < rows.length; offset += 100) {
+      const batch = rows.slice(offset, offset + 100);
+      const { error: updateError } = await supabase
+        .from('servers')
+        .update({ github_checked_at: now })
+        .in('id', batch.map(row => row.id));
+      if (updateError) {
+        ok = false;
+        writeFailures += batch.length;
+      }
+    }
+    return ok;
+  };
+  await markChecked(invalidServers);
 
+  const throttle = async () => {
+    const delay = Math.min(rateDelayMs(), Math.max(0, deadline - Date.now()));
+    if (delay > 0) await sleep(delay);
+  };
+
+  for (const [groupKey, group] of groups) {
+    attemptedRepos++;
     try {
-      // Fetch repo metadata with retry on rate limit
-      let repoRes: Response | null = null;
-      const MAX_RETRIES = 3;
-      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-        repoRes = await fetch(
-          `${GITHUB_API_BASE}/repos/${parsed.owner}/${parsed.repo}`,
-          { headers }
-        );
-        if (repoRes.status === 403) {
-          const retryAfter = repoRes.headers.get('retry-after');
-          let waitMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : 60000;
-          waitMs = Math.min(waitMs, 300_000); // Cap at 5 minutes
-          console.warn(`Rate limited (attempt ${attempt + 1}/${MAX_RETRIES}), waiting ${waitMs}ms`);
-          await sleep(waitMs);
-          // retry the same server
-        } else {
-          break;
-        }
-      }
-      if (!repoRes || repoRes.status === 403) {
-        failed++;
-        console.warn(`Skipping ${parsed.owner}/${parsed.repo} after ${MAX_RETRIES} rate-limit retries`);
-        continue;
-      }
+      const repoRes = await fetchGitHub(
+        `${GITHUB_API_BASE}/repos/${group.owner}/${group.repo}`,
+        { headers },
+        deadline,
+      );
 
-      // THE defect behind everything else. A 401 is never a property of one
-      // repo — it is the credential, and it will be 401 for every remaining
-      // call. This branch used to be a console.warn + continue that pushed
-      // nothing to `errors`, so the stage reported enriched=0 and the sync
-      // still closed as 'completed'. It did that on every run from
-      // 2026-03-26 onward and nothing anywhere went red for five months.
-      // Stop the run, and make the caller unable to call it a success.
+      // A 401 invalidates the credential for every remaining call.
       if (repoRes.status === 401) {
         const msg =
-          `GitHub authentication failed (HTTP 401) on ${parsed.owner}/${parsed.repo}. ` +
-          'The enrichment token is invalid, expired, or revoked — every remaining call would fail ' +
-          `identically, so the run is aborting after ${attempted} of ${servers.length} candidates. ` +
-          'Rotate the enrichment token.';
+          'GitHub authentication failed (HTTP 401). The enrichment token is invalid, expired, ' +
+          `or revoked; aborting after ${attemptedRepos} of ${groups.size} normalized repositories.`;
         console.error(`[Enrichment] ${msg}`);
         errors.push(msg);
         return { enriched, unchanged, errors, fatal: true };
       }
 
-      if (!repoRes.ok) {
-        failed++;
-        console.warn(`GitHub API ${repoRes.status} for ${parsed.owner}/${parsed.repo}`);
-        await sleep(GITHUB_RATE_DELAY_MS);
+      // Missing/deleted/private repositories are a durable property of the
+      // source row, not a GitHub outage. Advance only the visit cursor so the
+      // queue rotates; do not fabricate content freshness via updated_at.
+      if (repoRes.status === 404 || repoRes.status === 410) {
+        unavailableRepos++;
+        await markChecked(group.servers);
+        await throttle();
         continue;
       }
 
+      if (!repoRes.ok) {
+        transientRepoKeys.add(groupKey);
+        await throttle();
+        continue;
+      }
+
+      successfulRepos++;
       const repo = await repoRes.json();
 
       // Fetch README.
@@ -260,10 +380,13 @@ export async function enrichWithGitHub(
       let readmeContent: string | null = null;
       let readmeFetchOk = false;
       try {
-        const readmeRes = await fetch(
-          `${GITHUB_API_BASE}/repos/${parsed.owner}/${parsed.repo}/readme`,
-          { headers: { ...headers, Accept: 'application/vnd.github.raw' } }
+        const readmeRes = await fetchGitHub(
+          `${GITHUB_API_BASE}/repos/${group.owner}/${group.repo}/readme`,
+          { headers: { ...headers, Accept: 'application/vnd.github.raw' } },
+          deadline,
         );
+        if (readmeRes.status === 401) throw new Error('GitHub authentication failed (HTTP 401)');
+        if (isTransient(readmeRes)) transientRepoKeys.add(groupKey);
         if (readmeRes.ok) {
           readmeFetchOk = true;
           readmeContent = await readmeRes.text();
@@ -275,18 +398,25 @@ export async function enrichWithGitHub(
           // Definitively no README.
           readmeFetchOk = true;
         }
-      } catch {
-        // README fetch failed, continue without it
+      } catch (error) {
+        if (error instanceof StageDeadlineError ||
+            (error instanceof Error && /authentication failed \(HTTP 401\)/.test(error.message))) throw error;
+        transientRepoKeys.add(groupKey);
       }
 
       // Fetch contributor count
       let contributorCount = 0;
+      let contributorFetchOk = false;
       try {
-        const contribRes = await fetch(
-          `${GITHUB_API_BASE}/repos/${parsed.owner}/${parsed.repo}/contributors?per_page=1`,
-          { headers }
+        const contribRes = await fetchGitHub(
+          `${GITHUB_API_BASE}/repos/${group.owner}/${group.repo}/contributors?per_page=1`,
+          { headers },
+          deadline,
         );
+        if (contribRes.status === 401) throw new Error('GitHub authentication failed (HTTP 401)');
+        if (isTransient(contribRes)) transientRepoKeys.add(groupKey);
         if (contribRes.ok) {
+          contributorFetchOk = true;
           // Parse Link header for total count
           const linkHeader = contribRes.headers.get('link');
           if (linkHeader) {
@@ -297,79 +427,86 @@ export async function enrichWithGitHub(
             contributorCount = Array.isArray(contribs) ? contribs.length : 0;
           }
         }
-      } catch {
-        // Contributor count failed, use 0
+      } catch (error) {
+        if (error instanceof StageDeadlineError ||
+            (error instanceof Error && /authentication failed \(HTTP 401\)/.test(error.message))) throw error;
+        transientRepoKeys.add(groupKey);
       }
 
-      // Read back only this one row's rendered fields — one small row at a
-      // time rather than pulling every candidate's readme_content up front,
-      // which would put tens of MB of blobs in memory per run.
-      const { data: storedRow } = await supabase
-        .from('servers')
-        .select('github_stars, github_last_push, github_license, github_language, readme_content')
-        .eq('id', server.id)
-        .maybeSingle();
-      const stored = (storedRow ?? null) as RenderedContent | null;
-
-      // If we never got a definitive answer about the README, carry the stored
-      // one forward instead of overwriting it with a fetch failure.
-      const nextReadme = readmeFetchOk ? readmeContent : stored?.readme_content ?? null;
-
-      const nextFields = {
-        github_stars: repo.stargazers_count || 0,
-        github_forks: repo.forks_count || 0,
-        github_open_issues: repo.open_issues_count || 0,
-        github_last_push: repo.pushed_at || null,
-        github_license: repo.license?.spdx_id || null,
-        github_language: repo.language || null,
-        github_contributors: contributorCount,
-        github_archived: repo.archived || false,
-        readme_content: nextReadme,
-      };
-
-      // The gate. updated_at moves only when the rendered content actually
-      // differs; a row we merely looked at is marked as visited, not as
-      // modified.
-      const changed = !stored || renderedContentHash(stored) !== renderedContentHash(nextFields);
-
-      const now = new Date().toISOString();
-      const payload: Record<string, unknown> = { ...nextFields };
-      if (useCheckedAt) payload.github_checked_at = now;
-      if (changed) payload.updated_at = now;
-
-      const { error: updateError } = await supabase
-        .from('servers')
-        .update(payload)
-        .eq('id', server.id);
-
-      if (updateError) {
-        failed++;
-        console.error(`Failed to update ${server.id}:`, updateError.message);
-      } else if (changed) {
-        enriched++;
-      } else {
-        unchanged++;
+      for (const server of group.servers) {
+        // Read one small row at a time rather than loading README blobs for the
+        // entire candidate set.
+        const { data: storedRow, error: readError } = await supabase
+          .from('servers')
+          .select('github_stars, github_last_push, github_license, github_language, github_contributors, readme_content')
+          .eq('id', server.id)
+          .maybeSingle();
+        if (readError) {
+          writeFailures++;
+          continue;
+        }
+        const stored = (storedRow ?? null) as StoredContent | null;
+        const nextReadme = readmeFetchOk ? readmeContent : stored?.readme_content ?? null;
+        const nextFields = {
+          github_stars: repo.stargazers_count || 0,
+          github_forks: repo.forks_count || 0,
+          github_open_issues: repo.open_issues_count || 0,
+          github_last_push: repo.pushed_at || null,
+          github_license: repo.license?.spdx_id || null,
+          github_language: repo.language || null,
+          github_contributors: contributorFetchOk
+            ? contributorCount
+            : stored?.github_contributors ?? 0,
+          github_archived: repo.archived || false,
+          readme_content: nextReadme,
+        };
+        const changed = !stored || renderedContentHash(stored) !== renderedContentHash(nextFields);
+        const now = new Date().toISOString();
+        const payload: Record<string, unknown> = { ...nextFields };
+        if (useCheckedAt) payload.github_checked_at = now;
+        if (changed) payload.updated_at = now;
+        const { error: updateError } = await supabase.from('servers').update(payload).eq('id', server.id);
+        if (updateError) writeFailures++;
+        else if (changed) enriched++;
+        else unchanged++;
       }
     } catch (err) {
-      failed++;
-      console.error(`Error enriching ${server.id}:`, err);
+      if (err instanceof StageDeadlineError) {
+        const msg = `${err.message} after ${attemptedRepos} of ${groups.size} normalized repositories.`;
+        errors.push(msg);
+        console.error(`[Enrichment] ${msg}`);
+        return { enriched, unchanged, errors, fatal: true };
+      }
+      if (err instanceof Error && /authentication failed \(HTTP 401\)/.test(err.message)) {
+        errors.push(err.message);
+        return { enriched, unchanged, errors, fatal: true };
+      }
+      transientRepoKeys.add(groupKey);
     }
 
-    await sleep(GITHUB_RATE_DELAY_MS);
+    await throttle();
   }
 
   console.log(
-    `[Enrichment] ${attempted} attempted — ${enriched} changed, ${unchanged} unchanged, ${failed} failed`
+    `[Enrichment] repos=${groups.size} attempted=${attemptedRepos} ok=${successfulRepos} ` +
+    `unavailable=${unavailableRepos} transient_failed=${transientRepoKeys.size} invalid_urls=${invalidUrls} ` +
+    `write_failed=${writeFailures}; rows_changed=${enriched} rows_unchanged=${unchanged}`
   );
 
-  // A high failure rate is an outage, not a tail of odd repos. Surface it so
-  // the caller cannot record the run as a clean success.
-  if (attempted > 0 && failed / attempted > MAX_FAILURE_RATE) {
+  // Only transient/system failures indicate an outage. Permanent 404/410
+  // source misses remain visible in the histogram but cannot poison every run.
+  if (attemptedRepos > 0 && transientRepoKeys.size / attemptedRepos > MAX_FAILURE_RATE) {
     const msg =
-      `GitHub enrichment failed on ${failed} of ${attempted} repos ` +
-      `(${Math.round((failed / attempted) * 100)}%), above the ${Math.round(MAX_FAILURE_RATE * 100)}% ceiling. ` +
+      `GitHub enrichment transiently failed on ${transientRepoKeys.size} of ${attemptedRepos} repositories ` +
+      `(${Math.round((transientRepoKeys.size / attemptedRepos) * 100)}%), above the ${Math.round(MAX_FAILURE_RATE * 100)}% ceiling. ` +
       'Treating the stage as failed rather than reporting a partial run as complete.';
     console.error(`[Enrichment] ${msg}`);
+    errors.push(msg);
+    return { enriched, unchanged, errors, fatal: true };
+  }
+
+  if (writeFailures > 0) {
+    const msg = `GitHub enrichment could not persist ${writeFailures} row update(s).`;
     errors.push(msg);
     return { enriched, unchanged, errors, fatal: true };
   }

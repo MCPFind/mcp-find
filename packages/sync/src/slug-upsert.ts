@@ -65,7 +65,8 @@ export async function upsertBatchWithBisect(
   supabase: SupabaseClient<any, any, any>, // eslint-disable-line @typescript-eslint/no-explicit-any
   rows: StagedRecord[],
   skipped: SkippedRow[],
-  logPrefix = '[Registry Sync]'
+  logPrefix = '[Registry Sync]',
+  preserveCaseOnlyOwner = false,
 ): Promise<number> {
   if (rows.length === 0) return 0;
 
@@ -82,6 +83,33 @@ export async function upsertBatchWithBisect(
   }
   if (rows.length === 1) {
     const row = rows[0]!;
+    // Preserve a row that already owns this slug when the registry republishes
+    // the same identifier with different casing. URLs and canonical ownership
+    // stay stable, and the expected alias does not make every daily run fail.
+    let holderId: string | undefined;
+    try {
+      const { data: holder, error: holderError } = await supabase
+        .from('servers')
+        .select('id')
+        .eq('slug', row.slug)
+        .maybeSingle();
+      if (!holderError) holderId = (holder as { id?: string } | null)?.id;
+    } catch {
+      // Keep the original constraint failure when ownership cannot be proved.
+    }
+    if (preserveCaseOnlyOwner && holderId && holderId !== row.id &&
+        holderId.toLocaleLowerCase('en-US') === row.id.toLocaleLowerCase('en-US')) {
+      skipped.push({
+        id: row.id,
+        slug: row.slug,
+        reason: `slug already claimed by id "${holderId}" (verified case-only registry alias)`,
+      });
+      console.warn(
+        `${logPrefix} Preserving persisted slug owner id="${holderId}"; ` +
+        `skipping case-only alias id="${row.id}".`
+      );
+      return 0;
+    }
     skipped.push({ id: row.id, slug: row.slug, reason: error.message });
     console.error(
       `${logPrefix} SKIPPED row id="${row.id}" slug="${row.slug}" — ${error.message}`
@@ -90,8 +118,12 @@ export async function upsertBatchWithBisect(
   }
 
   const mid = Math.floor(rows.length / 2);
-  const left = await upsertBatchWithBisect(supabase, rows.slice(0, mid), skipped, logPrefix);
-  const right = await upsertBatchWithBisect(supabase, rows.slice(mid), skipped, logPrefix);
+  const left = await upsertBatchWithBisect(
+    supabase, rows.slice(0, mid), skipped, logPrefix, preserveCaseOnlyOwner
+  );
+  const right = await upsertBatchWithBisect(
+    supabase, rows.slice(mid), skipped, logPrefix, preserveCaseOnlyOwner
+  );
   return left + right;
 }
 

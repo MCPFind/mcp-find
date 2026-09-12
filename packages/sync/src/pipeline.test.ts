@@ -128,6 +128,26 @@ function terminalUpdate(): SyncLogUpdate {
 }
 
 describe('sync_log — a failed run reports the work it actually did', () => {
+  it('terminalizes the ledger when enrichment exhausts its stage deadline', async () => {
+    syncFromRegistry.mockResolvedValue(25);
+    enrichWithGitHub.mockResolvedValue({
+      enriched: 3,
+      unchanged: 0,
+      errors: ['GitHub enrichment stage deadline exceeded'],
+      fatal: true,
+    });
+    categorizeServers.mockResolvedValue(4);
+
+    const { runSyncPipeline } = await import('./pipeline');
+    expect(await runSyncPipeline()).toBe(1);
+    expect(terminalUpdate()).toMatchObject({
+      status: 'failed',
+      servers_synced: 25,
+      servers_enriched: 3,
+      errors: ['GitHub enrichment stage deadline exceeded'],
+    });
+  });
+
   it('records servers_synced on the stage-failure path', async () => {
     syncFromRegistry.mockResolvedValue(17282);
     enrichWithGitHub.mockResolvedValue({

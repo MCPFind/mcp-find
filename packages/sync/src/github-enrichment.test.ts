@@ -16,7 +16,7 @@
  * never-rotating 1,000-row slice of ~20,506 candidates.
  */
 
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { enrichWithGitHub } from './github-enrichment';
 
 interface Candidate {
@@ -63,6 +63,7 @@ function makeSupabase(opts: {
         not: () => chain,
         or: () => chain,
         eq: () => chain,
+        in: () => chain,
         order: (col: string, o: unknown) => {
           if (mode === 'candidates') selectorCalls.orders.push([col, o]);
           return chain;
@@ -93,7 +94,13 @@ function makeSupabase(opts: {
 }
 
 /** GitHub API stub: repo metadata, README, contributors. */
-function stubGithub(opts: { status?: number; repo?: Record<string, unknown>; readme?: string }) {
+function stubGithub(opts: {
+  status?: number;
+  readmeStatus?: number;
+  contributorStatus?: number;
+  repo?: Record<string, unknown>;
+  readme?: string;
+}) {
   const repo = opts.repo ?? {
     stargazers_count: 42,
     forks_count: 3,
@@ -107,14 +114,20 @@ function stubGithub(opts: { status?: number; repo?: Record<string, unknown>; rea
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string) => {
-      if (opts.status && opts.status !== 200) {
-        return { ok: false, status: opts.status, headers: { get: () => null } };
-      }
       if (url.endsWith('/readme')) {
+        if (opts.readmeStatus && opts.readmeStatus !== 200) {
+          return { ok: false, status: opts.readmeStatus, headers: { get: () => null } };
+        }
         return { ok: true, status: 200, headers: { get: () => null }, text: async () => opts.readme ?? 'README body' };
       }
       if (url.includes('/contributors')) {
+        if (opts.contributorStatus && opts.contributorStatus !== 200) {
+          return { ok: false, status: opts.contributorStatus, headers: { get: () => null } };
+        }
         return { ok: true, status: 200, headers: { get: () => null }, json: async () => [{}] };
+      }
+      if (opts.status && opts.status !== 200) {
+        return { ok: false, status: opts.status, headers: { get: () => null } };
       }
       return { ok: true, status: 200, headers: { get: () => null }, json: async () => repo };
     }),
@@ -122,9 +135,18 @@ function stubGithub(opts: { status?: number; repo?: Record<string, unknown>; rea
 }
 
 const CANDIDATE: Candidate = { id: 'acme/thing', github_url: 'https://github.com/acme/thing' };
+const ORIGINAL_ENV = { ...process.env };
+
+beforeEach(() => {
+  process.env.GH_ENRICHMENT_RATE_DELAY_MS = '0';
+  process.env.GH_ENRICHMENT_RETRY_BASE_MS = '0';
+  process.env.GH_ENRICHMENT_RETRY_JITTER_MS = '0';
+});
 
 afterEach(() => {
+  process.env = { ...ORIGINAL_ENV };
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe('candidate selector — explicit ordering and limit', () => {
@@ -180,6 +202,133 @@ describe('401 handling — the silent five-month failure', () => {
     // One repo request, then stop — not five.
     expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
     expect(h.updates).toHaveLength(0);
+  });
+});
+
+describe('durable unavailable and transient handling', () => {
+  it('advances only github_checked_at for a permanent 404', async () => {
+    stubGithub({ status: 404 });
+    const h = makeSupabase({ candidates: [CANDIDATE], stored: null });
+
+    const result = await enrichWithGitHub(h.client, 'token');
+
+    expect(result.fatal).toBe(false);
+    expect(h.updates).toHaveLength(1);
+    expect(h.updates[0]).toEqual({ github_checked_at: expect.any(String) });
+    expect(h.updates[0]).not.toHaveProperty('updated_at');
+  });
+
+  it('coalesces case and .git variants into one repository fetch', async () => {
+    stubGithub({});
+    const h = makeSupabase({
+      candidates: [
+        CANDIDATE,
+        { id: 'acme/thing-copy', github_url: 'https://github.com/ACME/THING.git' },
+      ],
+      stored: null,
+    });
+
+    const result = await enrichWithGitHub(h.client, 'token');
+
+    expect(result.enriched).toBe(2);
+    // metadata + README + contributors, once per normalized repository
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(3);
+    expect(h.updates).toHaveLength(2);
+  });
+
+  it('bounds transient retries and fails the stage when they are exhausted', async () => {
+    stubGithub({ status: 503 });
+    const h = makeSupabase({ candidates: [CANDIDATE], stored: null });
+
+    const result = await enrichWithGitHub(h.client, 'token');
+
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(3);
+    expect(result.fatal).toBe(true);
+    expect(result.errors.join('\n')).toMatch(/transiently failed/);
+    expect(h.updates).toHaveLength(0);
+  });
+
+  it('reports exhausted README transients while preserving the stored README', async () => {
+    stubGithub({ readmeStatus: 503 });
+    const h = makeSupabase({
+      candidates: [CANDIDATE],
+      stored: {
+        github_stars: 42,
+        github_last_push: '2026-03-25T00:00:00Z',
+        github_license: 'MIT',
+        github_language: 'TypeScript',
+        github_contributors: 1,
+        readme_content: 'known good README',
+      },
+    });
+
+    const result = await enrichWithGitHub(h.client, 'token');
+
+    expect(result.fatal).toBe(true);
+    expect(result.errors.join('\n')).toMatch(/transiently failed/);
+    expect(h.updates[0]).toMatchObject({ readme_content: 'known good README' });
+  });
+
+  it('reports exhausted contributor transients and preserves a valid count', async () => {
+    stubGithub({ contributorStatus: 429, readme: 'README body' });
+    const h = makeSupabase({
+      candidates: [CANDIDATE],
+      stored: {
+        github_stars: 42,
+        github_last_push: '2026-03-25T00:00:00Z',
+        github_license: 'MIT',
+        github_language: 'TypeScript',
+        github_contributors: 17,
+        readme_content: 'README body',
+      },
+    });
+
+    const result = await enrichWithGitHub(h.client, 'token');
+
+    expect(result.fatal).toBe(true);
+    expect(result.errors.join('\n')).toMatch(/transiently failed/);
+    expect(h.updates[0]).toMatchObject({ github_contributors: 17 });
+    expect(h.updates[0]).not.toHaveProperty('updated_at');
+  });
+
+  it('classifies an exhausted request timeout as transient, not a stage deadline', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new DOMException('timed out', 'TimeoutError')));
+    const h = makeSupabase({ candidates: [CANDIDATE], stored: null });
+
+    const result = await enrichWithGitHub(h.client, 'token');
+
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(3);
+    expect(result.fatal).toBe(true);
+    expect(result.errors.join('\n')).toMatch(/transiently failed/);
+    expect(result.errors.join('\n')).not.toMatch(/stage deadline/);
+  });
+
+  it('treats stage-deadline exhaustion as immediately fatal', async () => {
+    process.env.GH_ENRICHMENT_STAGE_TIMEOUT_MS = '1';
+    const fetch = vi.fn(async () => {
+      await new Promise(resolve => setTimeout(resolve, 5));
+      throw new DOMException('timed out', 'TimeoutError');
+    });
+    vi.stubGlobal('fetch', fetch);
+    const h = makeSupabase({ candidates: [CANDIDATE], stored: null });
+
+    const result = await enrichWithGitHub(h.client, 'token');
+
+    expect(result.fatal).toBe(true);
+    expect(result.errors.join('\n')).toMatch(/stage deadline exceeded/);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('emits one compact status histogram instead of one warning per missing repo', async () => {
+    stubGithub({ status: 404 });
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const h = makeSupabase({ candidates: [CANDIDATE], stored: null });
+
+    await enrichWithGitHub(h.client, 'token');
+
+    expect(log.mock.calls.flat().join('\n')).toContain('unavailable=1');
+    expect(warn).not.toHaveBeenCalled();
   });
 });
 
