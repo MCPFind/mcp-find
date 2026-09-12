@@ -145,6 +145,7 @@ beforeEach(() => {
 
 afterEach(() => {
   process.env = { ...ORIGINAL_ENV };
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -304,6 +305,8 @@ describe('durable unavailable and transient handling', () => {
   });
 
   it('treats stage-deadline exhaustion as immediately fatal', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-12T00:00:00Z'));
     process.env.GH_ENRICHMENT_STAGE_TIMEOUT_MS = '1';
     const fetch = vi.fn(async () => {
       await new Promise(resolve => setTimeout(resolve, 5));
@@ -312,7 +315,9 @@ describe('durable unavailable and transient handling', () => {
     vi.stubGlobal('fetch', fetch);
     const h = makeSupabase({ candidates: [CANDIDATE], stored: null });
 
-    const result = await enrichWithGitHub(h.client, 'token');
+    const pending = enrichWithGitHub(h.client, 'token');
+    await vi.runAllTimersAsync();
+    const result = await pending;
 
     expect(result.fatal).toBe(true);
     expect(result.errors.join('\n')).toMatch(/stage deadline exceeded/);
