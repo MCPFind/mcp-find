@@ -61,13 +61,20 @@ async function fetchGitHub(
           remaining,
         )),
       });
+      if (deadline - Date.now() <= 0) {
+        await response.body?.cancel();
+        throw new StageDeadlineError('GitHub enrichment stage deadline exceeded');
+      }
       if (!isTransient(response) || attempt === MAX_RETRIES - 1) return response;
       await response.body?.cancel();
       const delay = Math.min(retryDelayMs(response, attempt), Math.max(0, deadline - Date.now()));
       if (delay > 0) await sleep(delay);
     } catch (error) {
       lastError = error;
-      if (error instanceof StageDeadlineError || attempt === MAX_RETRIES - 1) throw error;
+      if (error instanceof StageDeadlineError || deadline - Date.now() <= 0) {
+        throw new StageDeadlineError('GitHub enrichment stage deadline exceeded');
+      }
+      if (attempt === MAX_RETRIES - 1) throw error;
       const delay = Math.min(retryDelayMs(null, attempt), Math.max(0, deadline - Date.now()));
       if (delay > 0) await sleep(delay);
     }
@@ -100,6 +107,10 @@ interface RenderedContent {
   github_license?: string | null;
   github_language?: string | null;
   readme_content?: string | null;
+}
+
+interface StoredContent extends RenderedContent {
+  github_contributors?: number | null;
 }
 
 /**
@@ -268,7 +279,7 @@ export async function enrichWithGitHub(
   let attemptedRepos = 0;
   let successfulRepos = 0;
   let unavailableRepos = 0;
-  let transientFailures = 0;
+  const transientRepoKeys = new Set<string>();
   let invalidUrls = 0;
   let writeFailures = 0;
   const errors: string[] = [];
@@ -321,7 +332,7 @@ export async function enrichWithGitHub(
     if (delay > 0) await sleep(delay);
   };
 
-  for (const group of groups.values()) {
+  for (const [groupKey, group] of groups) {
     attemptedRepos++;
     try {
       const repoRes = await fetchGitHub(
@@ -351,7 +362,7 @@ export async function enrichWithGitHub(
       }
 
       if (!repoRes.ok) {
-        transientFailures++;
+        transientRepoKeys.add(groupKey);
         await throttle();
         continue;
       }
@@ -375,6 +386,7 @@ export async function enrichWithGitHub(
           deadline,
         );
         if (readmeRes.status === 401) throw new Error('GitHub authentication failed (HTTP 401)');
+        if (isTransient(readmeRes)) transientRepoKeys.add(groupKey);
         if (readmeRes.ok) {
           readmeFetchOk = true;
           readmeContent = await readmeRes.text();
@@ -389,11 +401,12 @@ export async function enrichWithGitHub(
       } catch (error) {
         if (error instanceof StageDeadlineError ||
             (error instanceof Error && /authentication failed \(HTTP 401\)/.test(error.message))) throw error;
-        // README fetch failed, continue without it
+        transientRepoKeys.add(groupKey);
       }
 
       // Fetch contributor count
       let contributorCount = 0;
+      let contributorFetchOk = false;
       try {
         const contribRes = await fetchGitHub(
           `${GITHUB_API_BASE}/repos/${group.owner}/${group.repo}/contributors?per_page=1`,
@@ -401,7 +414,9 @@ export async function enrichWithGitHub(
           deadline,
         );
         if (contribRes.status === 401) throw new Error('GitHub authentication failed (HTTP 401)');
+        if (isTransient(contribRes)) transientRepoKeys.add(groupKey);
         if (contribRes.ok) {
+          contributorFetchOk = true;
           // Parse Link header for total count
           const linkHeader = contribRes.headers.get('link');
           if (linkHeader) {
@@ -415,7 +430,7 @@ export async function enrichWithGitHub(
       } catch (error) {
         if (error instanceof StageDeadlineError ||
             (error instanceof Error && /authentication failed \(HTTP 401\)/.test(error.message))) throw error;
-        // Contributor count failed, use 0
+        transientRepoKeys.add(groupKey);
       }
 
       for (const server of group.servers) {
@@ -423,14 +438,14 @@ export async function enrichWithGitHub(
         // entire candidate set.
         const { data: storedRow, error: readError } = await supabase
           .from('servers')
-          .select('github_stars, github_last_push, github_license, github_language, readme_content')
+          .select('github_stars, github_last_push, github_license, github_language, github_contributors, readme_content')
           .eq('id', server.id)
           .maybeSingle();
         if (readError) {
           writeFailures++;
           continue;
         }
-        const stored = (storedRow ?? null) as RenderedContent | null;
+        const stored = (storedRow ?? null) as StoredContent | null;
         const nextReadme = readmeFetchOk ? readmeContent : stored?.readme_content ?? null;
         const nextFields = {
           github_stars: repo.stargazers_count || 0,
@@ -439,7 +454,9 @@ export async function enrichWithGitHub(
           github_last_push: repo.pushed_at || null,
           github_license: repo.license?.spdx_id || null,
           github_language: repo.language || null,
-          github_contributors: contributorCount,
+          github_contributors: contributorFetchOk
+            ? contributorCount
+            : stored?.github_contributors ?? 0,
           github_archived: repo.archived || false,
           readme_content: nextReadme,
         };
@@ -464,7 +481,7 @@ export async function enrichWithGitHub(
         errors.push(err.message);
         return { enriched, unchanged, errors, fatal: true };
       }
-      transientFailures++;
+      transientRepoKeys.add(groupKey);
     }
 
     await throttle();
@@ -472,16 +489,16 @@ export async function enrichWithGitHub(
 
   console.log(
     `[Enrichment] repos=${groups.size} attempted=${attemptedRepos} ok=${successfulRepos} ` +
-    `unavailable=${unavailableRepos} transient_failed=${transientFailures} invalid_urls=${invalidUrls} ` +
+    `unavailable=${unavailableRepos} transient_failed=${transientRepoKeys.size} invalid_urls=${invalidUrls} ` +
     `write_failed=${writeFailures}; rows_changed=${enriched} rows_unchanged=${unchanged}`
   );
 
   // Only transient/system failures indicate an outage. Permanent 404/410
   // source misses remain visible in the histogram but cannot poison every run.
-  if (attemptedRepos > 0 && transientFailures / attemptedRepos > MAX_FAILURE_RATE) {
+  if (attemptedRepos > 0 && transientRepoKeys.size / attemptedRepos > MAX_FAILURE_RATE) {
     const msg =
-      `GitHub enrichment transiently failed on ${transientFailures} of ${attemptedRepos} repositories ` +
-      `(${Math.round((transientFailures / attemptedRepos) * 100)}%), above the ${Math.round(MAX_FAILURE_RATE * 100)}% ceiling. ` +
+      `GitHub enrichment transiently failed on ${transientRepoKeys.size} of ${attemptedRepos} repositories ` +
+      `(${Math.round((transientRepoKeys.size / attemptedRepos) * 100)}%), above the ${Math.round(MAX_FAILURE_RATE * 100)}% ceiling. ` +
       'Treating the stage as failed rather than reporting a partial run as complete.';
     console.error(`[Enrichment] ${msg}`);
     errors.push(msg);
