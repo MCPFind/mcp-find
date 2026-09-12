@@ -38,6 +38,9 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           GH_ENRICHMENT_TOKEN: ${{ secrets.GH_ENRICHMENT_TOKEN }}
+          # At the 800ms repository throttle, 600 candidates leave roughly
+          # seven minutes for GitHub responses/retries inside the 15m stage.
+          GH_ENRICHMENT_LIMIT: 600
           GH_ENRICHMENT_STAGE_TIMEOUT_MS: 900000
       - name: Ensure sync ledger is terminal
         if: ${{ always() && !cancelled() && steps.sync_start.outputs.ts != '' }}
