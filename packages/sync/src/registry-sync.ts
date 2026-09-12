@@ -215,7 +215,13 @@ export async function syncFromRegistry(
         //
         // totalSynced counts rows that were actually written, so a partial batch
         // reports as a partial batch rather than as zero or as a full one.
-        totalSynced += await upsertBatchWithBisect(supabase, await changedRows(supabase, admitted), skipped, LOG_PREFIX);
+        totalSynced += await upsertBatchWithBisect(
+          supabase,
+          await changedRows(supabase, admitted),
+          skipped,
+          LOG_PREFIX,
+          true,
+        );
       }
 
       options.onProgress?.(totalSynced);

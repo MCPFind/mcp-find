@@ -16,7 +16,7 @@
  * never-rotating 1,000-row slice of ~20,506 candidates.
  */
 
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { enrichWithGitHub } from './github-enrichment';
 
 interface Candidate {
@@ -63,6 +63,7 @@ function makeSupabase(opts: {
         not: () => chain,
         or: () => chain,
         eq: () => chain,
+        in: () => chain,
         order: (col: string, o: unknown) => {
           if (mode === 'candidates') selectorCalls.orders.push([col, o]);
           return chain;
@@ -122,9 +123,18 @@ function stubGithub(opts: { status?: number; repo?: Record<string, unknown>; rea
 }
 
 const CANDIDATE: Candidate = { id: 'acme/thing', github_url: 'https://github.com/acme/thing' };
+const ORIGINAL_ENV = { ...process.env };
+
+beforeEach(() => {
+  process.env.GH_ENRICHMENT_RATE_DELAY_MS = '0';
+  process.env.GH_ENRICHMENT_RETRY_BASE_MS = '0';
+  process.env.GH_ENRICHMENT_RETRY_JITTER_MS = '0';
+});
 
 afterEach(() => {
+  process.env = { ...ORIGINAL_ENV };
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe('candidate selector — explicit ordering and limit', () => {
@@ -180,6 +190,62 @@ describe('401 handling — the silent five-month failure', () => {
     // One repo request, then stop — not five.
     expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
     expect(h.updates).toHaveLength(0);
+  });
+});
+
+describe('durable unavailable and transient handling', () => {
+  it('advances only github_checked_at for a permanent 404', async () => {
+    stubGithub({ status: 404 });
+    const h = makeSupabase({ candidates: [CANDIDATE], stored: null });
+
+    const result = await enrichWithGitHub(h.client, 'token');
+
+    expect(result.fatal).toBe(false);
+    expect(h.updates).toHaveLength(1);
+    expect(h.updates[0]).toEqual({ github_checked_at: expect.any(String) });
+    expect(h.updates[0]).not.toHaveProperty('updated_at');
+  });
+
+  it('coalesces case and .git variants into one repository fetch', async () => {
+    stubGithub({});
+    const h = makeSupabase({
+      candidates: [
+        CANDIDATE,
+        { id: 'acme/thing-copy', github_url: 'https://github.com/ACME/THING.git' },
+      ],
+      stored: null,
+    });
+
+    const result = await enrichWithGitHub(h.client, 'token');
+
+    expect(result.enriched).toBe(2);
+    // metadata + README + contributors, once per normalized repository
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(3);
+    expect(h.updates).toHaveLength(2);
+  });
+
+  it('bounds transient retries and fails the stage when they are exhausted', async () => {
+    stubGithub({ status: 503 });
+    const h = makeSupabase({ candidates: [CANDIDATE], stored: null });
+
+    const result = await enrichWithGitHub(h.client, 'token');
+
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(3);
+    expect(result.fatal).toBe(true);
+    expect(result.errors.join('\n')).toMatch(/transiently failed/);
+    expect(h.updates).toHaveLength(0);
+  });
+
+  it('emits one compact status histogram instead of one warning per missing repo', async () => {
+    stubGithub({ status: 404 });
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const h = makeSupabase({ candidates: [CANDIDATE], stored: null });
+
+    await enrichWithGitHub(h.client, 'token');
+
+    expect(log.mock.calls.flat().join('\n')).toContain('unavailable=1');
+    expect(warn).not.toHaveBeenCalled();
   });
 });
 

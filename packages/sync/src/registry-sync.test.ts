@@ -190,10 +190,17 @@ interface UpsertAttempt {
 }
 
 /** Supabase double whose upsert enforces the real servers_slug_key constraint. */
-function makeSlugConstrainedSupabase(options: { existingSlugs?: string[] } = {}) {
+function makeSlugConstrainedSupabase(options: {
+  existingSlugs?: string[];
+  existingRows?: Array<{ id: string; slug: string }>;
+} = {}) {
   const written = new Map<string, { id: string; slug: string }>(); // id -> row
   const slugOwners = new Map<string, string>(); // slug -> id
   for (const s of options.existingSlugs ?? []) slugOwners.set(s, `pre-existing:${s}`);
+  for (const row of options.existingRows ?? []) {
+    written.set(row.id, row);
+    slugOwners.set(row.slug, row.id);
+  }
   const attempts: UpsertAttempt[] = [];
 
   return {
@@ -201,7 +208,15 @@ function makeSlugConstrainedSupabase(options: { existingSlugs?: string[] } = {})
     attempts,
     client: {
       from: () => ({
-        select: () => ({ in: async (_key: string, ids: string[]) => ({ data: ids.map(id => written.get(id)).filter(Boolean), error: null }) }),
+        select: () => ({
+          in: async (_key: string, ids: string[]) => ({ data: ids.map(id => written.get(id)).filter(Boolean), error: null }),
+          eq: (_key: string, slug: string) => ({
+            maybeSingle: async () => {
+              const id = slugOwners.get(slug);
+              return { data: id ? { id } : null, error: null };
+            },
+          }),
+        }),
         upsert: async (rows: Array<{ id: string; slug: string }>) => {
           attempts.push({ rows });
           // Postgres evaluates the statement atomically: one violation and
@@ -367,6 +382,24 @@ describe('duplicate-slug handling', () => {
 
     expect(synced).toBe(1);
     expect(db.written.size).toBe(1);
+  });
+
+  it('preserves a persisted owner when the registry changes only id casing', async () => {
+    const persisted = {
+      id: 'io.github.Zuga-luga/zugabot',
+      slug: 'io-github-zuga-luga-zugabot',
+    };
+    const db = makeSlugConstrainedSupabase({ existingRows: [persisted] });
+    const issues: string[] = [];
+    stubRegistryPages([['io.github.Zuga-luga/Zugabot', 'io.github.Zuga-luga/zugabot']]);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const synced = await syncFromRegistry(db.client as any, { onIssue: issue => issues.push(issue) });
+
+    expect(synced).toBe(0);
+    expect(db.written.get(persisted.id)).toEqual(persisted);
+    expect(db.written.has('io.github.Zuga-luga/Zugabot')).toBe(false);
+    expect(issues).toEqual([]);
   });
 });
 
