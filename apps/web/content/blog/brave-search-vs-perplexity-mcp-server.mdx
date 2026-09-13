@@ -1,0 +1,114 @@
+---
+title: "Brave Search MCP vs Perplexity MCP: A Practical Comparison"
+description: "Compare Brave Search MCP and Perplexity MCP on exposed tools, transports, and per-request pricing so you can pick the right search server for your AI agent."
+excerpt: "Brave Search MCP returns raw ranked results across eight tools. Perplexity MCP wraps four AI-native research tools around its Agent API. Here is how their tools, transports, and pricing actually compare, with configs for both."
+date: "2026-09-13"
+updatedAt: "2026-09-13"
+author: "Gus Marquez"
+authorUrl: "https://www.linkedin.com/in/gustavoamarquez"
+authorSameAs:
+  - "https://www.linkedin.com/in/gustavoamarquez"
+tags:
+  - "mcp"
+  - "developer"
+  - "search"
+  - "brave-search"
+  - "perplexity"
+category: "search"
+focusKeyword: "brave search mcp vs perplexity mcp"
+draft: false
+cornerstone: false
+topic_source: "new_topic"
+faqItems:
+  - question: "Do Brave Search MCP and Perplexity MCP cost the same for plain search?"
+    answer: "Close. Brave's Search Plan runs $5 per 1,000 requests with $5 in free monthly credits. Perplexity's Search API is a flat $5 per 1,000 requests with no separate free tier documented. Both require a card on file before you can run either, even against free credits."
+  - question: "Which server should I pick if I just need ranked results with URLs?"
+    answer: "Brave Search MCP. Its brave_web_search tool returns ranked results with source links directly, which is what most RAG or citation-grounding setups need. Perplexity's equivalent, perplexity_search, does the same thing but the server is built around its other three tools, which synthesize an answer rather than hand back a link list."
+  - question: "Does either server browse a URL I give it directly?"
+    answer: "No. Both route every call through their own vendor-hosted search and retrieval stack. Neither tool set accepts an arbitrary URL and fetches it directly; you would need a separate browsing or fetch-focused MCP server for that."
+  - question: "Is the claim that Perplexity is dropping MCP internally true?"
+    answer: "Unconfirmed. Several blog posts repeat the same claim about Perplexity's CTO announcing an internal move away from MCP at a March 2026 conference, but none link a recording, transcript, or official Perplexity statement. Coverage of that same conference from VentureBeat describes Perplexity shipping new MCP connector support for enterprise customers, which points the other way."
+---
+
+Brave Search MCP and Perplexity MCP are the two most visible officially maintained search servers in the MCP ecosystem, and they solve different problems. Brave hands an agent raw, ranked results across eight search-specific tools. Perplexity hands an agent four tools that route through its own reasoning stack and return a synthesized answer instead of a results list. Picking between them means picking between "give my agent a search engine" and "give my agent a research assistant." Pricing, docs, and both official GitHub repositories were checked on September 13, 2026. No authenticated installation was performed for this article; the setup examples below follow each vendor's published README, not a live test run.
+
+For the single-server walkthrough, see [MCPFind's Brave Search MCP setup guide](/blog/brave-search-mcp-server-setup-guide) and [Perplexity MCP server guide](/blog/perplexity-mcp-server-search-guide). This article compares the two directly.
+
+## What Tools Does Each Server Actually Expose?
+
+Brave Search MCP ([brave/brave-search-mcp-server](https://github.com/brave/brave-search-mcp-server), MIT license, `@brave/brave-search-mcp-server` on npm, currently at version 2.1.3) exposes eight tools: `brave_web_search`, `brave_local_search`, `brave_video_search`, `brave_image_search`, `brave_news_search`, `brave_place_search`, `brave_summarizer`, and `brave_llm_context`, the last of which returns pre-extracted content shaped for RAG pipelines rather than a page snippet. It requires Node.js 22 or higher and supports two transports: stdio (the default) and HTTP. No SSE transport is documented.
+
+Perplexity MCP ([perplexityai/modelcontextprotocol](https://github.com/perplexityai/modelcontextprotocol), MIT license, `@perplexity-ai/mcp-server` on npm, currently at version 1.2.1) exposes four tools: `perplexity_search`, `perplexity_ask`, `perplexity_reason`, and `perplexity_research`. Only `perplexity_search` is a direct search call. The other three route through Perplexity's Agent API at three different effort presets: `perplexity_ask` uses the fast preset, `perplexity_reason` uses medium, and `perplexity_research` uses high. Fewer tools, but each of the three non-search tools trades latency for depth rather than changing what kind of query it accepts.
+
+The practical difference: Brave gives you eight narrow, predictable tools that each do one search variant. Perplexity gives you one narrow search tool plus three tools where the agent is choosing a depth-versus-latency tradeoff, not a different data source.
+
+## How Does Pricing Compare?
+
+For plain search, the two are close. Brave's Search Plan is $5 per 1,000 requests with $5 in free monthly credits applied automatically, and a rate limit of 50 queries per second. Perplexity's Search API is a flat $5 per 1,000 requests with no token charges and no documented free tier. Both vendors require a card on file, including to use Brave's free credits, which Brave's own pricing page describes as an anti-fraud measure.
+
+Beyond plain search, the two pricing models diverge. Brave also sells an Answers Plan at $4 per 1,000 requests plus $5 per million input and output tokens, capped at 2 queries per second, for summarized answers with citations. Perplexity's Sonar API (the model family behind `perplexity_ask`, `perplexity_reason`, and `perplexity_research`) prices separately: $1 to $3 per million input tokens and $1 to $15 per million output tokens depending on the Sonar tier, plus a $5 to $14 per 1,000 requests fee scaled to search-context size. Sonar Deep Research, the high-effort backbone behind `perplexity_research`, adds its own token and citation charges on top. Perplexity's Agent API tool calls also carry per-invocation fees on top of model tokens: $0.0025 for a web search, $0.0005 for a URL fetch, $0.005 for a people or finance search, and $0.03 per sandbox session.
+
+In short: if all you need is `brave_web_search` or `perplexity_search`, the two vendors charge nearly the same $4-5 per 1,000 requests. Once you reach for Perplexity's `ask`, `reason`, or `research` tools, you're paying for an LLM call plus tool invocations on top of the base request fee, not just a search lookup. Verify current numbers against [Brave's pricing page](https://brave.com/search/api/) and [Perplexity's pricing docs](https://docs.perplexity.ai/getting-started/pricing) before budgeting; neither page shows an effective date, so treat these as the September 13, 2026 snapshot.
+
+## Configure Both Side by Side
+
+Brave Search MCP over stdio, in VS Code's `.vscode/mcp.json`:
+
+```json
+{
+  "inputs": [
+    {
+      "id": "brave-key",
+      "type": "promptString",
+      "description": "Enter your Brave Search API key",
+      "password": true
+    }
+  ],
+  "servers": {
+    "brave": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@brave/brave-search-mcp-server", "--transport", "stdio"],
+      "env": {
+        "BRAVE_API_KEY": "${input:brave-key}"
+      }
+    }
+  }
+}
+```
+
+Perplexity MCP in a client that reads a standard `mcpServers` block (Claude Desktop, Cursor):
+
+```json
+{
+  "mcpServers": {
+    "perplexity": {
+      "command": "npx",
+      "args": ["-y", "@perplexity-ai/mcp-server"],
+      "env": {
+        "PERPLEXITY_API_KEY": "your-api-key-here"
+      }
+    }
+  }
+}
+```
+
+Both launch through `npx` against their published npm package and take exactly one API key as an environment variable. Neither requires an OAuth flow. Get a Brave key from the [Brave Search API dashboard](https://brave.com/search/api/) and a Perplexity key from [Perplexity's API settings](https://docs.perplexity.ai/getting-started/pricing). Keep both keys out of any committed config file.
+
+## Test a Narrow Query Against Both
+
+Ask the same factual, time-sensitive question through each connected server and compare the shape of the response, not just the content. Brave's `brave_web_search` should return a ranked list of URLs with titles and snippets, the same shape you'd get from a search results page. Perplexity's `perplexity_ask` should return a single synthesized sentence or paragraph with inline citations, no list of links to sift through yourself.
+
+If either fails to start, check the `npx` output directly before touching your query; a missing or expired key will usually surface as an authentication error from the vendor's API rather than a generic MCP connection failure. If you need to compare depth rather than speed, run the same open-ended question through `perplexity_reason` and `perplexity_research` and check whether the source count and answer length change the way the effort-preset mapping predicts. Brave does not have an equivalent depth control; every Brave tool call returns at a fixed depth per tool.
+
+## Which One Fits Your Task?
+
+Pick Brave Search MCP when your agent needs ranked, sourced results it can reason over itself, when you're building a RAG pipeline that wants raw page content (`brave_llm_context` exists specifically for this), or when you need image, video, news, or local search variants Perplexity doesn't offer. Pick Perplexity MCP when you want the search-and-synthesis step done for you and you're comfortable paying LLM token costs on top of the request fee, or when a task genuinely needs the deep, multi-source research that `perplexity_research` is built for.
+
+One directory quirk worth knowing before you go looking for either on MCPFind: Brave's official listing is filed under [MCPFind's devtools category](/categories/devtools), not search, because our directory categorizes by the registry's declared metadata rather than by function. You can find it directly at [Brave Search MCP Server on MCPFind](/servers/io-github-brave-brave-search-mcp-server). Perplexity's official server isn't indexed in MCPFind's directory at all as of this snapshot; the only Perplexity-related listings are unofficial community wrappers with single-digit star counts. If you're browsing [MCPFind's search category](/categories/search) (1,973 servers indexed as of September 9, 2026, averaging 22.39 stars) expecting to find either vendor's official server by category, you won't. Go to the GitHub repository directly instead.
+
+## A Claim Worth Flagging, Not Repeating
+
+Several blog posts describe Perplexity's co-founder and CTO announcing at a March 2026 developer conference ("Ask 2026") that the company is moving its internal systems off MCP, citing tool schemas consuming up to 72% of context and low tool utilization. Checking for a source, that claim traces back to no recording, transcript, or official Perplexity statement. [VentureBeat's coverage of the same conference](https://venturebeat.com/technology/perplexity-takes-its-computer-ai-agent-into-the-enterprise-taking-aim-at) describes Perplexity shipping new MCP connector installation support for enterprise customers, the opposite direction. Treat the "Perplexity is quietly abandoning MCP" narrative as unconfirmed until a primary source surfaces, not as a fact to build a purchasing decision on.
+
+For more on when adding another MCP server is worth the schema overhead it adds to every agent turn, see [what MCP actually is](/blog/what-is-mcp). For a wider survey of search options beyond these two vendors, see [MCPFind's best MCP servers for web search](/blog/best-mcp-servers-for-web-search).
