@@ -83,9 +83,11 @@ function textResult(result) {
 
 const packageJson = JSON.parse(await readFile(resolve(packageRoot, 'package.json'), 'utf8'));
 const fixture = await startApiFixture();
+const serverEntry = process.env.MCPFIND_SERVER_ENTRY || resolve(packageRoot, 'dist/index.js');
+const serverCommand = process.env.MCPFIND_SERVER_COMMAND || process.execPath;
 const transport = new StdioClientTransport({
-  command: process.execPath,
-  args: [resolve(packageRoot, 'dist/index.js')],
+  command: serverCommand,
+  args: process.env.MCPFIND_SERVER_COMMAND ? [] : [serverEntry],
   cwd: packageRoot,
   env: { MCPFIND_API_URL: fixture.url },
   stderr: 'pipe',

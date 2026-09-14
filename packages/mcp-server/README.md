@@ -48,12 +48,10 @@ Each upstream request has a 10-second timeout.
 
 ## Development
 
-From the repository root, install dependencies and build the shared package before
-building the server:
+From the repository root, install dependencies and build the server:
 
 ```bash
 pnpm install --frozen-lockfile
-pnpm --filter @mcpfind/shared build
 pnpm --filter @mcpfind/server build
 pnpm --filter @mcpfind/server test:protocol
 pnpm --filter @mcpfind/server test:docs

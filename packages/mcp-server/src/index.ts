@@ -3,8 +3,8 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { searchServers, getServerDetails, getInstallConfig } from './client.js';
-import { CATEGORIES } from '@mcpfind/shared';
-import type { ClientType } from '@mcpfind/shared';
+import { CATEGORIES } from './types.js';
+import type { ClientType } from './types.js';
 
 const server = new McpServer({
   name: 'mcpfind',

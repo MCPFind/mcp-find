@@ -9,6 +9,11 @@ const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const readme = await readFile(resolve(packageRoot, 'README.md'), 'utf8');
 const packageJson = JSON.parse(await readFile(resolve(packageRoot, 'package.json'), 'utf8'));
 assert.equal(packageJson.name, '@mcpfind/server', 'package keeps its public identity');
+assert.equal(packageJson.license, 'MIT', 'package declares its license');
+assert.deepEqual(packageJson.files, ['dist', 'README.md', 'LICENSE'], 'package ships only runtime, README, and license files');
+assert.equal(packageJson.publishConfig?.access, 'public', 'scoped package is configured for public publication');
+assert(!Object.values(packageJson.dependencies ?? {}).some(version => version === 'workspace:*'), 'published runtime dependencies are registry-resolvable');
+assert.match(await readFile(resolve(packageRoot, 'LICENSE'), 'utf8'), /^MIT License/m, 'package includes its license text');
 const clientConfigurationSection = readme.match(/## Client configuration\s+([\s\S]*?)(?=\n## |$)/);
 
 assert(clientConfigurationSection, 'README has a Client configuration section');
