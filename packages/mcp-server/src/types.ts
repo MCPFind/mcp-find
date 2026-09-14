@@ -27,6 +27,8 @@ export type SortOption = 'stars' | 'updated' | 'name' | 'downloads';
 export interface ServerListItem {
   name: string;
   slug: string;
+  /** Stable public route when the directory has migrated a legacy slug. */
+  canonical_slug?: string | null;
   description: string | null;
   category: Category | null;
   github_stars: number;

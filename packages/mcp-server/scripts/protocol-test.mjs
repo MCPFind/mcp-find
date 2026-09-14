@@ -18,13 +18,14 @@ async function startApiFixture() {
   const requests = [];
   const fixture = createServer((request, response) => {
     const url = new URL(request.url, `http://${request.headers.host}`);
-    requests.push(url);
+    requests.push({ method: request.method, url });
 
     if (url.pathname === '/api/servers') {
       return json(response, 200, {
         servers: [{
           name: 'Fixture Search Server',
-          slug: 'fixture-search',
+          slug: 'fixture-search-legacy',
+          canonical_slug: 'fixture-search',
           description: 'A deterministic MCP server used by the protocol test.',
           category: 'search',
           github_stars: 42,
@@ -38,7 +39,8 @@ async function startApiFixture() {
     if (url.pathname === '/api/servers/fixture-search') {
       return json(response, 200, {
         name: 'Fixture Search Server',
-        slug: 'fixture-search',
+        slug: 'fixture-search-legacy',
+        canonical_slug: 'fixture-search',
         description: 'A deterministic MCP server used by the protocol test.',
         category: 'search',
         version: '1.2.3',
@@ -81,7 +83,17 @@ function textResult(result) {
   return result.content[0].text;
 }
 
+const nonOutputSecret = 'protocol-test-only-secret';
+
+function assertPublicToolOutput(value) {
+  const serialized = JSON.stringify(value);
+  assert.doesNotMatch(serialized, /127\.0\.0\.1|localhost|MCPFIND_API_URL|\/private\//,
+    'tool output contains public directory data only, never fixture/local locations');
+  assert(!serialized.includes(nonOutputSecret), 'tool output never exposes process environment values');
+}
+
 const packageJson = JSON.parse(await readFile(resolve(packageRoot, 'package.json'), 'utf8'));
+const { serverPageUrls } = await import(resolve(packageRoot, 'dist/links.js'));
 const fixture = await startApiFixture();
 const serverEntry = process.env.MCPFIND_SERVER_ENTRY || resolve(packageRoot, 'dist/index.js');
 const serverCommand = process.env.MCPFIND_SERVER_COMMAND || process.execPath;
@@ -89,7 +101,7 @@ const transport = new StdioClientTransport({
   command: serverCommand,
   args: process.env.MCPFIND_SERVER_COMMAND ? [] : [serverEntry],
   cwd: packageRoot,
-  env: { MCPFIND_API_URL: fixture.url },
+  env: { MCPFIND_API_URL: fixture.url, MCP_SERVER_PROTOCOL_TEST_SECRET: nonOutputSecret },
   stderr: 'pipe',
 });
 const client = new Client({ name: 'mcpfind-protocol-test', version: '1.0.0' });
@@ -97,6 +109,10 @@ const client = new Client({ name: 'mcpfind-protocol-test', version: '1.0.0' });
 try {
   await client.connect(transport);
   assert.deepEqual(client.getServerVersion(), { name: 'mcpfind', version: packageJson.version });
+  assert.deepEqual(serverPageUrls('fixture server/alpha?', 'search_servers'), {
+    canonical_url: 'https://mcpfind.org/servers/fixture%20server%2Falpha%3F',
+    tracked_url: 'https://mcpfind.org/servers/fixture%20server%2Falpha%3F?utm_source=mcp_server&utm_medium=referral&utm_campaign=mcpfind_server&utm_content=search_servers',
+  }, 'directory links encode slugs and keep fixed tracking separate from canonical identity');
 
   const toolList = await client.listTools();
   const toolsByName = new Map(toolList.tools.map(tool => [tool.name, tool]));
@@ -109,23 +125,34 @@ try {
     name: 'search_servers',
     arguments: { query: 'fixture', category: 'search', sort_by: 'stars', limit: 3 },
   });
-  assert.deepEqual(JSON.parse(textResult(search)), [{
-    name: 'Fixture Search Server', slug: 'fixture-search',
+  const searchOutput = JSON.parse(textResult(search));
+  assert.deepEqual(searchOutput, [{
+    name: 'Fixture Search Server', slug: 'fixture-search-legacy',
     description: 'A deterministic MCP server used by the protocol test.',
     category: 'search', stars: 42, license: 'MIT', package_type: 'npm', is_official: true,
+    canonical_url: 'https://mcpfind.org/servers/fixture-search',
+    tracked_url: 'https://mcpfind.org/servers/fixture-search?utm_source=mcp_server&utm_medium=referral&utm_campaign=mcpfind_server&utm_content=search_servers',
   }]);
-  const searchRequest = fixture.requests.at(-1);
+  const searchRequest = fixture.requests.at(-1).url;
   assert.equal(searchRequest.pathname, '/api/servers');
   assert.deepEqual(Object.fromEntries(searchRequest.searchParams), { q: 'fixture', category: 'search', sort: 'stars', limit: '3' });
+  assertPublicToolOutput(searchOutput);
 
   const detail = await client.callTool({ name: 'get_server_details', arguments: { server_id: 'fixture-search' } });
-  assert.equal(JSON.parse(textResult(detail)).tools[0].name, 'search');
-  assert.equal(JSON.parse(textResult(detail)).readme_excerpt, 'Fixture README content.');
+  const detailOutput = JSON.parse(textResult(detail));
+  assert.equal(detailOutput.tools[0].name, 'search');
+  assert.equal(detailOutput.slug, 'fixture-search-legacy');
+  assert.equal(detailOutput.readme_excerpt, 'Fixture README content.');
+  assert.equal(detailOutput.canonical_url, 'https://mcpfind.org/servers/fixture-search');
+  assert.equal(detailOutput.tracked_url, 'https://mcpfind.org/servers/fixture-search?utm_source=mcp_server&utm_medium=referral&utm_campaign=mcpfind_server&utm_content=get_server_details');
+  assertPublicToolOutput(detailOutput);
 
   const installConfig = await client.callTool({
     name: 'get_install_config', arguments: { server_id: 'fixture-search', client: 'claude-code' },
   });
   assert.deepEqual(JSON.parse(textResult(installConfig)), { command: 'npx', args: ['-y', '@fixture/search'] });
+  assert(fixture.requests.every(request => request.method === 'GET'), 'tools only make read-only API requests');
+  assert.equal(fixture.requests.length, 3, 'returning installation configuration does not execute an installation');
 
   const missing = await client.callTool({ name: 'get_server_details', arguments: { server_id: 'missing' } });
   assert.equal(missing.isError, true);

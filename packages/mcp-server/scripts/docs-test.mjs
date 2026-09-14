@@ -33,6 +33,10 @@ assert.equal(new Set(documentedToolNames).size, documentedToolNames.length, 'REA
 assert.match(readme, /MCPFIND_API_URL/, 'README documents the API endpoint override');
 assert.match(readme, /10-second timeout/, 'README documents the upstream timeout');
 assert.match(readme, /unknown server returns an MCP tool error/i, 'README documents the not-found error behavior');
+assert.match(readme, /canonical_url/, 'README documents the clean directory link');
+assert.match(readme, /tracked_url/, 'README documents the attributed directory link');
+assert.match(readme, /utm_source=mcp_server/, 'README documents the stable MCP referral source');
+assert.match(readme, /does not install or execute/i, 'README documents that configuration output is not an installation action');
 
 const transport = new StdioClientTransport({
   command: process.execPath,

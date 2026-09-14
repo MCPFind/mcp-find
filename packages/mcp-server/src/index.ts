@@ -3,6 +3,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { searchServers, getServerDetails, getInstallConfig } from './client.js';
+import { serverPageUrls } from './links.js';
 import { CATEGORIES } from './types.js';
 import type { ClientType } from './types.js';
 
@@ -14,7 +15,7 @@ const server = new McpServer({
 // Tool 1: search_servers
 server.tool(
   'search_servers',
-  'Search the MCP server directory. Returns matching servers with metadata, GitHub stats, and install info.',
+  'Search the MCP server directory. Returns matching servers with metadata, GitHub stats, and canonical plus tracked MCPFind server-page links.',
   {
     query: z.string().describe('Search query (e.g., "postgres", "slack", "file system")'),
     category: z.enum(CATEGORIES).optional().describe('Filter by category'),
@@ -33,6 +34,7 @@ server.tool(
         license: s.github_license,
         package_type: s.package_type,
         is_official: s.is_official,
+        ...serverPageUrls(s.canonical_slug ?? s.slug, 'search_servers'),
       }));
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(results, null, 2) }],
@@ -49,7 +51,7 @@ server.tool(
 // Tool 2: get_server_details
 server.tool(
   'get_server_details',
-  'Get full details for a specific MCP server including description, tools, schemas, GitHub stats, and README content.',
+  'Get full details for a specific MCP server including description, tools, schemas, GitHub stats, README content, and canonical plus tracked MCPFind server-page links.',
   {
     server_id: z.string().describe('Server slug or registry ID'),
   },
@@ -75,6 +77,7 @@ server.tool(
         github_license: detail_server.github_license,
         github_last_push: detail_server.github_last_push,
         is_official: detail_server.is_official,
+        ...serverPageUrls(detail_server.canonical_slug ?? detail_server.slug, 'get_server_details'),
         tools: (detail_server.tools ?? []).map(t => ({
           name: t.tool_name,
           description: t.tool_description,
