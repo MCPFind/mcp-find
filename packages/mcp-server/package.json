@@ -12,7 +12,9 @@
   "scripts": {
     "build": "tsc",
     "postbuild": "chmod +x dist/index.js",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test:protocol": "node scripts/protocol-test.mjs",
+    "test:docs": "node scripts/docs-test.mjs"
   },
   "exports": {
     ".": {

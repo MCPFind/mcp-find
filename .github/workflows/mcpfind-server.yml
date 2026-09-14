@@ -1,0 +1,50 @@
+name: MCPFind server
+
+on:
+  pull_request:
+    paths:
+      - 'packages/mcp-server/**'
+      - 'packages/shared/**'
+      - '.github/workflows/mcpfind-server.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'packages/mcp-server/**'
+      - 'packages/shared/**'
+      - '.github/workflows/mcpfind-server.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  protocol:
+    name: mcpfind-server-protocol
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @mcpfind/shared build
+      - run: pnpm --filter @mcpfind/server build
+      - run: pnpm --filter @mcpfind/server test:protocol
+
+  docs:
+    name: mcpfind-server-docs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @mcpfind/shared build
+      - run: pnpm --filter @mcpfind/server build
+      - run: pnpm --filter @mcpfind/server test:docs
