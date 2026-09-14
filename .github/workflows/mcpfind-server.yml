@@ -44,4 +44,5 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @mcpfind/server build
       - run: pnpm --filter @mcpfind/server test:docs
-      - run: npm --prefix packages/mcp-server pack --dry-run
+      - run: npm pack --dry-run
+        working-directory: packages/mcp-server
