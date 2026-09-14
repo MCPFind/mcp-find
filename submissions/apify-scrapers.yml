@@ -2,6 +2,6 @@ servers:
   - name: "Apify Public Data MCP"
     github_url: "https://github.com/jlucasmcrell/apify-scrapers"
     package_name: "apify-data-scrapers"
-    description: "25 production public-data scrapers as MCP tools: Google Maps leads, LinkedIn/Glassdoor jobs, SEC EDGAR, USAspending, FEC, EPA, ClinicalTrials.gov, openFDA, Europe PMC, GLEIF, CMS, Census, state business registries and contractor licences. Each tool runs an Apify Actor on your own account."
+    description: "30 production public-data scrapers as MCP tools: leads, jobs, SEC filings, procurement, grants, sanctions, recalls, health data, company registries and media. Each tool runs an Apify Actor on your own account."
     package_type: "pypi"
     category: "search"
