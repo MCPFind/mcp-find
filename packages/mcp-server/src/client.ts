@@ -1,4 +1,4 @@
-import type { Server, ServerListItem, ServerWithTools, ServerListResponse, ConfigOutput, ClientType, Category, SortOption } from '@mcpfind/shared';
+import type { ServerListItem, ServerWithTools, ServerListResponse, ConfigOutput, ClientType, Category, SortOption } from './types.js';
 
 const DEFAULT_API_URL = 'https://mcpfind.org/api';
 

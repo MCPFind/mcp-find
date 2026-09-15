@@ -18,10 +18,10 @@ name: Validate Community Submission
 #
 # The fix is to stop needing write access at all: the validator writes its
 # verdict to the job summary (always available to a read-only token) and signals
-# pass/fail through the check's exit code. Deliberately NOT fixed with
-# `pull_request_target` — that would run trusted-context code against untrusted
-# fork content, which is precisely the pattern this repository does not have and
-# must not acquire.
+# pass/fail through the check's exit code. The separate data-only preflight
+# uses `pull_request_target` only to run this base-revision validator against
+# allowlisted YAML fetched through the API; this ordinary check still executes
+# the PR branch with no secrets or write token.
 
 on:
   pull_request:
@@ -45,16 +45,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
 
       # The validator's only dependency. Installed directly rather than through
       # the workspace so this check stays fast and independent of the build.
       - name: Install dependencies
-        run: npm install yaml@2.7.0
+        run: npm install --ignore-scripts --no-save yaml@2.7.0
 
       # Writes a pass/fail breakdown to the job summary and exits non-zero on
       # any validation error, which turns the check red on the PR.

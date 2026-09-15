@@ -16,9 +16,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: 'pnpm'
@@ -38,9 +38,11 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           GH_ENRICHMENT_TOKEN: ${{ secrets.GH_ENRICHMENT_TOKEN }}
-          # At the 800ms repository throttle, 600 candidates leave roughly
-          # seven minutes for GitHub responses/retries inside the 15m stage.
-          GH_ENRICHMENT_LIMIT: 600
+          # The Sep 14 run averaged about 1.7s per normalized repository over
+          # its metadata, README, and contributor requests. Cap the row batch
+          # at 300: even if every row is a distinct repository at 1.8s each,
+          # the 15m stage retains six minutes for slower responses/retries.
+          GH_ENRICHMENT_LIMIT: 300
           GH_ENRICHMENT_STAGE_TIMEOUT_MS: 900000
       - name: Ensure sync ledger is terminal
         if: ${{ always() && !cancelled() && steps.sync_start.outputs.ts != '' }}

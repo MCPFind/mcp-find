@@ -1,0 +1,66 @@
+name: Community Submission Preflight
+
+# This is the automatic, data-only path for fork submissions. GitHub may hold
+# ordinary pull_request workflows from first-time contributors for approval;
+# this workflow uses the base revision and reads just the changed YAML through
+# the API, so contributors still receive a useful result without approving
+# execution of their branch.
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+    paths:
+      - 'community-servers.yml'
+      - 'submissions/**.yml'
+      - 'submissions/**.yaml'
+
+concurrency:
+  group: community-preflight-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+# No write token and no secrets. The GitHub API reads the PR file list and
+# contents; no fork ref is checked out or executed.
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  preflight:
+    name: Fork-safe submission preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # This checkout is the immutable base revision, never the PR head.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      # The dependency is pinned and lifecycle scripts stay disabled. It is
+      # installed against the trusted base checkout before any PR data is read.
+      - name: Install trusted validator dependency
+        run: npm install --ignore-scripts --no-save yaml@2.7.0
+
+      # Downloads only allowlisted submission YAML to the existing base tree.
+      # The helper accepts the PR head solely as an API content reference.
+      - name: Stage changed submission data
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/stage-pr-submission-files.mjs
+
+      - name: Validate structure with trusted code
+        run: node scripts/validate-submissions.mjs
+
+      - name: Verify liveness with trusted code
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: node scripts/verify-submission-liveness.mjs

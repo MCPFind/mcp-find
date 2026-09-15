@@ -129,9 +129,6 @@ importers:
 
   packages/mcp-server:
     dependencies:
-      '@mcpfind/shared':
-        specifier: workspace:*
-        version: link:../shared
       '@modelcontextprotocol/sdk':
         specifier: ^1.27.1
         version: 1.27.1(zod@4.3.6)

@@ -27,7 +27,7 @@
  *   --all          Verify ALL entries in the file, not just the diff delta.
  */
 
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { collectSubmissionFiles } from './validate-submissions.mjs';
 
@@ -246,6 +246,21 @@ async function readEntries(yamlPath) {
 }
 
 /**
+ * Read one path from the trusted base commit without invoking a shell.
+ *
+ * Submission filenames are contributor-controlled in a pull_request_target
+ * preflight. Keep the revision-and-path expression as one argument to git so
+ * shell metacharacters in a filename remain literal path bytes.
+ */
+export function readBaseSubmissionFile(baseSha, yamlPath, cwd = process.cwd()) {
+  return execFileSync('git', ['show', `${baseSha}:${yamlPath}`], {
+    cwd,
+    encoding: 'utf-8',
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+}
+
+/**
  * Entries added or changed by this PR in ONE submission file.
  *
  * Returns null only when BASE_SHA is unset, which signals "no diff available,
@@ -265,10 +280,7 @@ async function getNewEntries(yamlPath) {
 
   let basYamlText;
   try {
-    basYamlText = execSync(`git show ${baseSha}:${yamlPath}`, {
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
+    basYamlText = readBaseSubmissionFile(baseSha, yamlPath);
   } catch {
     // File is new in this PR — every entry in it is a new entry.
     console.log(`[verify-submission] ${yamlPath} is new in this PR — all ${allEntries.length} entr${allEntries.length === 1 ? 'y' : 'ies'} are new.`);
@@ -286,7 +298,7 @@ async function getNewEntries(yamlPath) {
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
-async function main() {
+export async function runLivenessChecks() {
   // Both accepted intake paths: the hand-edited registry file and the
   // one-file-per-server directory the /submit form writes into.
   const YAML_PATHS = collectSubmissionFiles();
@@ -388,13 +400,13 @@ async function main() {
   return { failures, warnings, results };
 }
 
-main()
-  .then(({ failures, warnings, results }) => {
+export async function main() {
+  const { failures, warnings, results } = await runLivenessChecks();
     console.log('\n========== SUMMARY ==========');
 
     if (!results || results.length === 0) {
       console.log('No entries verified.');
-      process.exit(0);
+      return 0;
     }
 
     if (failures.length > 0) {
@@ -414,9 +426,17 @@ main()
     const summary = JSON.stringify({ failures, warnings }, null, 2);
     process.stdout.write(`\n__LIVENESS_RESULT_JSON__${summary}__END_LIVENESS_RESULT_JSON__\n`);
 
-    process.exit(failures.length > 0 ? 1 : 0);
-  })
-  .catch((err) => {
+    return failures.length > 0 ? 1 : 0;
+}
+
+// Only run when invoked directly so the shell-safety helper can be imported by
+// its regression test without initiating network checks.
+const invokedDirectly = process.argv[1] && new URL(import.meta.url).pathname === process.argv[1];
+if (invokedDirectly) {
+  main()
+    .then((code) => { process.exitCode = code; })
+    .catch((err) => {
     console.error('Unhandled error in verify-submission-liveness:', err);
-    process.exit(1);
-  });
+      process.exitCode = 1;
+    });
+}

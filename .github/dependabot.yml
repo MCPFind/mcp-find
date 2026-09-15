@@ -1,0 +1,8 @@
+version: 2
+updates:
+  # Keep SHA-pinned workflow actions current. Dependabot preserves the
+  # release-version comments beside each pin when it updates a reference.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
