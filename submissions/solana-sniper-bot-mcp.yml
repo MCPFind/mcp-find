@@ -1,0 +1,7 @@
+servers:
+  - name: "Solana Sniper Bot MCP"
+    github_url: "https://github.com/solara-sniper-bot/MCP"
+    package_name: "solana-snipe-bot-mcp"
+    description: "Autonomous Solana trading bot with 281 MCP tools across Meme, Spot, Perpetuals, and Mirror modes"
+    package_type: "pypi"
+    category: "finance"
