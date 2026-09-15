@@ -1,0 +1,14 @@
+name: DC Hub
+github: https://github.com/azmartone67/dchub-mcp-server
+package: ""
+description: Live data-center, power-grid, fiber, interconnection-queue & M&A intelligence for AI agents via Streamable HTTP at https://dchub.cloud/mcp (88 tools).
+homepage: https://dchub.cloud
+remote: https://dchub.cloud/mcp
+transport: streamable-http
+license: MIT
+tags:
+  - data-center
+  - energy
+  - power-grid
+  - fiber
+  - infrastructure
