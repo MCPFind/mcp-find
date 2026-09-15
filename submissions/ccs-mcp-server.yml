@@ -1,0 +1,7 @@
+servers:
+  - name: "CCS MCP Server"
+    github_url: "https://github.com/DSHCorrectover/ccs-mcp-server"
+    package_name: "ccs-mcp-server"
+    description: "CCS Runtime Evidence MCP Server — 7-dimension runtime verification for AI agent tool calls with Ed25519 signed receipts, fail-closed RCE/SSRF/credential-hijack checks, zero dependencies, local by default."
+    package_type: "npm"
+    category: "devtools"
