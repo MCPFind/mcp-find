@@ -16,3 +16,10 @@ servers:
     description: "X and Twitter automation MCP server for tweet search, profile tweets, follower export, media workflows, webhooks, and confirmation-gated posting."
     package_type: "npm"
     category: "communication"
+
+  - name: "Glasswarp"
+    github_url: "https://github.com/glasswarp/mcp-server"
+    package_name: "@glasswarp/mcp"
+    description: "See and control a real Windows PC you own from any MCP client, locally or remotely. Observe, click, type, launch apps, Live View. BYOH."
+    package_type: "npm"
+    category: "devtools"
