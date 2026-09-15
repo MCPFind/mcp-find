@@ -1,0 +1,7 @@
+servers:
+  - name: "AIHawk"
+    github_url: "https://github.com/feder-cr/AIHawk"
+    package_name: "aihawk"
+    description: "AI browser agent that opens pages, clicks, types, reads text and takes screenshots on a real Firefox from plain-English instructions."
+    package_type: "pypi"
+    category: "automation"
