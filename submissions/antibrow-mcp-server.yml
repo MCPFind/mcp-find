@@ -1,0 +1,7 @@
+servers:
+  - name: "AntiBrow MCP Server"
+    github_url: "https://github.com/antibrow/antibrow"
+    package_name: "anti-detect-browser"
+    description: "Local browser automation over MCP with persistent profiles and per-profile proxy configuration."
+    package_type: "npm"
+    category: "automation"
