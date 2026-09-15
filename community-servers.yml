@@ -16,3 +16,10 @@ servers:
     description: "X and Twitter automation MCP server for tweet search, profile tweets, follower export, media workflows, webhooks, and confirmation-gated posting."
     package_type: "npm"
     category: "communication"
+
+  - name: "Orphograph"
+    github_url: "https://github.com/Orphograph/Orphograph"
+    package_name: "orphograph-mcp"
+    description: "Empirical notary: hash files locally, OpenTimestamps, Bitcoin-anchored receipts. Bytes never leave the device."
+    package_type: "pypi"
+    category: "finance"
