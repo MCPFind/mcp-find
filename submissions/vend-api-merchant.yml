@@ -1,0 +1,7 @@
+servers:
+  - name: "Vend API Merchant"
+    github_url: "https://github.com/PANDeveloper001/vend"
+    package_name: "vend-api-merchant"
+    description: "Pay-per-call API merchant settled in Nano (XNO). 6 tools: extract URL, check links, domain info, web search, geoip lookup, nano account info. Instant, feeless, no API key required."
+    package_type: "pypi"
+    category: "devtools"
