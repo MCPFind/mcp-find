@@ -1,0 +1,7 @@
+servers:
+  - name: "Busabase"
+    github_url: "https://github.com/busabase/busabase"
+    package_name: "busabase"
+    description: "Self-hosted workspace and database for AI agents with a Streamable HTTP MCP server."
+    package_type: "npm"
+    category: "databases"
