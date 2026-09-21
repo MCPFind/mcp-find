@@ -1,0 +1,7 @@
+servers:
+  - name: "Blogger Agent by Nova (CIVAI)"
+    github_url: "https://github.com/civai-technologies/blogger-agent-mcp-by-nova-civai"
+    package_name: "blogger-agent-mcp-by-nova-civai"
+    description: "I do everything related to Google Blogger content"
+    package_type: docker
+    category: "social"

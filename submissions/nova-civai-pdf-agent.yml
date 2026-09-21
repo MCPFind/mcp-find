@@ -1,0 +1,7 @@
+servers:
+  - name: "PDF Agent by Nova (CIVAI)"
+    github_url: "https://github.com/civai-technologies/pdf-agent-mcp-by-nova-civai"
+    package_name: "pdf-agent-mcp-by-nova-civai"
+    description: "I create PDF documents from markdown — preview, then generate a downloadable file"
+    package_type: docker
+    category: "media"

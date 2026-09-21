@@ -1,0 +1,7 @@
+servers:
+  - name: "Interviewer Agent by Nova (CIVAI)"
+    github_url: "https://github.com/civai-technologies/interviewer-agent-mcp-by-nova-civai"
+    package_name: "interviewer-agent-mcp-by-nova-civai"
+    description: "I do everything related to interviews and structured Q&A"
+    package_type: docker
+    category: "other"
