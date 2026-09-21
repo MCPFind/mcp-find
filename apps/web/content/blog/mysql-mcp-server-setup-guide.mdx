@@ -4,7 +4,7 @@ seoTitle: "MySQL MCP Server: Connect Your Database to Claude"
 description: "Connect MySQL to Claude and AI agents using MCP. Compare community server options, configure read-only access, and avoid write-access pitfalls in production."
 excerpt: "MCPFind indexes 400 database MCP servers including community-built MySQL options. This guide covers setting up the MySQL MCP server in Claude Desktop, choosing between read-only and read-write modes, and comparing MySQL to PostgreSQL MCP alternatives for real-world data workflows."
 date: "2026-06-15"
-updatedAt: "2026-09-21"
+updatedAt: "2026-06-15"
 author: "Adam Bush"
 authorUrl: "https://www.linkedin.com/in/adam-bush/"
 authorSameAs:
@@ -75,7 +75,7 @@ MCPFind's database category indexes 400 servers averaging 11.06 stars each. Most
 
 Community MySQL servers fall into two types. Thin wrappers pass query strings directly to the mysql2 Node.js client with minimal preprocessing: straightforward to configure, but no validation layer between Claude and your data. Structured servers add an intent-parsing step before generating SQL, which reduces the risk of destructive queries from an ambiguous prompt and fits better in production settings.
 
-For a concrete community option to assess against these criteria, see the [MySQL MCP server listing](/servers/io-github-neverinfamous-mysql-mcp).
+For a concrete community option to assess against these criteria, see the [MySQL MCP server listing](/servers/io-github-neverinfamous-mysql-mcp) and its [upstream repository](https://github.com/neverinfamous/mysql-mcp).
 
 When evaluating options, check three criteria: when the repository was last updated (MySQL 8.0's `caching_sha2_password` default auth breaks older servers), whether SSL is supported via environment variable for encrypted connections, and whether write tools require an explicit `ALLOW_WRITE=true` flag rather than being on by default. The [best database MCP servers comparison](/blog/best-database-mcp-servers) covers the broader database ecosystem including how MySQL options compare to higher-starred alternatives in the category.
 
