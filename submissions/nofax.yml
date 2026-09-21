@@ -1,0 +1,7 @@
+servers:
+  - name: "Nofax"
+    github_url: "https://github.com/AKzar1el/nofax"
+    package_name: "nofax"
+    description: "Human-in-the-loop approvals and notifications for AI coding agents through a local stdio MCP server."
+    package_type: "npm"
+    category: "devtools"
