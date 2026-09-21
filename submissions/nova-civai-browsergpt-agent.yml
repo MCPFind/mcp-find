@@ -1,0 +1,7 @@
+servers:
+  - name: "Browser Automation Agent by Nova (CIVAI)"
+    github_url: "https://github.com/civai-technologies/browsergpt-agent-mcp-by-nova-civai"
+    package_name: "browsergpt-agent-mcp-by-nova-civai"
+    description: "I do everything related to Browser Automation & Management"
+    package_type: docker
+    category: "automation"

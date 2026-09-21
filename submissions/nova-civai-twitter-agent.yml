@@ -1,0 +1,7 @@
+servers:
+  - name: "Twitter Agent by Nova (CIVAI)"
+    github_url: "https://github.com/civai-technologies/twitter-agent-mcp-by-nova-civai"
+    package_name: "twitter-agent-mcp-by-nova-civai"
+    description: "I do everything related to Twitter posting and campaigns"
+    package_type: docker
+    category: "social"

@@ -1,0 +1,7 @@
+servers:
+  - name: "Telegram Agent by Nova (CIVAI)"
+    github_url: "https://github.com/civai-technologies/telegram-agent-mcp-by-nova-civai"
+    package_name: "telegram-agent-mcp-by-nova-civai"
+    description: "I use your linked Telegram MTProto session (Integrations → Telegram) to list groups, members, and send DMs"
+    package_type: docker
+    category: "communication"

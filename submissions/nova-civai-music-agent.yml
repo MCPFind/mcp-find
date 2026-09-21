@@ -1,0 +1,7 @@
+servers:
+  - name: "Music Agent by Nova (CIVAI)"
+    github_url: "https://github.com/civai-technologies/music-agent-mcp-by-nova-civai"
+    package_name: "music-agent-mcp-by-nova-civai"
+    description: "I do everything related to music and lyrics"
+    package_type: docker
+    category: "media"

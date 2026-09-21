@@ -1,0 +1,7 @@
+servers:
+  - name: "Calendar Agent by Nova (CIVAI)"
+    github_url: "https://github.com/civai-technologies/calendar-agent-mcp-by-nova-civai"
+    package_name: "calendar-agent-mcp-by-nova-civai"
+    description: "I do everything related to calendar scheduling"
+    package_type: docker
+    category: "productivity"
