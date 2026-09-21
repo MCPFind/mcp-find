@@ -3,7 +3,7 @@ title: "monday.com MCP Server: Connect AI Agents to Your Boards"
 description: "Set up the official monday.com MCP server so Claude and other AI assistants can read, create, and update your boards, items, and status updates directly."
 excerpt: "monday.com's official MCP server lets an AI assistant create items, move them between groups, and post updates on your boards. This guide covers install, the read-only safety flag, and what the server can and cannot touch."
 date: "2026-07-15"
-updatedAt: "2026-07-15"
+updatedAt: "2026-09-21"
 author: "Gus Marquez"
 authorUrl: "https://www.linkedin.com/in/gustavoamarquez"
 authorSameAs:
@@ -38,6 +38,8 @@ If you run projects out of monday.com boards, you know the drill. You update ite
 The monday.com MCP server is an official package, `mondaycom/mcp`, that connects an AI assistant to your monday.com account through the same API the web app itself uses. monday.com builds and maintains it directly. That matters if you're deciding whether to trust it with write access to real project data rather than a sandbox account.
 
 Once connected, it can create items, delete them, move an item to a different group, change column values, post updates, and spin up new boards or forms straight from a conversation. That replaces a fair amount of manual clicking through nested board views and status dropdowns. MCPFind indexes 33 servers in the productivity category, and monday.com is one of the few with a first-party integration rather than a community-built alternative, a distinction worth checking for before you connect any assistant to data you'd rather not hand to an unmaintained side project.
+
+The corresponding MCPFind directory entry is the [monday.com MCP server listing](/servers/com-monday-monday-com).
 
 ## Installing and Configuring the Server
 

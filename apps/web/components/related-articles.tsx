@@ -3,13 +3,23 @@ import { getAllPosts } from "@/lib/blog";
 import { IconBook, IconArrowRight } from "@tabler/icons-react";
 
 interface RelatedArticlesProps {
+  serverSlug?: string;
   serverCategory: string | null | undefined;
   maxPosts?: number;
   serverName?: string;
   serverDescription?: string | null;
 }
 
+const SERVER_ARTICLE_OVERRIDES: Record<string, string[]> = {
+  "com-monday-monday-com": ["monday-mcp-server-ai-agents"],
+  "io-github-asklokesh-xero-mcp-server": [
+    "mcp-for-accountants-quickbooks-xero",
+  ],
+  "io-github-neverinfamous-mysql-mcp": ["mysql-mcp-server-setup-guide"],
+};
+
 export async function RelatedArticles({
+  serverSlug = "",
   serverCategory,
   maxPosts = 3,
   serverName = "",
@@ -36,7 +46,13 @@ export async function RelatedArticles({
   const taskPosts = isCalendar
     ? allPosts.filter(p => /calendar/.test(`${p.slug} ${p.frontmatter.tags.join(" ")}`))
     : [];
-  const posts = (taskPosts.length ? taskPosts : matched).slice(0, maxPosts);
+  const overrideSlugs = SERVER_ARTICLE_OVERRIDES[serverSlug] ?? [];
+  const overridePosts = overrideSlugs
+    .map((slug) => allPosts.find((post) => post.slug === slug))
+    .filter((post): post is NonNullable<typeof post> => Boolean(post));
+  const posts = (
+    overridePosts.length ? overridePosts : taskPosts.length ? taskPosts : matched
+  ).slice(0, maxPosts);
 
   if (posts.length === 0) return null;
 

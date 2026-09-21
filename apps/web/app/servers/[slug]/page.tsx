@@ -495,7 +495,12 @@ export default async function ServerDetailPage({
             )}
 
             {/* Related Articles */}
-            <RelatedArticles serverCategory={server.category} serverName={server.name} serverDescription={server.description} />
+            <RelatedArticles
+              serverSlug={server.canonical_slug ?? server.slug}
+              serverCategory={server.category}
+              serverName={server.name}
+              serverDescription={server.description}
+            />
           </div>
 
           {/* Right: Sidebar */}
