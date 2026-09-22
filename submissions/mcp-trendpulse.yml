@@ -1,0 +1,7 @@
+servers:
+  - name: "MCP TrendPulse"
+    github_url: "https://github.com/AKzar1el/mcp-trendpulse"
+    package_name: "mcp-trendpulse"
+    description: "Google News and Google Trends MCP server for keyword, market, SEO, and content research."
+    package_type: "pypi"
+    category: "search"
