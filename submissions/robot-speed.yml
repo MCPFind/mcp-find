@@ -1,0 +1,7 @@
+servers:
+  - name: "Robot Speed"
+    github_url: "https://github.com/robot-speed/mcp"
+    package_name: "robot-speed-mcp"
+    description: "SEO tools for AI agents — audits, Core Web Vitals, keywords, AI visibility, traffic, backlinks, CMS publishing. Primary: remote https://www.robot-speed.com/api/mcp"
+    package_type: "npm"
+    category: "analytics"
