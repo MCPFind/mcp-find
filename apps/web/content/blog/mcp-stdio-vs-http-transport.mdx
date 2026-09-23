@@ -1,9 +1,9 @@
 ---
 title: "MCP stdio vs HTTP Transport: What's the Difference?"
-description: "When to use stdio versus Streamable HTTP in MCP servers. Covers architecture, config examples, and decision rules based on 6,105 indexed servers."
-excerpt: "The choice between stdio and Streamable HTTP transport shapes how your MCP server handles concurrency, authentication, and deployment. This guide explains both options with config examples and decision rules drawn from 6,105 servers in the MCPFind directory."
+description: "When to use stdio versus Streamable HTTP in MCP servers. Covers architecture, config examples, and decision rules based on 35,157 indexed servers."
+excerpt: "The choice between stdio and Streamable HTTP transport shapes how your MCP server handles concurrency, authentication, and deployment. This guide explains both options with config examples and decision rules drawn from 35,157 servers in the MCPFind directory."
 date: "2026-04-06"
-updatedAt: "2026-05-28"
+updatedAt: "2026-09-23"
 author: "Gus Marquez"
 authorUrl: "https://www.linkedin.com/in/gustavoamarquez"
 authorSameAs:
@@ -34,7 +34,7 @@ When you build an MCP server, one of the first configuration decisions is which 
 
 For a curated list of top servers in this space, see [the best DevOps MCP servers](/blog/best-mcp-servers-devops-cicd).
 
-We analyzed 6,105 servers in the MCPFind directory across 21 categories and found that transport preference tracks closely with use case. Tools built for Claude Desktop or Cursor almost always use stdio. Servers meant for SaaS integrations use HTTP. This guide explains both options with concrete examples so you can decide quickly.
+We analyzed 35,157 servers in the MCPFind directory across 21 categories and found that transport preference tracks closely with use case. Tools built for Claude Desktop or Cursor almost always use stdio. Servers meant for SaaS integrations use HTTP. This guide explains both options with concrete examples so you can decide quickly.
 
 ## What Is stdio Transport in MCP?
 
@@ -42,19 +42,19 @@ stdio is the original MCP transport. When a client like Claude Desktop starts a 
 
 This design makes stdio simple to configure and zero-dependency for users. The client manages the full server lifecycle: it starts the process, pipes commands through stdin, reads from stdout, and kills the process on shutdown. No hosting, no authentication headers, no firewall rules to configure.
 
-stdio is the right choice when the server runs on the same machine as the client. Every tool targeting Claude Desktop or Cursor uses stdio as its primary transport. The MCPFind [devtools category](/categories/devtools) holds 2,738 servers, the largest category in the directory, and the majority of those tools ship with stdio as their default.
+stdio is the right choice when the server runs on the same machine as the client. Every tool targeting Claude Desktop or Cursor uses stdio as its primary transport. The MCPFind [devtools category](/categories/devtools) has grown to 7,808 servers — the largest named category in the directory (only the catch-all *Other* bucket, which isn't a distinct topic, is bigger) — and the majority of those tools ship with stdio as their default.
 
 The core limitation is single-tenancy. One process serves one client. For a server that needs to handle requests from multiple users at the same time, you need HTTP.
 
 ## What Is Streamable HTTP Transport in MCP?
 
-Streamable HTTP is the modern MCP transport for remote deployment. The server runs as a persistent HTTP service; clients connect with POST requests and responses stream back using Server-Sent Events.
+Streamable HTTP is the modern MCP transport for remote deployment. The server runs as a persistent HTTP service; clients connect with POST requests and responses stream back using Server-Sent Events. It's the only standard remote transport binding in the [official MCP specification](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports) alongside stdio — the older combined HTTP+SSE transport is no longer part of the current spec.
 
 The primary advantage is concurrency. One server process handles requests from multiple clients at the same time. You can host it on a cloud VM, serverless function, or behind a load balancer. Standard HTTP authentication works as expected: bearer tokens, API keys, or OAuth headers in each request.
 
 The tradeoff is operational overhead. You need a running service with a stable URL, CORS configuration if browser clients connect, and a secrets management strategy. For tools distributed to individual developers as local installs, that overhead rarely makes sense. For a SaaS integration serving many users, HTTP is the only viable path.
 
-MCPFind's [ai-ml category](/categories/ai-ml) indexes 800 servers with the highest average star count in the directory at 118 stars. The top production-grade servers in that group use HTTP transport because they are built to serve multiple users remotely.
+MCPFind's [cloud category](/categories/cloud) now has the highest average star count in the directory: 515 servers averaging 69.63 stars. Its top server, [Coder](/servers/io-github-coder-coder) (15,795 GitHub stars), [ships both a local stdio mode](https://coder.com/docs/ai-coder/mcp-server) (`coder exp mcp server`) and a remote Streamable HTTP endpoint (`/api/experimental/mcp/http`) for shared, deployment-hosted access — a concrete example of a production tool built to serve multiple users remotely over HTTP.
 
 ## How Do stdio and HTTP Compare in Practice?
 
@@ -101,7 +101,7 @@ Choose stdio if you are building for Claude Desktop, Cursor, VS Code, or any loc
 
 Consider starting with stdio even if HTTP is your long-term target. stdio servers are easier to debug: you can run the process manually in your terminal and inspect the JSON exchange directly without any HTTP tooling. Once the tool logic works correctly, adding HTTP transport is a mechanical change to the server entry point.
 
-If your server belongs to a category targeting teams or enterprises, HTTP is the standard. The MCPFind [databases category](/categories/databases) holds 251 servers, and its top server, [Supabase](/servers/com-supabase-mcp) with 2,556 GitHub stars, supports both transports to cover developer and SaaS deployment scenarios. That flexibility is the goal: start with stdio, add HTTP when the use case demands it.
+If your server belongs to a category targeting teams or enterprises, HTTP is the standard. The MCPFind [databases category](/categories/databases) has grown to 760 servers, and its current top server by stars, [DBHub](/servers/io-github-bytebase-dbhub) (3,535 GitHub stars), [supports both transports](https://github.com/bytebase/dbhub) via a `--transport` flag (`stdio` or `http`) to cover developer and SaaS deployment scenarios. That flexibility is the goal: start with stdio, add HTTP when the use case demands it.
 
 To understand the broader MCP server classification model, read [What Is MCP?](/blog/what-is-mcp) for full context before making transport decisions. For a deeper look at when MCP servers make sense versus direct API integration, see [MCP vs API Integration](/blog/mcp-vs-api-integration). For a curated look at the best devtools servers that pair well with either transport, see [the best devtools MCP servers for repo intelligence](/blog/best-devtools-mcp-servers-repo-intelligence).
 
