@@ -1,0 +1,7 @@
+servers:
+  - name: "Kleap"
+    github_url: "https://github.com/kleaphq/cli"
+    package_name: "kleap-cli"
+    description: "Website infrastructure for AI agents — create, edit, publish real websites via MCP with verified-live guarantee."
+    package_type: "npm"
+    category: "devtools"
