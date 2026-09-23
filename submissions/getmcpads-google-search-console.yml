@@ -1,0 +1,7 @@
+servers:
+  - name: "Get MCP Ads \u2014 Google Search Console"
+    github_url: "https://github.com/get-mcp-ads/google-search-console-mcp-server"
+    package_name: "@getmcpads/google-search-console-mcp-server"
+    description: "Read Search Console performance, URL inspection results, sitemaps and site data through a read-only MCP server."
+    package_type: "npm"
+    category: "search"
