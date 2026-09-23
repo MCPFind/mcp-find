@@ -4,6 +4,12 @@
 # Required fields: name, github_url, package_name, description
 # Optional fields: package_type (npm|pypi|docker), category
 servers:
+  - name: "UpRes"
+    github_url: "https://github.com/auroracapital/upres-cli"
+    package_name: "upres-cli"
+    description: "List models, query credits, and submit 4K image and video upscale jobs via the UpRes API. Hosts: flare, prism, lumen, mirage (images); motion, motion-x (video)."
+    package_type: "npm"
+    category: "devtools"
   - name: "BuyWhere MCP Server"
     github_url: "https://github.com/BuyWhere/buywhere-mcp"
     package_name: "@buywhere/mcp-server"
