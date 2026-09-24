@@ -1,0 +1,7 @@
+servers:
+  - name: "MadeOnSol MCP Server"
+    github_url: "https://github.com/MadeOnSol/mcp-server-madeonsol"
+    package_name: "mcp-server-madeonsol"
+    description: "Real-time Solana intelligence for AI agents: KOL wallet activity, alpha wallets, deployer reputation, token risk, wallet data and DEX data across 100+ tools. Auth with a MadeOnSol API key (free tier available) or keyless x402 pay-per-call in USDC on Solana."
+    package_type: "npm"
+    category: "finance"
