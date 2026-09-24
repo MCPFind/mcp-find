@@ -1,0 +1,7 @@
+servers:
+  - name: "Edgrapi"
+    github_url: "https://github.com/paperandbeyond23-gif/edgrapi-skills"
+    package_name: "ghcr.io/paperandbeyond23-gif/edgrapi-mcp"
+    description: "US government data as clean JSON: SAM.gov contract opportunities, USAspending awards, Grants.gov grants, congressional trades and SEC EDGAR filings."
+    package_type: "docker"
+    category: "finance"
