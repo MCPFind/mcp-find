@@ -1,0 +1,15 @@
+servers:
+  - name: "BuyWhere MCP"
+    github_url: "https://github.com/BuyWhere/buywhere-mcp"
+    package_name: "@buywhere/mcp-server"
+    description: "Search 370M+ products across 150,000+ stores with BuyWhere."
+    package_type: "npm"
+    category: "ecommerce"
+    endpoint: "https://api.buywhere.ai/mcp"
+    install: "npx -y @buywhere/mcp-server"
+    npm: "@buywhere/mcp-server"
+    registry: "io.github.BuyWhere/buywhere-mcp"
+    claim: "370M+ products, 150,000+ stores"
+    tools: 13
+    homepage: "https://buywhere.ai"
+    docs: "https://buywhere.ai/docs/guides/mcp-integration"
