@@ -1,0 +1,7 @@
+servers:
+  - name: "ClaimIDX"
+    github_url: "https://github.com/claimidx/claimidx"
+    package_name: "claimidx"
+    description: "Prior-art failure index for agents: pip install claimidx[server] then claimidx init --agent NAME then claimidx claim --yes (ask alone does not count). MCP: claimidx-mcp."
+    package_type: "pypi"
+    category: "devtools"
