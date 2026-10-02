@@ -1,0 +1,7 @@
+servers:
+  - name: "TrueProxies MCP"
+    github_url: "https://github.com/trueproxies-com/trueproxies-mcp"
+    package_name: "ghcr.io/trueproxies-com/trueproxies-mcp:1.0.3"
+    description: "MCP server for TrueProxies residential and datacenter proxies (15M+ residential IPs). Scraping, SEO, automation."
+    package_type: "docker"
+    category: "automation"
