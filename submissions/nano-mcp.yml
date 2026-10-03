@@ -1,0 +1,7 @@
+servers:
+  - name: "nano-mcp (Nano XNO payments)"
+    github_url: "https://github.com/dhyabi2/NANO_MCP_SERVER"
+    package_name: "nano-mcp"
+    description: "MCP server for Nano (XNO) cryptocurrency operations - wallet derive/read, address generation, and pay-per-tool-call settlement for AI assistants, feeless and instant."
+    package_type: "npm"
+    category: "finance"
