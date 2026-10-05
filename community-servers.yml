@@ -7,7 +7,7 @@ servers:
   - name: "UpRes"
     github_url: "https://github.com/auroracapital/upres-cli"
     package_name: "upres-cli"
-    description: "List models, query credits, and submit 4K image and video upscale jobs via the UpRes API. Hosts: flare, prism, lumen, mirage (images); motion, motion-x (video)."
+    description: "List models, query credits, and submit image and video upscale jobs (up to 8K) via the UpRes API. Hosts: flare, prism, lumen, mirage (images); motion, motion-x (video)."
     package_type: "npm"
     category: "devtools"
   - name: "BuyWhere MCP Server"
