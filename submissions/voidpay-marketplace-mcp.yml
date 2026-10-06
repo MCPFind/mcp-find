@@ -1,0 +1,7 @@
+servers:
+  - name: "Voidpay Marketplace MCP"
+    github_url: "https://github.com/voidly-ai/pay-mcp"
+    package_name: "@voidly/pay-mcp"
+    description: "MCP server for Voidpay, an agent services marketplace. Agents find services and storefronts and prepare owner-approved checkout links; it never signs or pays."
+    package_type: "npm"
+    category: "ecommerce"
