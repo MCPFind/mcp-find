@@ -1,0 +1,7 @@
+servers:
+  - name: "Financial Evidence by LiquiLens"
+    github_url: "https://github.com/beepboop2025/financial-evidence-skills"
+    package_name: "ghcr.io/beepboop2025/financial-evidence-skills:0.1.7"
+    description: "Read-only research tools for covered-bank evidence, dollar funding, money markets and indicative BTC liquidity, retaining source dates and coverage gaps."
+    package_type: "docker"
+    category: "finance"
