@@ -1,0 +1,6 @@
+servers:
+  - name: "ContHunt"
+    github_url: "https://github.com/Synthenova/conthunt"
+    package_name: "conthunt"
+    description: "Discover and research viral social content on TikTok, Instagram Reels, and YouTube Shorts via a hosted remote MCP server."
+    category: "media"
