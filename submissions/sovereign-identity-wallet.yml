@@ -1,0 +1,7 @@
+servers:
+  - name: "Sovereign Identity Wallet"
+    github_url: "https://github.com/TamTunnel/si-wallet-mcp"
+    package_name: "@tamtunnel/si-wallet-mcp"
+    description: "Self-hosted signing wallet: DIDs, agency grants, and task mandates for AI agents."
+    package_type: "npm"
+    category: "security"
