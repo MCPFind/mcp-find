@@ -1,0 +1,7 @@
+servers:
+  - name: "PDFtoMarkdown.ai MCP"
+    github_url: "https://github.com/happywpco/pdftomarkdown-mcp"
+    package_name: "@happywp/pdftomarkdown-mcp"
+    description: "Convert PDFs and Office documents into clean, structured Markdown for AI agents via the PDFtoMarkdown.ai API."
+    package_type: "npm"
+    category: "filesystems"
