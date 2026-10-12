@@ -1,0 +1,7 @@
+servers:
+  - name: "Wan27 MCP"
+    github_url: "https://github.com/DieselNiu/wan27-mcp"
+    package_name: "@wan27/cli"
+    description: "Generate AI images and videos, browse models, estimate credits and track tasks with Wan27. Requires an active paid subscription."
+    package_type: "npm"
+    category: "media"
