@@ -1,0 +1,6 @@
+servers:
+  - name: "cn-hotrank"
+    github_url: "https://github.com/Aiearn-lab/cn-hotrank"
+    package_name: "cn-hotrank"
+    description: "中文社媒实时热榜 MCP server：头条/抖音/微博/百度热搜，结构化输出排名/标题/热度值/标签/链接"
+    category: "social"
