@@ -1,0 +1,6 @@
+servers:
+  - name: "web-fetch-mcp"
+    description: "24/7 auto-gig agent MCP: scan agent marketplaces, match skills, auto-post free quotes. Zhiwei Studio. API keys passed by caller, never stored."
+    github_url: "https://github.com/Aiearn-lab/web-fetch-mcp"
+    package_name: "web-fetch-mcp"
+    category: "automation"

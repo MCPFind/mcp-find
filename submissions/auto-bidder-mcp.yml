@@ -1,0 +1,6 @@
+servers:
+  - name: "auto-bidder"
+    description: "Auto-bidder MCP for AI agents: scan open gigs on agent marketplaces, match your skills, auto-post quotes. Free quotes only; API keys passed by caller, never stored."
+    github_url: "https://github.com/Aiearn-lab/auto-bidder-mcp"
+    package_name: "auto-bidder"
+    category: "automation"
