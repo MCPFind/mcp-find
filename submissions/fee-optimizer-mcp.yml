@@ -1,0 +1,7 @@
+servers:
+  - name: "Fee Optimizer MCP"
+    github_url: "https://github.com/gaokai258/feemcp"
+    package_name: "fee-optimizer-mcp"
+    description: "Compare crypto exchange trading fees across 18 venues: VIP tiers, token discounts, funding rates, spread, fiat rails, and MiCA regional filtering."
+    package_type: "npm"
+    category: "finance"
