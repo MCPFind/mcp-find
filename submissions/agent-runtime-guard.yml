@@ -1,0 +1,7 @@
+servers:
+  - name: "Agent Runtime Guard"
+    github_url: "https://github.com/DSHCorrectover/agent-runtime-guard"
+    package_name: "agent-runtime-guard"
+    description: "Fail-closed runtime interception layer for agent tool calls: blocks destructive commands, credential theft, SSRF and injection, with Ed25519 evidence receipts."
+    package_type: "npm"
+    category: "security"
