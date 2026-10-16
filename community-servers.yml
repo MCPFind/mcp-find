@@ -16,3 +16,9 @@ servers:
     description: "X and Twitter automation MCP server for tweet search, profile tweets, follower export, media workflows, webhooks, and confirmation-gated posting."
     package_type: "npm"
     category: "communication"
+  - name: "Guava Wallet Intelligence"
+    github_url: "https://github.com/Guava-Research/GuavaWIT"
+    package_name: "@guavawalletintelligence/mcp-server"
+    description: "Crypto security, honeypot detection, wallet analysis, and token risk scoring across 31 blockchains."
+    package_type: npm
+    category: security
