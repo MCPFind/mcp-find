@@ -1,0 +1,6 @@
+servers:
+  - name: "MACD Adaptive"
+    github_url: "https://github.com/macd-adaptive/macd-mcp"
+    package_name: "macd-mcp"
+    description: "MCP server for MACD Adaptive (macd.ie), a Dublin web studio: services, pricing, availability, quote estimates and discovery calls. Remote, stateless, no auth, English/Spanish."
+    category: "other"
