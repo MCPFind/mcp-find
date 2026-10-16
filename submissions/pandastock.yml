@@ -1,0 +1,7 @@
+servers:
+  - name: "PandaStock"
+    github_url: "https://github.com/D-Asce/pandastocksdk"
+    package_name: "pandastock-mcp"
+    description: "A-share realtime stock data MCP server: NATS-pushed quotes, Level-2, DDX large orders, fund flows, and AI stock screening; 22 open tools with a free public test account."
+    package_type: "pypi"
+    category: "finance"
