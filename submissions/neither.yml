@@ -1,0 +1,7 @@
+servers:
+  - name: "Neither"
+    github_url: "https://github.com/stonianua/neither-mcp"
+    package_name: "@neitherai/mcp-server"
+    description: "Project context your AI can query through MCP. Selected notes/docs in Cursor or Claude Desktop, retrieve with source evidence. Local stdio, Node 20+."
+    package_type: "npm"
+    category: "search"
