@@ -1,0 +1,7 @@
+servers:
+  - name: "remotify-mcp"
+    github_url: "https://github.com/onlsol/relay.remotify.run"
+    package_name: "remotify-mcp"
+    description: "Run approved shell commands on remote computers through AI assistants. The remote machine needs only curl and bash, with no SSH access or installed agent."
+    package_type: "npm"
+    category: "devtools"
