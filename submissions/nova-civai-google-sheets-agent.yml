@@ -1,0 +1,7 @@
+servers:
+  - name: "Google Sheets Agent by Nova (CIVAI)"
+    github_url: "https://github.com/civai-technologies/google-sheets-agent-mcp-by-nova-civai"
+    package_name: "google-sheets-agent-mcp-by-nova-civai"
+    description: "I do everything related to Google Sheets"
+    package_type: docker
+    category: "productivity"

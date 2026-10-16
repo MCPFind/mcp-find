@@ -1,0 +1,7 @@
+servers:
+  - name: "Content Calendar Agent by Nova (CIVAI)"
+    github_url: "https://github.com/civai-technologies/content-calendar-agent-mcp-by-nova-civai"
+    package_name: "content-calendar-agent-mcp-by-nova-civai"
+    description: "I create markdown content calendars and export them as PDFs via PDF Generator MCP"
+    package_type: docker
+    category: "social"

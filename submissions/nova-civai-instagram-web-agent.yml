@@ -1,0 +1,7 @@
+servers:
+  - name: "Instagram Agent by Nova (CIVAI)"
+    github_url: "https://github.com/civai-technologies/instagram-web-agent-mcp-by-nova-civai"
+    package_name: "instagram-web-agent-mcp-by-nova-civai"
+    description: "I use your Instagram Web browser session (Integrations → Instagram Web) via instagrapi — not Meta / Graph API"
+    package_type: docker
+    category: "social"

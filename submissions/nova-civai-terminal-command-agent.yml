@@ -1,0 +1,7 @@
+servers:
+  - name: "Terminal Command Agent by Nova (CIVAI)"
+    github_url: "https://github.com/civai-technologies/terminal-command-agent-mcp-by-nova-civai"
+    package_name: "terminal-command-agent-mcp-by-nova-civai"
+    description: "I run shell commands on your private cloud environment (bash, sh, zsh)"
+    package_type: docker
+    category: "devtools"

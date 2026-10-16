@@ -1,0 +1,7 @@
+servers:
+  - name: "Support Agent Admin by Nova (CIVAI)"
+    github_url: "https://github.com/civai-technologies/support-agent-admin-mcp-by-nova-civai"
+    package_name: "support-agent-admin-mcp-by-nova-civai"
+    description: "I manage your Support Agent CRM — pipeline analytics, follow-ups, Leads Discovery, and workspace output (Sheets, Docs, Calendar, research)"
+    package_type: docker
+    category: "productivity"

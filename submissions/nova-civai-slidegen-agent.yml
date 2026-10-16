@@ -1,0 +1,7 @@
+servers:
+  - name: "Slidegen Agent by Nova (CIVAI)"
+    github_url: "https://github.com/civai-technologies/slidegen-agent-mcp-by-nova-civai"
+    package_name: "slidegen-agent-mcp-by-nova-civai"
+    description: "I do everything related to image and slide asset generation"
+    package_type: docker
+    category: "media"

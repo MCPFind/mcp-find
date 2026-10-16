@@ -1,0 +1,7 @@
+servers:
+  - name: "Nova Inbox Agent by Nova (CIVAI)"
+    github_url: "https://github.com/civai-technologies/email-inbox-agent-mcp-by-nova-civai"
+    package_name: "email-inbox-agent-mcp-by-nova-civai"
+    description: "Read and send mail from your Nova Inbox (@nova.civai.co) for OTPs, directory signups, and inbound messages"
+    package_type: docker
+    category: "communication"
