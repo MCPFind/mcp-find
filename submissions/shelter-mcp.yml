@@ -1,0 +1,7 @@
+servers:
+  - name: "Shelter MCP"
+    github_url: "https://github.com/nextauralabs/shelter-mcp"
+    package_name: "@shelter.money/mcp"
+    description: "Canadian read-only money tools for agents (Claude/Cursor/Codex)"
+    package_type: "npm"
+    category: "finance"
