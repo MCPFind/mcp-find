@@ -1,0 +1,7 @@
+servers:
+  - name: "Get MCP Ads \u2014 Google Analytics 4"
+    github_url: "https://github.com/get-mcp-ads/google-analytics-mcp-server"
+    package_name: "@getmcpads/google-analytics-mcp-server"
+    description: "Read Google Analytics 4 reports, realtime data and property configuration through a read-only MCP server."
+    package_type: "npm"
+    category: "analytics"
