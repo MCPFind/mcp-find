@@ -1,0 +1,7 @@
+servers:
+  - name: "Shopify Change Intelligence"
+    github_url: "https://github.com/contentforge-press/shopify-change-intelligence"
+    package_name: "shopify-change-intelligence"
+    description: "Track product launches, price changes and inventory moves across any public Shopify store. Free snapshot; paid change intel, batch and landscape tiers via x402 USDC."
+    package_type: "npm"
+    category: "ecommerce"

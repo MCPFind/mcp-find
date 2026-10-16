@@ -1,0 +1,7 @@
+servers:
+  - name: "GitHub Repo Change Intelligence"
+    github_url: "https://github.com/contentforge-press/github-repo-change-intelligence"
+    package_name: "github-repo-change-intelligence"
+    description: "Track releases, stars, issues and pushes of any public GitHub repo for dependency and open-source monitoring. Free snapshot; paid intel via x402 USDC."
+    package_type: "npm"
+    category: "monitoring"

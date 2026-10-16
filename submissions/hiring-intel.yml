@@ -1,0 +1,7 @@
+servers:
+  - name: "Hiring Change Intelligence"
+    github_url: "https://github.com/contentforge-press/hiring-change-intelligence"
+    package_name: "hiring-change-intelligence"
+    description: "Track job openings and closings across Greenhouse, Lever and Ashby to detect hiring growth or hiring freezes. Free snapshot; paid intel via x402 USDC."
+    package_type: "npm"
+    category: "monitoring"

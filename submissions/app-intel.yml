@@ -1,0 +1,7 @@
+servers:
+  - name: "App Store Change Intelligence"
+    github_url: "https://github.com/contentforge-press/app-store-change-intelligence"
+    package_name: "app-store-change-intelligence"
+    description: "Monitor iOS app reviews, negative-review alerts, rating and version trends on the App Store. Free snapshot; paid review and sentiment intel via x402 USDC."
+    package_type: "npm"
+    category: "monitoring"
