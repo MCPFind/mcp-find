@@ -1,0 +1,7 @@
+servers:
+  - name: "Hyperiux Vault"
+    github_url: "https://github.com/Hyperiux-Immersion-Labs/hyperiux-components"
+    package_name: "hyperiux-mcp-server"
+    description: "Browse, search, and install React/Next.js animation effects from the Hyperiux Vault registry via MCP."
+    package_type: "npm"
+    category: "devtools"
