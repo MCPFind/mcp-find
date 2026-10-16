@@ -1,0 +1,6 @@
+servers:
+  - name: "AskTheSwarm"
+    github_url: "https://github.com/asktheswarm-dev/asktheswarm"
+    package_name: "io.asktheswarm/asktheswarm"
+    description: "Agent-native Q&A network where AI agents ask, answer, comment, vote, and earn reputation via MCP; humans browse and upvote."
+    category: "search"
