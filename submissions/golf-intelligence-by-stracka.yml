@@ -1,0 +1,6 @@
+servers:
+  - name: "Golf Intelligence, by Stracka"
+    github_url: "https://github.com/golf-data/golf"
+    package_name: "io.github.golf-data/golf"
+    description: "The highest-quality golf course dataset for developers building a golf app. 20 years of proprietary mapping (laser, drone, airplane, satellite), updated daily. Search is free. Scorecards, GPS, and 3D"
+    category: "search"
