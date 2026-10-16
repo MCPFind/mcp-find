@@ -1,0 +1,6 @@
+servers:
+  - name: "AcqPath"
+    github_url: "https://github.com/reflectme-source/acqpath-distribution"
+    package_name: "https://api.getacqpath.com/mcp"
+    description: "Signed source-rights evidence for RAG, AI input, indexing, training and search."
+    category: "security"
