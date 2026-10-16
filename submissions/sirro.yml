@@ -1,0 +1,6 @@
+servers:
+  - name: "Sirro"
+    github_url: "https://github.com/Jonathanmberg/Sirro-open"
+    package_name: "https://www.sirro.dev/mcp"
+    description: "Shared memory for AI coding agents. Save assets once in Cursor, pull them back by name from Claude Code, Codex and other MCP tools."
+    category: "devtools"
