@@ -1,0 +1,7 @@
+servers:
+  - name: "OctoWatch DLP MCP Server"
+    github_url: "https://github.com/extralabs/octowatch-mcp-server"
+    package_name: "octowatch-mcp-server"
+    description: "OctoWatch DLP Employee Monitor - MCP Server"
+    package_type: "pypi"
+    category: "productivity"
