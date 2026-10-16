@@ -1,0 +1,7 @@
+servers:
+  - name: "Effect 中文文档 (Effect Chinese Docs)"
+    github_url: "https://github.com/aaronlou/effect-ts.cn"
+    package_name: "effect-ts-cn-mcp"
+    description: "Search the official Effect (TypeScript) documentation in Chinese — 234 translated v3/v4 pages with verifiable citations back to each upstream section."
+    package_type: "npm"
+    category: "documentation"
