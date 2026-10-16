@@ -16,3 +16,8 @@ servers:
     description: "X and Twitter automation MCP server for tweet search, profile tweets, follower export, media workflows, webhooks, and confirmation-gated posting."
     package_type: "npm"
     category: "communication"
+  - name: "Dintak MCP Gateway"
+    github_url: "https://github.com/qtpgitadmin/dintak-mcp-gateway-public"
+    package_name: "com.dintak/dintak-mcp-gateway"
+    description: "Semantic job search, job posting, and job apply for Dintak, with resume-to-job match scoring, exposed as a hosted remote MCP server."
+    category: "productivity"
