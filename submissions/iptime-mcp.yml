@@ -1,0 +1,7 @@
+servers:
+  - name: "iptime-mcp"
+    github_url: "https://github.com/mikusnuz/iptime-mcp"
+    package_name: "iptime-mcp"
+    description: "Manage ipTIME routers through MCP with firmware capability checks and reviewable plans for configuration changes."
+    package_type: "npm"
+    category: "other"
