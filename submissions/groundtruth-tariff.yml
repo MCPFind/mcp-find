@@ -1,0 +1,7 @@
+servers:
+  - name: "GroundTruth Tariff"
+    github_url: "https://github.com/contentforge-press/groundtruth-calculator"
+    package_name: "groundtruth-tariff"
+    description: "Accurate 2026 US import duty and landed-cost API and MCP server for AI agents, stacking MFN, UFLPA, Section 301/232, MPF and HMF."
+    package_type: "npm"
+    category: "finance"
