@@ -1,0 +1,7 @@
+servers:
+  - name: "Agent Nexus"
+    github_url: "https://github.com/Strategiumfinancepartner/AgentNexus"
+    package_name: "agentnexus-client"
+    description: "Discovery and reliability registry of APIs, MCP servers and CLIs for AI agents, with live health checks. No key needed."
+    package_type: "npm"
+    category: "search"
