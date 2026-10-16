@@ -1,0 +1,7 @@
+servers:
+  - name: "Shopify Change Intelligence"
+    github_url: "https://github.com/contentforge-press/shopify-change-intelligence"
+    package_name: "shopify-change-intelligence"
+    description: "Monitor any public Shopify store: free live snapshot, paid change intelligence (new/removed products, price moves, stock) and competitor reports in USDC via x402 on Base."
+    package_type: "npm"
+    category: "ecommerce"
