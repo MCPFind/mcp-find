@@ -1,6 +1,8 @@
 export const EDITORIAL_ANNOTATION_CHECKED_AT = "2026-10-17";
 
 export type ServerEditorialAnnotation = {
+  /** Date this specific editorial addition was materially updated (YYYY-MM-DD). */
+  updatedAt: string;
   title: string;
   sourceLabel: string;
   sourceUrl: string;
@@ -19,6 +21,7 @@ export const SERVER_EDITORIAL_ANNOTATIONS: Readonly<
   Record<string, ServerEditorialAnnotation>
 > = {
   "ai-smithery-brave": {
+    updatedAt: "2026-10-17",
     title: "Match the identifier to the official search package",
     sourceLabel: "Brave Search MCP server documentation",
     sourceUrl: "https://github.com/brave/brave-search-mcp-server",
@@ -32,6 +35,7 @@ export const SERVER_EDITORIAL_ANNOTATIONS: Readonly<
     guideLabel: "Read the Brave Search verification guide",
   },
   "io-github-firecrawl-firecrawl-mcp-server": {
+    updatedAt: "2026-10-17",
     title: "Choose a connection and verify one public page",
     sourceLabel: "Firecrawl MCP server documentation",
     sourceUrl: "https://github.com/firecrawl/firecrawl-mcp-server",
@@ -45,6 +49,7 @@ export const SERVER_EDITORIAL_ANNOTATIONS: Readonly<
     guideLabel: "Read the Firecrawl bounded scraping guide",
   },
   "io-github-googleapis-mcp-toolbox": {
+    updatedAt: "2026-10-17",
     title: "Separate the execution project from dataset access",
     sourceLabel: "Google BigQuery Toolbox setup documentation",
     sourceUrl: "https://docs.cloud.google.com/bigquery/docs/pre-built-tools-with-mcp-toolbox",
@@ -58,6 +63,7 @@ export const SERVER_EDITORIAL_ANNOTATIONS: Readonly<
     guideLabel: "Read the BigQuery Toolbox setup guide",
   },
   "com-zapier-mcp": {
+    updatedAt: "2026-10-17",
     title: "Discover a configured read action before enabling writes",
     sourceLabel: "Zapier MCP connection documentation",
     sourceUrl: "https://docs.zapier.com/mcp/overview/how-connections-work",
@@ -71,6 +77,7 @@ export const SERVER_EDITORIAL_ANNOTATIONS: Readonly<
     guideLabel: "Read the Zapier connection and review guide",
   },
   "ai-exa-exa": {
+    updatedAt: "2026-10-17",
     title: "Retain search and fetch when selecting tools",
     sourceLabel: "Exa MCP server documentation",
     sourceUrl: "https://github.com/exa-labs/exa-mcp-server",
@@ -84,6 +91,7 @@ export const SERVER_EDITORIAL_ANNOTATIONS: Readonly<
     guideLabel: "Read the Exa search and source-check guide",
   },
   "io-github-github-github-mcp-server": {
+    updatedAt: "2026-10-17",
     title: "Scope repository access before enabling writes",
     sourceLabel: "GitHub MCP server documentation",
     sourceUrl: "https://github.com/github/github-mcp-server",
@@ -97,6 +105,7 @@ export const SERVER_EDITORIAL_ANNOTATIONS: Readonly<
     guideLabel: "Read the GitHub setup guide",
   },
   "com-figma-mcp-mcp": {
+    updatedAt: "2026-10-17",
     title: "Choose hosted access or the eligible desktop route",
     sourceLabel: "Figma MCP server documentation",
     sourceUrl: "https://developers.figma.com/docs/figma-mcp-server/",
@@ -110,6 +119,7 @@ export const SERVER_EDITORIAL_ANNOTATIONS: Readonly<
     guideLabel: "Read the Figma design-to-code guide",
   },
   "com-stripe-mcp": {
+    updatedAt: "2026-10-17",
     title: "Separate payment lookup from financial changes",
     sourceLabel: "Stripe MCP documentation",
     sourceUrl: "https://docs.stripe.com/mcp",
@@ -123,6 +133,7 @@ export const SERVER_EDITORIAL_ANNOTATIONS: Readonly<
     guideLabel: "Read the Stripe access and review guide",
   },
   "com-supabase-mcp": {
+    updatedAt: "2026-10-17",
     title: "Constrain the project and tool groups first",
     sourceLabel: "Supabase MCP documentation",
     sourceUrl: "https://supabase.com/docs/guides/ai-tools/mcp",
@@ -136,6 +147,7 @@ export const SERVER_EDITORIAL_ANNOTATIONS: Readonly<
     guideLabel: "Read the Supabase project-scoping guide",
   },
   "com-cloudflare-mcp-mcp": {
+    updatedAt: "2026-10-17",
     title: "Confirm account and permissions before infrastructure changes",
     sourceLabel: "Cloudflare MCP server documentation",
     sourceUrl:
@@ -150,6 +162,7 @@ export const SERVER_EDITORIAL_ANNOTATIONS: Readonly<
     guideLabel: "Read the Cloudflare Workers workflow guide",
   },
   "io-elevenlabs-mcp": {
+    updatedAt: "2026-10-17",
     title: "Choose the hosted connection before a local wrapper",
     sourceLabel: "ElevenLabs plugin documentation",
     sourceUrl: "https://github.com/elevenlabs/plugin",
@@ -163,6 +176,7 @@ export const SERVER_EDITORIAL_ANNOTATIONS: Readonly<
     guideLabel: "Read the ElevenLabs setup guide",
   },
   "io-github-asklokesh-xero-mcp-server": {
+    updatedAt: "2026-10-17",
     title: "Treat this Xero connector as a community package",
     sourceLabel: "asklokesh/xero-mcp-server README",
     sourceUrl: "https://github.com/asklokesh/xero-mcp-server",
@@ -176,6 +190,7 @@ export const SERVER_EDITORIAL_ANNOTATIONS: Readonly<
     guideLabel: "Read the accounting workflow guide",
   },
   "io-github-neverinfamous-mysql-mcp": {
+    updatedAt: "2026-10-17",
     title: "Match the package to this listing before connecting data",
     sourceLabel: "neverinfamous/mysql-mcp README",
     sourceUrl: "https://github.com/neverinfamous/mysql-mcp",
@@ -189,6 +204,7 @@ export const SERVER_EDITORIAL_ANNOTATIONS: Readonly<
     guideLabel: "Read the MySQL setup guide",
   },
   "io-github-acedatacloud-mcp-seedream-pro": {
+    updatedAt: "2026-10-17",
     title: "Choose one credential route and follow the task result",
     sourceLabel: "AceDataCloud/SeedreamMCP README",
     sourceUrl: "https://github.com/AceDataCloud/SeedreamMCP",
@@ -200,6 +216,7 @@ export const SERVER_EDITORIAL_ANNOTATIONS: Readonly<
       "Docs-derived; MCPFind did not authorize an account, submit an image request, or verify pricing. Confirm current model availability and account limits in the provider documentation.",
   },
   "com-monday-monday-com": {
+    updatedAt: "2026-10-17",
     title: "Use hosted OAuth for the normal board workflow",
     sourceLabel: "monday.com MCP documentation",
     sourceUrl: "https://github.com/mondaycom/mcp",
@@ -213,6 +230,7 @@ export const SERVER_EDITORIAL_ANNOTATIONS: Readonly<
     guideLabel: "Read the monday.com workflow guide",
   },
   "io-github-aras-workspace-claude-kvm": {
+    updatedAt: "2026-10-17",
     title: "Keep the first remote-desktop trial observable",
     sourceLabel: "ARAS-Workspace/claude-kvm README",
     sourceUrl: "https://github.com/ARAS-Workspace/claude-kvm",
@@ -227,4 +245,10 @@ export const SERVER_EDITORIAL_ANNOTATIONS: Readonly<
 
 export function getServerEditorialAnnotation(slug: string) {
   return SERVER_EDITORIAL_ANNOTATIONS[slug];
+}
+
+/** A static, per-listing editorial date; never a shared review date or request time. */
+export function getServerEditorialUpdatedAt(slug: string): string | null {
+  const updatedAt = getServerEditorialAnnotation(slug)?.updatedAt;
+  return updatedAt && /^\d{4}-\d{2}-\d{2}$/.test(updatedAt) ? updatedAt : null;
 }

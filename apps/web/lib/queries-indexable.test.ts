@@ -137,6 +137,42 @@ describe('getServersSitemapPage — applies isIndexable() gate', () => {
     expect(rows[0]?.lastmod).toBe('2026-07-01T00:00:00Z');
   });
 
+  it('uses an annotation’s explicit editorial date when it is newer than DB dates', async () => {
+    const queryMock = makeSupabaseQueryMock({
+      data: [{
+        ...GOOD_SERVER,
+        slug: 'com-monday-monday-com',
+        canonical_slug: 'com-monday-monday-com',
+        updated_at: '2026-09-12T00:00:00Z',
+        registry_updated_at: null,
+      }],
+    });
+    vi.doMock('./supabase', () => ({ supabase: queryMock }));
+
+    const { getServersSitemapPage } = await import('./queries');
+    const rows = await getServersSitemapPage(0, 1000);
+
+    expect(rows[0]?.lastmod).toBe('2026-10-17');
+  });
+
+  it('retains a newer DB date over an annotation date', async () => {
+    const queryMock = makeSupabaseQueryMock({
+      data: [{
+        ...GOOD_SERVER,
+        slug: 'com-monday-monday-com',
+        canonical_slug: 'com-monday-monday-com',
+        updated_at: '2026-10-18T12:00:00Z',
+        registry_updated_at: '2026-10-01T00:00:00Z',
+      }],
+    });
+    vi.doMock('./supabase', () => ({ supabase: queryMock }));
+
+    const { getServersSitemapPage } = await import('./queries');
+    const rows = await getServersSitemapPage(0, 1000);
+
+    expect(rows[0]?.lastmod).toBe('2026-10-18T12:00:00Z');
+  });
+
   it('reports lastmod null — never a substituted date — when the row has no timestamp', async () => {
     const queryMock = makeSupabaseQueryMock({
       data: [{ ...GOOD_SERVER, updated_at: null, registry_updated_at: null }],

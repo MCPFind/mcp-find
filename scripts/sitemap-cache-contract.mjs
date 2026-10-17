@@ -23,7 +23,7 @@ export function sitemapCacheViolations(root) {
     }
   }
   const queries = read('apps/web/lib/queries.ts');
-  if (!queries.includes("['indexable-sitemap-rows-v2']") || !queries.includes("{ tags: ['servers'], revalidate: 3600 }")) {
+  if (!queries.includes("['indexable-sitemap-rows-v3']") || !queries.includes("{ tags: ['servers'], revalidate: 3600 }")) {
     errors.push({ file: 'apps/web/lib/queries.ts', message: 'Shared sitemap query cache requires review.' });
   }
   return errors;

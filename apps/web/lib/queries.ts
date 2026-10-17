@@ -9,6 +9,7 @@ import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@mcpfind/shared';
 import { isIndexable, readmeLengthOf, type IndexableServerInput } from './indexable';
 import { maxLastmod } from './sitemap-lastmod';
 import { normalizeListParams } from './filter-utils';
+import { getServerEditorialUpdatedAt } from './server-editorial-annotations';
 
 // All sequential detail reads share one deadline; leave room for rendering under 15s.
 const QUERY_TIMEOUT_MS = 6000;
@@ -505,7 +506,7 @@ type SitemapRow = Pick<
 
 /**
  * What the sitemap emitters consume. `lastmod` is already resolved here —
- * GREATEST(updated_at, registry_updated_at) — so no downstream file has to
+ * GREATEST(updated_at, registry_updated_at, per-listing editorial updatedAt) — so no downstream file has to
  * decide what a server page's real modification date is, and none of them
  * can quietly substitute `now()`.
  *
@@ -563,7 +564,11 @@ const _getIndexableSitemapRows = cache(
               results.push({
                 slug: row.slug,
                 canonical_slug: row.canonical_slug,
-                lastmod: maxLastmod([row.updated_at, row.registry_updated_at]),
+                lastmod: maxLastmod([
+                  row.updated_at,
+                  row.registry_updated_at,
+                  getServerEditorialUpdatedAt(row.canonical_slug ?? row.slug),
+                ]),
               });
             }
           }
@@ -571,7 +576,7 @@ const _getIndexableSitemapRows = cache(
         }
         return results;
       },
-      ['indexable-sitemap-rows-v2'],
+      ['indexable-sitemap-rows-v3'],
       { tags: ['servers'], revalidate: 3600 }
     )()
 );
