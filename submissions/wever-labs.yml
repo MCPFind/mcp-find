@@ -1,0 +1,5 @@
+servers:
+  - name: "Wever Labs"
+    description: "Wever Labs: 52 MCP tools for agents. Paid calls in USDC on Base via x402, 10 free/wallet/30 days. Trust scoring, referrals, subscriptions, treasury, escrow, disputes."
+    github_url: "https://github.com/CodeWever/wever-labs-mcp-registry"
+    package_name: "io.github.CodeWever/wever-labs-products"
