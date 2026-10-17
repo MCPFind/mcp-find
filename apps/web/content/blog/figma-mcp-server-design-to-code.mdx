@@ -1,9 +1,9 @@
 ---
 title: "Figma MCP Server: Design-to-Code in Claude and Cursor"
-description: "Learn how the Figma MCP server connects Claude and Cursor to your design files for real-time design-to-code workflows. Setup guide and alternatives included."
-excerpt: "The Figma MCP server gives Claude and Cursor direct access to Figma file data, eliminating the screenshot-and-describe workflow. We analyzed MCPFind's automation category (102 servers) and compared Figma MCP against its closest alternatives. Here is what you need to know before configuring it."
+description: "Choose Figma hosted OAuth or the eligible desktop MCP route, then scope a design-to-code task to one frame and review the output."
+excerpt: "Connect to the official Figma MCP server with hosted OAuth or the desktop route. Start with one frame, reuse existing components, and compare the implementation with the design."
 date: "2026-05-04"
-updatedAt: "2026-05-28"
+updatedAt: "2026-10-17"
 author: "Gus Marquez"
 authorUrl: "https://www.linkedin.com/in/gustavoamarquez"
 authorSameAs:
@@ -20,91 +20,53 @@ draft: false
 cornerstone: false
 faqItems:
   - question: "Does the Figma MCP server require a paid Figma plan?"
-    answer: "No. The Figma MCP server works with any plan that grants API access, including the free tier for personal files. Figma Dev Mode features (CSS export, code inspection) require a Professional or Organization plan, but the MCP server itself only needs a personal access token."
+    answer: "Check the current plan and rate-limit documentation for the route you choose. The desktop route requires a Dev or Full seat on an eligible plan; the hosted route has its own access and usage limits."
   - question: "Can the Figma MCP server write changes back to Figma files?"
-    answer: "No. The Figma MCP server is read-only. It reads component properties, frame layouts, and style values from your files but cannot push changes back. If you need write access, you would need to use the Figma REST API directly."
+    answer: "Do not assume every Figma MCP route is read-only. Current remote documentation includes canvas workflows, while the desktop server does not support writing to the canvas. Review the tools your client exposes before authorizing changes."
   - question: "Does Figma MCP work with Windsurf and VS Code, or only Cursor?"
-    answer: "Figma MCP works with any MCP-compatible client: Cursor, Claude Desktop, Windsurf, VS Code (with the MCP extension), and Claude Code. The server uses stdio transport, so configuration is similar across all clients."
-  - question: "How do I update the Figma MCP server when Figma ships a new version?"
-    answer: "If you installed via npm, run `npm update @figma/mcp` in your project. If you installed via the Figma Desktop plugin, updates are managed automatically. Check the MCPFind server page for the current version before updating."
+    answer: "Use a client supported by Figma's current MCP documentation. Remote HTTP and desktop HTTP setup differ; generic stdio support alone does not establish compatibility."
+  - question: "Do I need a personal access token or npm package for the official route?"
+    answer: "No personal-token npm setup is required for the documented hosted OAuth route. Follow Figma's current remote or desktop installation instructions rather than substituting a community wrapper."
 ---
 
-The Figma MCP server connects Claude and Cursor directly to your design files, turning component properties, CSS values, and frame hierarchies into AI-readable context. We analyzed the MCPFind automation category, which indexes 102 servers with an average of 5.77 stars each, and Figma MCP stands out as the only design integration published by the tool vendor itself. With 516 GitHub stars and active maintenance from Figma's engineering team, it has quickly become the reference implementation for design-to-code workflows in the MCP ecosystem. This guide covers what the server actually exposes, how to configure it, and where the current limitations sit.
+The Figma MCP server connects design context to AI coding tools. Start with the [official Figma listing](/servers/com-figma-mcp-mcp), then choose the connection that fits your client and account rather than copying a personal-token npm example.
+
+*Docs reviewed October 17, 2026 from [Figma's introduction](https://developers.figma.com/docs/figma-mcp-server/), [remote setup](https://developers.figma.com/docs/figma-mcp-server/remote-server-installation/), and [desktop setup](https://developers.figma.com/docs/figma-mcp-server/local-server-installation/). This guide is docs-derived; MCPFind did not connect to a file or validate generated code.*
 
 ## What Does the Figma MCP Server Actually Do?
 
-The Figma MCP server reads your design files and exposes their contents as structured context for AI tools. Claude can query component properties, auto-layout spacing, style tokens, and frame hierarchies directly from a Figma file URL, without you manually copying specs or taking screenshots.
-
-Authentication uses a Figma personal access token, giving the server the same read scope as a developer inspecting a file in Dev Mode. The server communicates via stdio transport, so it runs as a local process alongside your AI client rather than as a hosted endpoint.
-
-When you paste a Figma link into Claude and ask it to implement a component, the MCP server fetches the frame data in real time. Claude receives property values, color tokens, and spacing numbers as structured JSON rather than as a description you typed. This changes the quality of output significantly. A correctly configured Figma MCP connection reduces hallucinated values (made-up padding or wrong hex codes) because Claude is reading the source of truth.
-
-The server does not process images or SVG exports. It reads vector data and design tokens, which means it works best on component-level frames with defined styles rather than on complex illustrations or exported assets.
+The server supplies design context to an agent; the agent still needs to interpret it, match your codebase, and produce an implementation. Do not treat generated code as a visual acceptance check. Figma's current documentation also includes remote canvas workflows, so the old blanket claim that every connection is read-only is inaccurate.
 
 ## How Do You Install the Figma MCP Server in Cursor or Claude Desktop?
 
-The Figma MCP server installs via npm and requires Node.js 18 or later. Add it to your MCP client configuration with the following block:
+Figma recommends its remote server. In a supported client's remote MCP configuration, use the HTTP endpoint below and complete the Figma OAuth sign-in. Follow the [client-specific instructions](https://developers.figma.com/docs/figma-mcp-server/remote-server-installation/) for the exact configuration location and available plugin route.
 
 ```json
 {
   "mcpServers": {
     "figma": {
-      "command": "npx",
-      "args": ["@figma/mcp"],
-      "env": {
-        "FIGMA_ACCESS_TOKEN": "your-personal-access-token"
-      }
+      "url": "https://mcp.figma.com/mcp"
     }
   }
 }
 ```
 
-For Cursor, add this to `.cursor/mcp.json`. For Claude Desktop, add it to `claude_desktop_config.json` in your application support directory. For Claude Code, run `claude mcp add figma npx @figma/mcp` and set the environment variable separately.
-
-Generate a personal access token in Figma under Account Settings > Personal access tokens. Scope it to read-only file access. Token rotation is not automated, so document where you store it. After adding the server, restart your client and verify the Figma tools appear in your MCP server list. Once active, paste a Figma file URL into a prompt and Claude will read the frame data without further setup.
+The desktop alternative uses `http://127.0.0.1:3845/mcp`. It requires the Figma desktop app and a Dev or Full seat on a Professional, Education, Organization, Government, or Enterprise plan. Enable it through the desktop setup instructions. It does not support the remote server's canvas-writing workflows. Check current plan limits before choosing either route.
 
 ## What Figma Data Can Claude Access Through the MCP Server?
 
-The Figma MCP server exposes several data categories from your files. Component names and properties are readable, including variant properties and instance overrides. Fill colors are returned as hex or RGBA values. Typography includes font family, weight, size, and line height. Spacing values come from auto-layout padding and gap settings. Frame dimensions and position coordinates are available as well.
+For a first task, provide a link to one small frame and ask:
 
-What the server does not expose: exported images, embedded fonts, interaction triggers, or prototype flow data. The MCP server reads the design graph, not the rendered output. This is intentional. The goal is to give Claude precise numeric values, not a visual representation that it would need to interpret.
+> Read the design context for this frame. Identify the existing components and styling conventions in this repository, then propose an implementation plan. Do not change the Figma file or write application code yet.
 
-We confirmed that the server handles nested components correctly. When Claude queries a Card component that contains a Button subcomponent, it receives the full property tree including the subcomponent's own values. This makes it possible to ask Claude to implement an entire design section rather than one component at a time, as long as all referenced components live in the same file or connected library.
+The expected result is a plan tied to that frame and your existing components. Review it against the design, then approve a small implementation. Compare spacing, typography, layout, and assets in the rendered result before accepting it. This review catches mismatches that a successful connection alone cannot establish.
 
 ## How Does Figma MCP Compare to Alternative Design Server Options?
 
-MCPFind's automation category currently indexes 102 servers, but Figma MCP is the only design-specific tool with a direct relationship to a major design platform. The next closest options are community-built servers that screen-scrape Figma exports or read static JSON specs, neither of which updates when you change the design.
-
-The [Figma MCP server page](/servers/com-figma-mcp-mcp) on MCPFind shows 516 stars, which places it in the top tier of the automation category. Compare that to the category average of 5.77 stars: Figma MCP is 89 times more starred than a typical automation server.
-
-For teams using Sketch or Penpot, no equivalent official MCP servers exist yet. A few community projects for Penpot exist in MCPFind's devtools category, but they lack the same maintenance level. If you are evaluating design tools and MCP support matters to your AI workflow, Figma currently has the clearest path.
+The official server is the clearest starting point when the source design is in Figma. A community wrapper may expose a different API or authentication scheme; compare its exact repository and permissions rather than treating it as interchangeable. For a one-off handoff, exported assets and written specs may be sufficient without granting an agent continuing file access.
 
 ## What Are the Current Limitations of the Figma MCP Server?
 
-The most significant limitation is that the server is read-only. Claude can read your designs but cannot push changes back, which limits the workflow to code generation rather than a true design feedback loop.
+Client support, tool availability, plan limits, and the remote/desktop feature split can change. Use the linked documentation rather than a fixed tool or directory count. Keep requests to a frame or component, review account/file access, and explicitly approve any canvas mutation separately from a code-generation task.
 
-Performance degrades on very large files. Files with hundreds of components and multiple pages can cause slow responses because the server fetches the full document graph before responding. To keep queries fast, share direct frame URLs rather than top-level file URLs. Pointing Claude at a specific component frame retrieves only the relevant subtree.
-
-The server does not currently expose design tokens as standalone objects. If your Figma file uses a token plugin to manage a semantic token system, the MCP server returns the resolved values rather than the token names. Claude will see `#1E40AF` rather than `colors.brand.primary`. This is a known limitation in the current API version.
-
-Finally, multi-file component libraries require that referenced components be published to the team library. Claude can read local components without issue, but library components must have public status in your Figma workspace.
-
-Explore the full [MCPFind automation category](/categories/automation) to compare Figma MCP alongside other integration servers for your workflow. For background on how MCP connects AI tools to external data sources, see our guide on [what is MCP](/blog/what-is-mcp). Teams using CI/CD automation alongside design workflows may also find value in [Best MCP Servers for DevOps and CI/CD](/blog/best-mcp-servers-devops-cicd). For the devtools servers that complement design-to-code pipelines on the code side, see [the best devtools MCP servers for repo intelligence](/blog/best-devtools-mcp-servers-repo-intelligence).
-
-## Frequently Asked Questions
-
-### Does the Figma MCP server require a paid Figma plan?
-
-No. The Figma MCP server works with any plan that grants API access, including the free tier for personal files. Figma Dev Mode features (CSS export, code inspection) require a Professional or Organization plan, but the MCP server itself only needs a personal access token.
-
-### Can the Figma MCP server write changes back to Figma files?
-
-No. The Figma MCP server is read-only. It reads component properties, frame layouts, and style values from your files but cannot push changes back. If you need write access, you would need to use the Figma REST API directly.
-
-### Does Figma MCP work with Windsurf and VS Code, or only Cursor?
-
-Figma MCP works with any MCP-compatible client: Cursor, Claude Desktop, Windsurf, VS Code (with the MCP extension), and Claude Code. The server uses stdio transport, so configuration is similar across all clients.
-
-### How do I update the Figma MCP server when Figma ships a new version?
-
-If you installed via npm, run `npm update @figma/mcp` in your project. If you installed via the Figma Desktop plugin, updates are managed automatically. Check the MCPFind server page for the current version before updating.
+Explore the [automation category](/categories/automation) for adjacent integrations. For background, see [what is MCP](/blog/what-is-mcp) and [DevOps and CI/CD servers](/blog/best-mcp-servers-devops-cicd).

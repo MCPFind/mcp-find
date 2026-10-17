@@ -1,10 +1,10 @@
 ---
-title: "Supabase MCP Server: 32 Tools, OAuth Setup, and Production Safety"
-seoTitle: "Supabase MCP Server: 32 Tools, OAuth & Production"
-description: "Supabase leads MCPFind's databases category at 2,556 stars. Configure 32 tools for SQL, schema design, and project management in Claude or Cursor."
-excerpt: "Supabase leads the MCPFind databases category at 2,556 GitHub stars and exposes 32 tools covering the full platform. This guide covers full configuration for Claude and Cursor, security best practices for keeping production data safe, and how Supabase compares to PostgreSQL and other database MCP servers."
+title: "Supabase MCP Server: OAuth, Project Scope, and Read-Only Setup"
+seoTitle: "Supabase MCP Server: OAuth & Read-Only Setup"
+description: "Configure hosted Supabase MCP with OAuth, project scope, read-only mode, and selected feature groups before granting database access."
+excerpt: "Use hosted OAuth, restrict the connection to one development project, and select read-only tool groups. Includes a scoped CI alternative and the separate self-hosted route."
 date: "2026-05-14"
-updatedAt: "2026-05-28"
+updatedAt: "2026-10-17"
 author: "Gus Marquez"
 authorUrl: "https://www.linkedin.com/in/gustavoamarquez"
 authorSameAs:
@@ -19,154 +19,78 @@ focusKeyword: "supabase mcp server"
 draft: false
 cornerstone: false
 howToName: "How to Configure the Supabase MCP Server in Claude or Cursor"
-howToDescription: "Connect an AI client to your Supabase project using a personal access token or OAuth 2. Setup takes under three minutes."
-howToTotalTime: "PT3M"
+howToDescription: "Connect to a development project through hosted OAuth and inspect one schema with read-only, project-scoped access."
 howToSteps:
-  - name: "Generate a personal access token in Supabase"
-    text: "Log in to app.supabase.com, click your avatar in the top right, go to Account settings, and generate a personal access token. Copy it immediately as it will not be shown again. Alternatively, use the OAuth 2 flow described below to avoid storing a token locally."
+  - name: "Choose a development project and scope"
+    text: "Choose a development project with synthetic data. Build the hosted MCP URL with its project_ref, read_only=true, and only the feature groups needed for the task."
   - name: "Add the server to your MCP config"
-    text: "Open your claude_desktop_config.json (macOS: ~/Library/Application Support/Claude/) and add a mcpServers block with command: npx, args: [-y, @supabase/mcp-server-supabase@latest, --access-token, YOUR_TOKEN]. For Cursor, paste the same block under Settings > MCP Servers. Restart the client after saving."
+    text: "Add https://mcp.supabase.com/mcp with the selected parameters through the client's remote MCP setup. Authenticate with the hosted OAuth flow; dynamic client registration avoids manually creating a PAT for interactive setup."
   - name: "Confirm the connection"
-    text: "Ask Claude to list your Supabase projects. A successful response returns your project names and regions. If nothing returns, verify the token has not expired and that Node.js 18 or later is installed."
+    text: "Ask for table names in one schema, without reading rows or applying changes. Compare the result with the selected project in the Dashboard before expanding the task."
 faqItems:
   - question: "Does the Supabase MCP server work with self-hosted Supabase instances?"
-    answer: "Yes. You can point the MCP server at a self-hosted Supabase project by configuring the project URL and service role key. The same 32 tools work against both managed and self-hosted projects."
+    answer: "Follow Supabase's separate self-hosted MCP instructions. Do not assume hosted configuration or tool parity, and do not substitute a project URL and service-role key into the hosted setup."
   - question: "What is the difference between Supabase MCP and using the Supabase JS client directly?"
-    answer: "The Supabase JS client requires you to write code. The MCP server exposes the same operations as natural-language tools that an AI agent can call directly, removing the need to write or execute SQL or API calls manually."
-  - question: "Can the Supabase MCP server trigger Edge Functions?"
-    answer: "As of the 2025-03-26 MCP spec revision, Edge Functions are not exposed as MCP tools. The server focuses on database operations, project management, and schema design rather than serverless function invocation."
+    answer: "MCP exposes selected platform tools to an AI client; the JS client is an application library. Their authorization and operation surfaces differ, so they are not interchangeable."
+  - question: "Does the Supabase MCP server expose Edge Function tools?"
+    answer: "The current repository documents a functions feature group, including Edge Function tools. Inspect the selected groups and actual exposed tools; availability is not determined by the MCP protocol revision."
   - question: "How does authentication work with the Supabase MCP server?"
-    answer: "You can authenticate with a personal access token generated in the Supabase dashboard, or use the OAuth 2 flow introduced in the 2025-03-26 spec revision. The OAuth path avoids storing long-lived tokens in config files."
+    answer: "The hosted server uses OAuth with dynamic client registration by default. Supabase documents a scoped PAT for CI where browser authentication is unavailable. Self-hosted access has separate instructions."
 ---
 
-The Supabase MCP server connects Claude, Cursor, and other AI clients to your Supabase project with 32 tools covering SQL execution, schema design, TypeScript type generation, and project management. Authentication uses either a personal access token or OAuth 2. OAuth is preferred because no secret appears in your config file. Do not connect to a production project until you understand the RLS bypass risk with the service role key.
+The Supabase MCP server connects an AI client to selected database and platform tools. Use the [Supabase listing](/servers/com-supabase-mcp) to identify the official project, then constrain the connection before exposing data. The available tools depend on the selected feature groups and server version.
+
+*Docs reviewed October 17, 2026 from [Supabase's hosted MCP guide](https://supabase.com/docs/guides/ai-tools/mcp), [official repository](https://github.com/supabase/mcp), and [self-hosting instructions](https://supabase.com/docs/guides/self-hosting/enable-mcp). This guide is docs-derived; MCPFind did not connect to a project or execute SQL.*
 
 ## What Tools Does the Supabase MCP Server Expose?
 
-The [Supabase MCP server](/servers/com-supabase-mcp) exposes 32 tools organized around two areas: database management and project operations.
+The repository groups tools by purpose, including database, documentation, development, debugging, and functions capabilities. Inspect the enabled groups and tool list for your connection instead of assuming full-platform access. Database schema inspection and applying a migration have different consequences, even when the same client can request both.
 
-On the database side, you get tools for executing SQL queries, designing and modifying table schemas, listing tables and extensions, generating TypeScript types from your schema, and getting security recommendations for your database configuration. These tools let an AI agent work with your data model directly, without you writing migrations manually.
+## Choose Tool Groups for the Task
 
-On the project side, tools cover listing and creating Supabase projects, getting cost estimates for new projects, pausing and restoring projects, accessing real-time logs, and managing environment configuration. The combination means a single AI session can both query data and manage the project infrastructure around it.
+Choose access around the task:
 
-Supabase also became an official Claude connector, which means it appears in Claude.ai's built-in connector menu alongside other first-party integrations. The local MCP server configuration and the official connector share the same tool surface.
+| Task | Initial boundary | Review before expansion |
+|---|---|---|
+| Understand one schema | One development project, read-only database tools | Confirm the schema and table names in the Dashboard |
+| Consult platform documentation | Documentation tools | Keep retrieved text separate from instructions authorizing a write |
+| Propose a migration | Draft SQL for review | Check target, diff, data impact, and normal migration process before applying |
+| Work on an Edge Function | Inspect the current functions tools and permissions | Review source and deployment target before deployment |
 
-## Complete Tool Inventory: All 32 Supabase MCP Tools
-
-No competing resource publishes a clean enumeration of every tool the Supabase MCP server exposes. The table below covers the full surface, organized by category.
-
-| Tool Name | Category | Purpose | Auth Required |
-|---|---|---|---|
-| `list_projects` | Project | List all Supabase projects in your account | PAT or OAuth |
-| `get_project` | Project | Get configuration, region, and status for a specific project | PAT or OAuth |
-| `create_project` | Project | Provision a new Supabase project | PAT or OAuth |
-| `pause_project` | Project | Pause a project to stop compute billing | PAT or OAuth |
-| `restore_project` | Project | Restore a paused project to active state | PAT or OAuth |
-| `get_project_url` | Project | Get the API URL for a project | PAT or OAuth |
-| `get_anon_key` | Project | Retrieve the anon public key for a project | PAT or OAuth |
-| `get_cost` | Project | Get cost estimate for a new project configuration | PAT or OAuth |
-| `confirm_cost` | Project | Confirm cost acknowledgment before creating a project | PAT or OAuth |
-| `list_organizations` | Project | List organizations associated with your account | PAT or OAuth |
-| `get_organization` | Project | Get details for a specific organization | PAT or OAuth |
-| `get_logs` | Project | Retrieve real-time logs from a project | PAT or OAuth |
-| `execute_sql` | Database | Run a raw SQL query against a project's database | PAT or OAuth |
-| `list_tables` | Database | List tables and views in the database | PAT or OAuth |
-| `list_extensions` | Database | List installed PostgreSQL extensions | PAT or OAuth |
-| `list_migrations` | Database | List applied database migrations | PAT or OAuth |
-| `apply_migration` | Database | Apply a SQL migration to the database | PAT or OAuth |
-| `get_advisors` | Database | Get security and performance advisory recommendations | PAT or OAuth |
-| `generate_typescript_types` | Database | Generate TypeScript type definitions from the current schema | PAT or OAuth |
-| `create_branch` | Branch | Create a database branch (preview environment) | PAT or OAuth |
-| `list_branches` | Branch | List all database branches for a project | PAT or OAuth |
-| `delete_branch` | Branch | Delete a database branch | PAT or OAuth |
-| `merge_branch` | Branch | Merge a branch's migrations into the main database | PAT or OAuth |
-| `reset_branch` | Branch | Reset a branch to its base migration state | PAT or OAuth |
-| `rebase_branch` | Branch | Rebase a branch on top of the latest main migrations | PAT or OAuth |
-| `list_edge_functions` | Functions | List deployed Edge Functions for a project | PAT or OAuth |
-| `deploy_edge_function` | Functions | Deploy a new or updated Edge Function | PAT or OAuth |
-| `get_function_body` | Functions | Retrieve the source code of a deployed Edge Function | PAT or OAuth |
-| `delete_edge_function` | Functions | Delete a deployed Edge Function | PAT or OAuth |
-| `create_secret` | Secrets | Create a new Vault secret for a project | PAT or OAuth |
-| `list_secrets` | Secrets | List secret names stored in Vault (values not returned) | PAT or OAuth |
-| `delete_secret` | Secrets | Delete a Vault secret | PAT or OAuth |
-
-All 32 tools require a valid personal access token or an active OAuth 2 session. The service role key referenced elsewhere in this guide applies to direct database connections, not to the MCP server authentication layer. Tool availability may vary slightly by server version.
+These are suggested boundaries, not claims that MCPFind exercised the tools. Enable only the groups needed for the chosen task.
 
 ## How Do You Configure the Supabase MCP Server in Claude and Cursor?
 
-Setup takes under three minutes. The process differs slightly depending on whether you use a personal access token or the newer OAuth 2 flow.
+The hosted endpoint is `https://mcp.supabase.com/mcp`. OAuth with dynamic client registration is the default; interactive setup does not require manually creating a PAT. Use your client's current remote MCP setup and complete the browser sign-in.
 
-**Personal access token (current standard path):**
-
-1. Go to your Supabase dashboard and generate a personal access token under Account settings.
-2. Add the server to your Claude Desktop or Cursor MCP config:
+For a development schema lookup, the documented parameters can be combined as follows. Replace `YOUR_PROJECT_REF` and verify the feature groups against the current guide:
 
 ```json
 {
   "mcpServers": {
     "supabase": {
-      "command": "npx",
-      "args": ["-y", "@supabase/mcp-server-supabase@latest", "--access-token", "YOUR_TOKEN"]
+      "url": "https://mcp.supabase.com/mcp?project_ref=YOUR_PROJECT_REF&read_only=true&features=database,docs"
     }
   }
 }
 ```
 
-**OAuth 2 flow (supported since spec revision 2025-03-26):**
-
-The updated MCP spec adds official authorization support. With OAuth, you authenticate through a standard browser login instead of pasting a long-lived token. This is the preferred path for teams sharing config files since no secret appears in the configuration.
-
-Both paths work with Cursor, Claude Desktop, Windsurf, VS Code Copilot, and Cline. After setup, ask Claude to list your project's tables to confirm the connection is active.
+`project_ref` restricts the project and disables account tools; `read_only=true` uses a read-only Postgres user for queries; `features` limits tool groups. For CI without browser authentication, Supabase documents a scoped PAT sent in the Authorization header. Keep the value in protected secret storage and grant only the permissions the enabled tools require.
 
 ## What Are the Security Best Practices for Supabase MCP?
 
-The most important rule: do not connect the MCP server to a production project unless you understand the blast radius of an AI agent with write access to your production database.
+Start with synthetic data in a development project. For the first check, ask:
 
-We recommend connecting to a development or staging project. LLMs excel at schema exploration and test data generation in a sandboxed environment. Once a migration looks correct in development, you can apply it to production through your normal deployment process. The MCP server does not need production access to be useful during development.
+> List table names in the public schema of the selected project. Do not read row contents, apply migrations, or modify anything.
 
-A few additional practices:
+Compare the result with the Dashboard. Read-only access still allows data disclosure, and project scoping does not make untrusted database text safe to follow as instructions. Review the permissions and the data your client can receive before connecting production.
 
-- Use the OAuth 2 flow rather than a personal access token when possible. A token in a config file can get committed to a repository. OAuth keeps the credential out of your filesystem.
-- If you use a personal access token, create a project-scoped token with the minimum permissions needed rather than using a full account-level token.
-- Review SQL generated by the AI before executing it on any project with real data. The Supabase MCP does not have a dry-run mode.
-- Avoid running the server with the service role key against production. The service role bypasses Row Level Security (RLS) policies, which means an AI agent can read and write any row in any table regardless of your auth rules.
-
-Supabase's own documentation recommends keeping a separate development project for MCP use. That project can mirror your production schema but hold only synthetic or anonymized data. This pattern lets you get full value from AI-assisted schema design and query building without risking exposure of real user data.
-
-The MCPFind databases category includes 317 servers, and these security practices apply broadly across all database MCP integrations, not just Supabase.
+Review proposed SQL and migrations through your normal change process. Require separate approval for a write, including its target and expected effect. Do not use the old service-role-key example as an official hosted MCP authentication route. For a self-hosted stack, follow the [separate enablement and security instructions](https://supabase.com/docs/guides/self-hosting/enable-mcp) and inspect the resulting tool surface.
 
 ## How Does Supabase MCP Compare to Other Database MCP Servers?
 
-Supabase leads the MCPFind [databases category](/categories/databases) by a significant margin at 2,556 stars. The next closest is PostgreSQL-based community servers that interact with raw database connections rather than a full platform.
+The official server is a candidate when the task includes Supabase platform capabilities. A direct PostgreSQL connector may better fit a database-only task on another host; compare permissions and supported operations rather than assuming one is universally more capable. See the [PostgreSQL guide](/blog/connect-postgresql-claude-mcp) and [database category](/categories/databases) for alternatives.
 
-The key difference between Supabase MCP and a direct PostgreSQL MCP server is scope. A raw PostgreSQL server like the one we covered in the [PostgreSQL MCP guide](/blog/connect-postgresql-claude-mcp) gives you SQL query execution. The Supabase server adds project management, TypeScript type generation, real-time log access, and schema recommendations on top of that. If your project is on Supabase, the official server is strictly more capable than a generic PostgreSQL connection.
+## What Supabase Features Are Available Through MCP?
 
-For teams on AWS RDS or self-managed PostgreSQL, the generic database servers still make sense. MySQL and SQLite have dedicated MCP servers in the MCPFind directory as well, each with specific tool surfaces. The 317 databases servers in the directory cover the full range from cloud-managed platforms to local file databases.
-
-## What Supabase Features Are Not Yet Available Through MCP?
-
-The Supabase MCP server is comprehensive but does not cover the full platform.
-
-Edge Functions are not exposed as MCP tools. If you want Claude to write and deploy an Edge Function, it can write the code, but deployment requires running `supabase functions deploy` manually or through your CI pipeline. The MCP server cannot execute CLI commands outside its defined tool surface.
-
-Auth configuration is also outside the current tool set. You can query users from the database directly via SQL, but the MCP server does not expose Supabase Auth admin endpoints for managing providers, email templates, or JWT settings.
-
-Real-time subscriptions and Storage bucket operations are similarly outside the scope of the current server version. The 32 exposed tools focus on the database management and project operations that benefit most from AI-assisted workflows. The Supabase team has publicly mentioned Auth admin and Edge Function tools as future additions. Following the official Supabase changelog is the best way to track when new capabilities ship. Expect the tool surface to expand steadily as the team continues updating the official server. For a curated comparison of the top database MCP servers for vector search and RAG pipelines, see [the best database MCP servers for vector and RAG stacks](/blog/best-databases-mcp-servers-vector-rag-stacks).
-
-## Frequently Asked Questions
-
-### Does the Supabase MCP server work with self-hosted Supabase instances?
-
-Yes. You can point the MCP server at a self-hosted Supabase project by configuring the project URL and service role key. The same 32 tools work against both managed and self-hosted projects.
-
-### What is the difference between Supabase MCP and using the Supabase JS client directly?
-
-The Supabase JS client requires you to write code. The MCP server exposes the same operations as natural-language tools that an AI agent can call directly, removing the need to write or execute SQL or API calls manually.
-
-### Can the Supabase MCP server trigger Edge Functions?
-
-As of the 2025-03-26 MCP spec revision, Edge Functions are not exposed as MCP tools. The server focuses on database operations, project management, and schema design rather than serverless function invocation.
-
-### How does authentication work with the Supabase MCP server?
-
-You can authenticate with a personal access token generated in the Supabase dashboard, or use the OAuth 2 flow introduced in the 2025-03-26 spec revision. The OAuth path avoids storing long-lived tokens in config files.
+Consult the current repository for the enabled tool groups. Current documentation includes functions tools; availability depends on the setup and enabled groups. Hosted, local CLI, and self-hosted setups need their own configuration review; do not promise identical tools across them. For a related use case, see [database servers for vector and RAG stacks](/blog/best-databases-mcp-servers-vector-rag-stacks).
