@@ -3,7 +3,7 @@ title: "Brave Search MCP Server: Configure and Verify Web Search"
 description: "Configure the official Brave Search MCP server in VS Code with stdio and a prompted API key, then check source links and search results."
 excerpt: "Use Brave’s published package and an explicit stdio connection. Includes a complete VS Code example and practical checks for results and account limits."
 date: "2026-09-10"
-updatedAt: "2026-09-10"
+updatedAt: "2026-10-17"
 author: "Gus Marquez"
 authorUrl: "https://www.linkedin.com/in/gustavoamarquez"
 authorSameAs:
@@ -30,7 +30,9 @@ faqItems:
 
 Brave publishes an MCP server for its Search API. This guide connects its npm package to VS Code over stdio and gives you a small result-quality check before adding search to a larger workflow.
 
-Documentation reviewed September 10, 2026. No API key was used and no authenticated installation was performed for this article.
+Docs-derived; sources checked October 17, 2026. MCPFind did not use an API key or perform an authenticated installation for this article.
+
+The directory identifier [ai-smithery-brave](/servers/ai-smithery-brave) maps to the official [brave/brave-search-mcp-server](https://github.com/brave/brave-search-mcp-server) repository. The identifier is not the npm launch command: this guide uses the official `@brave/brave-search-mcp-server` package.
 
 ## Prepare the account and runtime
 
@@ -71,9 +73,11 @@ Inspect the server in VS Code's MCP interface and supply the key when requested.
 
 ## Check one narrow search
 
-Ask the agent to use Brave Search to find the official installation documentation for a product you already know. Request page titles and source links, then open the results and compare them with the publisher's site.
+Use `brave_web_search` for one documentation question whose answer you can independently check. For example, ask for official release documentation for a named product, restrict the date window to the month you are researching, choose the intended country, and request at most three results. Inspect the tool's current parameter schema for the supported date, country, and count values before calling it.
 
-For a second check, ask a question where date matters and request the source's date alongside the answer. Search results identify candidate pages; they do not make every snippet current or substantiate an answer by themselves.
+Expected output is a short set of page titles and URLs that match the query and bounds. Open each candidate on the publisher's domain and confirm its publication or update date before citing it. A result snippet is a lead, and a date filter does not establish that the page itself says what the answer claims.
+
+Compare this one task with a browser lookup before adding it to a larger workflow. If results are empty, first confirm that the call succeeded; then consider relaxing one query bound. An authentication error or exhausted quota is a different outcome and should stop the test until the key or account limit is resolved.
 
 If the process cannot start, inspect the `npx` path and server output. If authentication or quota fails, check the key and account limits before changing the search query. Keep errors separate from “no matching results” in any automation you build.
 

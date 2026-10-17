@@ -3,7 +3,7 @@ title: "BigQuery MCP Server: Set Up the Prebuilt Toolbox"
 description: "Connect Claude Code to BigQuery with the documented MCP Toolbox binary, Application Default Credentials, and a prebuilt configuration without a missing YAML file."
 excerpt: "A complete configuration path for BigQuery Toolbox: project prerequisites, credentials, binary selection, prebuilt arguments, and a read-first connection check."
 date: "2026-09-10"
-updatedAt: "2026-09-10"
+updatedAt: "2026-10-17"
 author: "Adam Bush"
 authorUrl: "https://www.linkedin.com/in/adam-bush/"
 authorSameAs:
@@ -30,7 +30,9 @@ faqItems:
 
 The prebuilt BigQuery configuration in MCP Toolbox for Databases gives a local MCP client a documented route to BigQuery. This guide follows that route from credentials to a connection check. It does not compare tool counts with a separate managed service or assume that a hosted endpoint removes setup requirements.
 
-Sources checked September 10, 2026. No authenticated BigQuery installation or query was run for this article.
+Docs-derived; sources checked October 17, 2026. MCPFind did not authenticate to BigQuery or run a query for this article.
+
+This guide matches the listing [io-github-googleapis-mcp-toolbox](/servers/io-github-googleapis-mcp-toolbox), whose repository is [googleapis/mcp-toolbox](https://github.com/googleapis/mcp-toolbox). Its setup uses a downloaded `toolbox` executable; do not substitute an unrelated npm or PyPI package.
 
 ## Prepare your Google Cloud project
 
@@ -73,10 +75,19 @@ Create or merge into `.mcp.json` in your project root:
 
 Replace both placeholders. On Windows, supply the actual executable path using JSON-escaped backslashes or forward slashes. This example uses the prebuilt configuration, so there is no `tools.yaml` to create. Google's client section documents these arguments and the project environment variable. [Client configuration](https://docs.cloud.google.com/bigquery/docs/pre-built-tools-with-mcp-toolbox).
 
-## Verify access before querying data
+`BIGQUERY_PROJECT` selects the default execution project. Confirm which project will run and be billed for query jobs, and which datasets the ADC identity can read. Access to the execution/billing project does not grant access to every dataset; dataset IAM is a separate decision. A dataset in another project needs its own permissions. Review both with the administrator before execution. [Google's BigQuery setup and permissions](https://docs.cloud.google.com/bigquery/docs/pre-built-tools-with-mcp-toolbox).
 
-Start Claude Code in the project, inspect the server in `/mcp`, then ask it to list the datasets it can access without executing SQL or changing data. Compare the result with the Cloud console using the same account.
+## Verify metadata before querying data
+
+Start Claude Code in the project, inspect the server in `/mcp`, and use a known, non-sensitive dataset for this docs-derived check:
+
+1. List the available datasets, then the tables in that one dataset, and inspect one table's schema. Ask for metadata only, without reading rows or changing data.
+2. Expect the known dataset and table identifiers, column names, and types. Compare them with the Cloud console using the same account before asking for SQL.
+3. Review a proposed read-only query that names the fully qualified table, selects only necessary columns, and restricts the relevant partition or date range. Add a small row limit for the output, and review query cost controls: a `LIMIT` alone does not bound bytes scanned.
+4. Confirm the execution/billing project, dataset permissions, and query before approving it. Expect only the reviewed columns and bounded result rows; compare a known sample with the source and inspect the job's usage before expanding.
+
+Metadata success establishes a narrower check than query execution. Separate approval is required for writes, schema changes, or broader data access.
 
 If the process fails to start, check the executable path and permissions. If it starts but access fails, check ADC, the selected project, and IAM permissions. Record the first failing operation rather than replacing the configuration with an unrelated server.
 
-For the next test, use a dataset you understand and review the proposed SQL before execution. A successful connection does not establish that a generated query is correct, economical, or authorized. Browse [database integrations](/categories/databases) for discovery; use the publisher's setup documentation for each server you actually install.
+A successful connection does not establish that a generated query is correct, economical, or authorized. Browse [database integrations](/categories/databases) for discovery; use the publisher's setup documentation for each server you actually install.

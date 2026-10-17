@@ -11,6 +11,11 @@ interface RelatedArticlesProps {
 }
 
 const SERVER_ARTICLE_OVERRIDES: Record<string, string[]> = {
+  "ai-smithery-brave": ["brave-search-mcp-server-setup-guide"],
+  "io-github-firecrawl-firecrawl-mcp-server": ["firecrawl-mcp-server-web-scraping-guide"],
+  "io-github-googleapis-mcp-toolbox": ["bigquery-mcp-server-google-cloud-guide"],
+  "com-zapier-mcp": ["zapier-mcp-server-automation-guide"],
+  "ai-exa-exa": ["exa-mcp-server-ai-search-guide"],
   "io-github-github-github-mcp-server": ["github-mcp-server-claude-code-tutorial"],
   "com-figma-mcp-mcp": ["figma-mcp-server-design-to-code"],
   "com-stripe-mcp": ["stripe-mcp-server-guide"],

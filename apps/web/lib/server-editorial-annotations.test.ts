@@ -8,6 +8,11 @@ import {
 } from "./server-editorial-annotations";
 
 const annotatedSlugs = [
+  "ai-smithery-brave",
+  "io-github-firecrawl-firecrawl-mcp-server",
+  "io-github-googleapis-mcp-toolbox",
+  "com-zapier-mcp",
+  "ai-exa-exa",
   "io-github-github-github-mcp-server",
   "com-figma-mcp-mcp",
   "com-stripe-mcp",
@@ -22,7 +27,7 @@ const annotatedSlugs = [
 ];
 
 describe("server editorial annotations", () => {
-  it("has exactly the eleven approved, source-linked annotations", () => {
+  it("has exactly the sixteen approved, source-linked annotations", () => {
     expect(Object.keys(SERVER_EDITORIAL_ANNOTATIONS).sort()).toEqual([...annotatedSlugs].sort());
     for (const slug of annotatedSlugs) {
       const annotation = getServerEditorialAnnotation(slug);
@@ -39,6 +44,23 @@ describe("server editorial annotations", () => {
       "com-stripe-mcp": "stripe-mcp-server-guide",
       "com-supabase-mcp": "supabase-mcp-server-deep-dive",
       "com-cloudflare-mcp-mcp": "cloudflare-mcp-server-workers-guide",
+    };
+    for (const [serverSlug, guideSlug] of Object.entries(pairs)) {
+      expect(getServerEditorialAnnotation(serverSlug)?.guideHref).toBe(`/blog/${guideSlug}`);
+      const articles = await RelatedArticles({ serverSlug, serverCategory: "unrelated-category" });
+      const markup = renderToStaticMarkup(articles);
+      expect(markup).toContain(`href="/blog/${guideSlug}"`);
+      expect(markup.match(/href="\/blog\//g)).toHaveLength(1);
+    }
+  });
+
+  it("keeps each third-batch guide paired with its exact listing", async () => {
+    const pairs = {
+      "ai-smithery-brave": "brave-search-mcp-server-setup-guide",
+      "io-github-firecrawl-firecrawl-mcp-server": "firecrawl-mcp-server-web-scraping-guide",
+      "io-github-googleapis-mcp-toolbox": "bigquery-mcp-server-google-cloud-guide",
+      "com-zapier-mcp": "zapier-mcp-server-automation-guide",
+      "ai-exa-exa": "exa-mcp-server-ai-search-guide",
     };
     for (const [serverSlug, guideSlug] of Object.entries(pairs)) {
       expect(getServerEditorialAnnotation(serverSlug)?.guideHref).toBe(`/blog/${guideSlug}`);
