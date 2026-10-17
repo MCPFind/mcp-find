@@ -4,6 +4,7 @@ import { RelatedArticles } from "../components/related-articles";
 import {
   EDITORIAL_ANNOTATION_CHECKED_AT,
   getServerEditorialAnnotation,
+  getServerEditorialUpdatedAt,
   SERVER_EDITORIAL_ANNOTATIONS,
 } from "./server-editorial-annotations";
 
@@ -34,6 +35,9 @@ describe("server editorial annotations", () => {
       expect(annotation).toBeDefined();
       expect(annotation?.sourceUrl).toMatch(/^https:\/\//);
       expect(annotation?.reviewBoundary).toContain("Docs-derived");
+      expect(annotation?.updatedAt).toBe("2026-10-17");
+      expect(getServerEditorialUpdatedAt(slug)).toBe("2026-10-17");
+      expect(Date.parse(`${annotation?.updatedAt}T00:00:00Z`)).not.toBeNaN();
     }
   });
 
@@ -77,5 +81,9 @@ describe("server editorial annotations", () => {
 
   it("keeps a visible review date", () => {
     expect(EDITORIAL_ANNOTATION_CHECKED_AT).toBe("2026-10-17");
+  });
+
+  it("does not create dates for unannotated listings", () => {
+    expect(getServerEditorialUpdatedAt("com-example-unrelated")).toBeNull();
   });
 });
