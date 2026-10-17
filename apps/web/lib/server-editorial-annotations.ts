@@ -18,6 +18,71 @@ export type ServerEditorialAnnotation = {
 export const SERVER_EDITORIAL_ANNOTATIONS: Readonly<
   Record<string, ServerEditorialAnnotation>
 > = {
+  "ai-smithery-brave": {
+    title: "Match the identifier to the official search package",
+    sourceLabel: "Brave Search MCP server documentation",
+    sourceUrl: "https://github.com/brave/brave-search-mcp-server",
+    decision:
+      "This Smithery identifier maps to Brave's official repository. The documented local package is @brave/brave-search-mcp-server; use its explicit stdio configuration and an account API key rather than treating the directory slug as a package name.",
+    workflow:
+      "Use brave_web_search for one known documentation question, with a date window, country, and small result count supported by its current schema. Expect titles and URLs, then open the publisher pages to verify the answer and dates. Distinguish an empty successful search from authentication or quota failure.",
+    reviewBoundary:
+      "Docs-derived; MCPFind did not authenticate or run a search. Check current account limits and source content before expanding the task.",
+    guideHref: "/blog/brave-search-mcp-server-setup-guide",
+    guideLabel: "Read the Brave Search verification guide",
+  },
+  "io-github-firecrawl-firecrawl-mcp-server": {
+    title: "Choose a connection and verify one public page",
+    sourceLabel: "Firecrawl MCP server documentation",
+    sourceUrl: "https://github.com/firecrawl/firecrawl-mcp-server",
+    decision:
+      "The official repository documents hosted OAuth/API-key routes and local stdio through firecrawl-mcp. The listing is marked May be outdated; compare its setup with the current maintainer documentation before connecting.",
+    workflow:
+      "Map one public documentation site, select one URL, and scrape only the title, source URL, and fields needed for the question. Compare them with the publisher page and inspect usage before expanding to a multi-page crawl.",
+    reviewBoundary:
+      "Docs-derived; MCPFind did not authenticate, scrape, or measure usage. Review domain scope, account limits, and any interactive or write action separately.",
+    guideHref: "/blog/firecrawl-mcp-server-web-scraping-guide",
+    guideLabel: "Read the Firecrawl bounded scraping guide",
+  },
+  "io-github-googleapis-mcp-toolbox": {
+    title: "Separate the execution project from dataset access",
+    sourceLabel: "Google BigQuery Toolbox setup documentation",
+    sourceUrl: "https://docs.cloud.google.com/bigquery/docs/pre-built-tools-with-mcp-toolbox",
+    decision:
+      "This listing maps to googleapis/mcp-toolbox and the downloaded toolbox executable. Use ADC with --prebuilt bigquery --stdio. Confirm the default execution/billing project separately from the ADC identity's dataset IAM permissions.",
+    workflow:
+      "Inspect one known dataset, table, and schema before reading rows. Compare metadata with the Cloud console, then review a fully qualified, read-only query, its partition bounds, output limit, and cost controls before execution; a LIMIT alone does not cap scanned bytes.",
+    reviewBoundary:
+      "Docs-derived; MCPFind did not authenticate or execute SQL. Review billing, dataset permissions, and the proposed query before a read, and approve writes or broader access separately.",
+    guideHref: "/blog/bigquery-mcp-server-google-cloud-guide",
+    guideLabel: "Read the BigQuery Toolbox setup guide",
+  },
+  "com-zapier-mcp": {
+    title: "Discover a configured read action before enabling writes",
+    sourceLabel: "Zapier MCP connection documentation",
+    sourceUrl: "https://docs.zapier.com/mcp/overview/how-connections-work",
+    decision:
+      "Zapier uses Streamable HTTP at https://mcp.zapier.com/api/v1/connect, with OAuth in supported clients and a connection-token fallback. Configured app actions, dynamic discovery, and the connection mode determine available tools; the service is not limited to triggering existing Zaps.",
+    workflow:
+      "Discover an enabled read action for a named sample spreadsheet, inspect its inputs, and request only known columns and a small row range. Compare returned fields, rows, and source identifiers with the sheet, then inspect the operation in History.",
+    reviewBoundary:
+      "Docs-derived; MCPFind did not authenticate or execute an action. Confirm the app account, destination, proposed fields, and intended effect separately before permitting a write or message.",
+    guideHref: "/blog/zapier-mcp-server-automation-guide",
+    guideLabel: "Read the Zapier connection and review guide",
+  },
+  "ai-exa-exa": {
+    title: "Retain search and fetch when selecting tools",
+    sourceLabel: "Exa MCP server documentation",
+    sourceUrl: "https://github.com/exa-labs/exa-mcp-server",
+    decision:
+      "Hosted anonymous access is supported with rate limits; OAuth or an API key enables higher limits and Agent access. The hosted tools= parameter replaces the default selection, so include search and fetch explicitly when adding advanced search.",
+    workflow:
+      "Use advanced search for one publisher domain and date window with a small result count, then fetch one selected publisher URL. Compare its date and relevant content with the original page before using it as evidence.",
+    reviewBoundary:
+      "Docs-derived; MCPFind did not authenticate, search, or fetch content. Check account limits and review broader or Agent research separately; a filtered result does not itself verify a source's date or claims.",
+    guideHref: "/blog/exa-mcp-server-ai-search-guide",
+    guideLabel: "Read the Exa search and source-check guide",
+  },
   "io-github-github-github-mcp-server": {
     title: "Scope repository access before enabling writes",
     sourceLabel: "GitHub MCP server documentation",
