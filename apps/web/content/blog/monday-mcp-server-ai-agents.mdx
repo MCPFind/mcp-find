@@ -3,7 +3,7 @@ title: "monday.com MCP Server: Connect AI Agents to Your Boards"
 description: "Set up the official monday.com MCP server so Claude and other AI assistants can read, create, and update your boards, items, and status updates directly."
 excerpt: "monday.com's official MCP server lets an AI assistant create items, move them between groups, and post updates on your boards. This guide covers install, the read-only safety flag, and what the server can and cannot touch."
 date: "2026-07-15"
-updatedAt: "2026-07-15"
+updatedAt: "2026-10-17"
 author: "Gus Marquez"
 authorUrl: "https://www.linkedin.com/in/gustavoamarquez"
 authorSameAs:
@@ -22,7 +22,7 @@ faqItems:
   - question: "Is the monday.com MCP server official, or a community project?"
     answer: "Official. monday.com publishes and maintains the `mondaycom/mcp` package in-house, so support comes from the vendor rather than outside developers."
   - question: "Can I run the monday.com MCP server without giving it write access to my boards?"
-    answer: "You can. Passing the `--read-only` flag limits the server to reading boards and items, with no ability to create, update, or delete. It's a sensible way to test the connection before you open up a live project board to writes."
+    answer: "The local package documents a `--read-only` mode. Use it for a narrow retrieval test, then separately review workspace access, credentials, and every proposed change before enabling wider operations."
   - question: "Does the monday.com MCP server require a local install, or is there a hosted option?"
     answer: "Either works. Run it locally with npx and a personal API token, or connect to the hosted remote server at mcp.monday.com through an installed marketplace app using OAuth."
   - question: "Can the AI assistant run raw GraphQL queries against my monday.com account?"
@@ -40,6 +40,14 @@ The monday.com MCP server is an official package, `mondaycom/mcp`, that connects
 Once connected, it can create items, delete them, move an item to a different group, change column values, post updates, and spin up new boards or forms straight from a conversation. That replaces a fair amount of manual clicking through nested board views and status dropdowns. MCPFind indexes 33 servers in the productivity category, and monday.com is one of the few with a first-party integration rather than a community-built alternative, a distinction worth checking for before you connect any assistant to data you'd rather not hand to an unmaintained side project.
 
 The corresponding MCPFind directory entry is the [monday.com MCP server listing](/servers/com-monday-monday-com); review the [upstream repository](https://github.com/mondaycom/mcp) before installation.
+
+### Choose the connection route by the task
+
+monday.com currently recommends its hosted MCP route for normal connections: it uses OAuth, has workspace controls, and avoids a local installation. Use the local `@mondaydotcomorg/monday-api-mcp` package only when you need the repository's documented local customization, offline development, or contribution workflow; it requires a personal API token.
+
+For the first board task, limit access to the required workspace, ask for the items on one board, and inspect the result before proposing a create or update action. The local package documents `--read-only`; its dynamic API tools are disabled by default and require full API access.
+
+*Docs reviewed October 17, 2026 from the [official monday.com MCP repository](https://github.com/mondaycom/mcp). This guide is docs-derived; MCPFind did not connect an account or modify a board.*
 
 ## Installing and Configuring the Server
 
@@ -67,7 +75,7 @@ One thing is notably absent by default: raw GraphQL access. monday.com's underly
 
 ## Starting Safe with Read-Only Mode
 
-Start with the `--read-only` flag before granting write access. It restricts the server to reading boards, items, and updates. No ability to create, delete, or modify anything at all. That's the safest way to confirm the connection works and see what the assistant can find before it's able to change something you didn't expect it to touch.
+For the local package, start with the documented `--read-only` mode before considering change-capable access. It reduces the local server's available operations, but it does not replace workspace controls, credential handling, or review of each proposed action. Confirm what one board returns before widening the task.
 
 Once you're comfortable, drop the flag to enable writes. Because the server authenticates as you, every action it takes is attributed to your account in monday.com's activity log the same way a manual edit would be, so there's a clear audit trail if something unexpected happens. Check that trail the first few times you use write access. It builds confidence in what the assistant is actually doing on your boards, and it gives you a paper trail to point to if a teammate asks why an item suddenly moved groups or a status flipped overnight.
 
@@ -85,7 +93,7 @@ Official. monday.com publishes and maintains the `mondaycom/mcp` package in-hous
 
 ### Can I run the monday.com MCP server without giving it write access to my boards?
 
-You can. Passing the `--read-only` flag limits the server to reading boards and items, with no ability to create, update, or delete. It's a sensible way to test the connection before you open up a live project board to writes.
+The local package documents a `--read-only` mode. Use it for a narrow retrieval test, then separately review workspace access, credentials, and every proposed change before enabling wider operations.
 
 ### Does the monday.com MCP server require a local install, or is there a hosted option?
 

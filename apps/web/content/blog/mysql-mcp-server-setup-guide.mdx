@@ -4,7 +4,7 @@ seoTitle: "MySQL MCP Server: Connect Your Database to Claude"
 description: "Connect MySQL to Claude and AI agents using MCP. Compare community server options, configure read-only access, and avoid write-access pitfalls in production."
 excerpt: "MCPFind indexes 400 database MCP servers including community-built MySQL options. This guide covers setting up the MySQL MCP server in Claude Desktop, choosing between read-only and read-write modes, and comparing MySQL to PostgreSQL MCP alternatives for real-world data workflows."
 date: "2026-06-15"
-updatedAt: "2026-06-15"
+updatedAt: "2026-10-17"
 author: "Adam Bush"
 authorUrl: "https://www.linkedin.com/in/adam-bush/"
 authorSameAs:
@@ -24,11 +24,11 @@ faqItems:
   - question: "Is there an official MySQL MCP server from Oracle?"
     answer: "No. Oracle and the MySQL team do not maintain an official MCP server. All available implementations are community-built and distributed through GitHub and npm, which means you evaluate them by maintenance activity and feature completeness rather than vendor SLA."
   - question: "Can the MySQL MCP server modify data, or is it read-only by default?"
-    answer: "Most community MySQL MCP servers default to read-only SELECT access. Write tools (INSERT, UPDATE, DELETE) exist in some implementations but require explicit configuration flags to enable. Start with read-only access in any production environment."
+    answer: "The linked `@neverinfamous/mysql-mcp` README documents core CRUD capabilities. Use a dedicated least-privilege database account and confirm the current tools and authorization settings before allowing any change."
   - question: "How is the MySQL MCP server different from the PostgreSQL MCP server?"
     answer: "MySQL and PostgreSQL servers share the same transport patterns but differ in connection string format, schema introspection method (information_schema vs pg_catalog), and auth plugin requirements. MySQL 8.0 introduced caching_sha2_password by default, which older MCP server builds may not support."
   - question: "What credentials does the MySQL MCP server require to connect?"
-    answer: "You need a host, port (default 3306), database name, username, and password. Create a dedicated read-only user scoped to the target database rather than using root or admin credentials."
+    answer: "You need a host, port (default 3306), database name, username, and password. Create a dedicated least-privilege user scoped to the target database rather than using root or admin credentials; that limits database privileges but does not replace review of the server and client configuration."
   - question: "Does the MySQL MCP server work with cloud-hosted databases like PlanetScale or Amazon RDS?"
     answer: "Yes. Cloud-hosted MySQL instances including Amazon RDS, Google Cloud SQL, and PlanetScale work with any MySQL MCP server that accepts a standard connection string. PlanetScale's serverless driver uses HTTP rather than TCP, so verify your server's transport compatibility before connecting."
 ---
@@ -45,29 +45,15 @@ Unlike [Supabase](/servers/com-supabase-mcp), which leads MCPFind's databases ca
 
 ## How Do You Configure the MySQL MCP Server in Claude Desktop?
 
-If you want to connect MySQL to Claude Desktop, add a server entry to `claude_desktop_config.json`. Most community MySQL servers follow the stdio pattern: Claude launches the server as a local process, sends commands through stdin, and receives results through stdout.
+This guide's linked listing is specifically for [`@neverinfamous/mysql-mcp`](https://github.com/neverinfamous/mysql-mcp), not a generic `mcp-server-mysql` package. Its maintainer documents a local stdio launch with a MySQL connection string, alongside HTTP-oriented deployment options. Use the package and transport that its current README documents.
 
-A typical configuration looks like this:
-
-```json
-{
-  "mcpServers": {
-    "mysql": {
-      "command": "npx",
-      "args": ["-y", "mcp-server-mysql"],
-      "env": {
-        "MYSQL_HOST": "localhost",
-        "MYSQL_PORT": "3306",
-        "MYSQL_USER": "mcp_reader",
-        "MYSQL_PASSWORD": "your-secure-password",
-        "MYSQL_DATABASE": "myapp_db"
-      }
-    }
-  }
-}
+```bash
+npx @neverinfamous/mysql-mcp --transport stdio --mysql "mysql://mcp_user:your-password@localhost:3306/myapp_db"
 ```
 
-Before connecting, create a dedicated read-only user scoped to the database: `GRANT SELECT ON myapp_db.* TO 'mcp_reader'@'%' IDENTIFIED BY 'password';`. Never use root credentials or an account with write access on a production database. Restart Claude Desktop after saving the configuration file. Once connected, Claude can list tables, describe schema, and run read-only queries in response to natural language questions.
+For a production data source, create a dedicated least-privilege account and begin with one bounded schema or reporting request. Use a replica when practical, inspect returned rows, and keep change-capable access out of the first connection. The repository documents core CRUD tools and observability resources, so do not assume this particular package is read-only.
+
+*Docs reviewed October 17, 2026 from the [neverinfamous/mysql-mcp README](https://github.com/neverinfamous/mysql-mcp). This guide is docs-derived; MCPFind did not connect to a database or execute SQL.*
 
 ## What MySQL Server Options Does MCPFind Index in the Database Category?
 
@@ -77,7 +63,7 @@ Community MySQL servers fall into two types. Thin wrappers pass query strings di
 
 For a concrete community option to assess against these criteria, see the [MySQL MCP server listing](/servers/io-github-neverinfamous-mysql-mcp) and its [upstream repository](https://github.com/neverinfamous/mysql-mcp).
 
-When evaluating options, check three criteria: when the repository was last updated (MySQL 8.0's `caching_sha2_password` default auth breaks older servers), whether SSL is supported via environment variable for encrypted connections, and whether write tools require an explicit `ALLOW_WRITE=true` flag rather than being on by default. The [best database MCP servers comparison](/blog/best-database-mcp-servers) covers the broader database ecosystem including how MySQL options compare to higher-starred alternatives in the category.
+When evaluating options, check three criteria: when the repository was last updated (MySQL 8.0's `caching_sha2_password` default auth breaks older servers), whether SSL is supported via environment variable for encrypted connections, and what operations the selected package exposes and which database privileges its connection user actually has. The [best database MCP servers comparison](/blog/best-database-mcp-servers) covers the broader database ecosystem including how MySQL options compare to higher-starred alternatives in the category.
 
 ## How Does MySQL MCP Server Authentication Work With Different Connection Types?
 
@@ -111,7 +97,7 @@ No. Oracle and the MySQL team do not maintain an official MCP server. All availa
 
 ### Can the MySQL MCP server modify data, or is it read-only by default?
 
-Most community MySQL MCP servers default to read-only SELECT access. Write tools (INSERT, UPDATE, DELETE) exist in some implementations but require explicit configuration flags to enable. Start with read-only access in any production environment.
+The linked `@neverinfamous/mysql-mcp` README documents core CRUD capabilities. Treat the database user's privileges as the primary guardrail: begin with a dedicated, least-privilege account and verify the package's current tool and authorization settings before allowing any change.
 
 ### How is the MySQL MCP server different from the PostgreSQL MCP server?
 
@@ -119,7 +105,7 @@ MySQL and PostgreSQL servers share the same transport patterns but differ in con
 
 ### What credentials does the MySQL MCP server require to connect?
 
-You need a host, port (default 3306), database name, username, and password. Create a dedicated read-only user scoped to the target database rather than using root or admin credentials.
+You need a host, port (default 3306), database name, username, and password. Create a dedicated least-privilege user scoped to the target database rather than using root or admin credentials; that limits database privileges but does not replace review of the server and client configuration.
 
 ### Does the MySQL MCP server work with cloud-hosted databases like PlanetScale or Amazon RDS?
 

@@ -55,6 +55,8 @@ import {
   IconAlertCircle,
 } from "@tabler/icons-react";
 import { ServerOutboundLink } from "@/components/ServerOutboundLink";
+import { ServerEditorialAnnotation } from "@/components/ServerEditorialAnnotation";
+import { getServerEditorialAnnotation } from "@/lib/server-editorial-annotations";
 
 // 7 days — was 24h. Primary lever against the Supabase Disk IO/egress
 // overage: this is the ISR window for every /servers/[slug] render
@@ -210,6 +212,7 @@ export default async function ServerDetailPage({
     : null;
 
   const publishedDate = server.registry_published_at ?? server.created_at;
+  const editorialAnnotation = getServerEditorialAnnotation(server.canonical_slug ?? server.slug);
 
   return (
     <div className="min-h-screen bg-black text-white overflow-x-hidden">
@@ -305,6 +308,10 @@ export default async function ServerDetailPage({
               readmeContent={server.readme_content}
               githubUrl={server.github_url}
             />
+
+            {editorialAnnotation && (
+              <ServerEditorialAnnotation annotation={editorialAnnotation} />
+            )}
 
             {/* Tools */}
             {server.tools.length > 0 && (
