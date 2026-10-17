@@ -146,6 +146,17 @@ function stubGithub(opts: {
   );
 }
 
+async function persistReadme(readme: string): Promise<unknown> {
+  stubGithub({ readme });
+  const h = makeSupabase({ candidates: [CANDIDATE], stored: null });
+
+  const result = await enrichWithGitHub(h.client, 'token');
+
+  expect(result.fatal).toBe(false);
+  expect(h.updates).toHaveLength(1);
+  return h.updates[0].readme_content;
+}
+
 const CANDIDATE: Candidate = { id: 'acme/thing', github_url: 'https://github.com/acme/thing' };
 const ORIGINAL_ENV = { ...process.env };
 
@@ -346,6 +357,38 @@ describe('durable unavailable and transient handling', () => {
 
     expect(log.mock.calls.flat().join('\n')).toContain('unavailable=1');
     expect(warn).not.toHaveBeenCalled();
+  });
+});
+
+describe('README truncation', () => {
+  it('leaves short and exactly 50,000-unit READMEs unchanged', async () => {
+    const short = 'overview \ud83d\udcca';
+    const exactlyAtLimit = `${'a'.repeat(49_998)}\ud83d\udcca`;
+
+    await expect(persistReadme(short)).resolves.toBe(short);
+    await expect(persistReadme(exactlyAtLimit)).resolves.toBe(exactlyAtLimit);
+  });
+
+  it('keeps ordinary plain-text truncation unchanged', async () => {
+    const plain = 'a'.repeat(50_001);
+
+    await expect(persistReadme(plain)).resolves.toBe('a'.repeat(50_000));
+  });
+
+  it('omits a high surrogate at the cutoff only when its low surrogate is next', async () => {
+    const splitPair = `${'a'.repeat(49_999)}\ud83d\udcca`;
+
+    await expect(persistReadme(splitPair)).resolves.toBe('a'.repeat(49_999));
+  });
+
+  it('retains surrogate pairs adjacent to, but not split by, the cutoff', async () => {
+    const pairEndsAtCutoff = `${'a'.repeat(49_998)}\ud83d\udccaz`;
+    const pairStartsAfterCutoff = `${'a'.repeat(50_000)}\ud83d\udcca`;
+
+    await expect(persistReadme(pairEndsAtCutoff)).resolves.toBe(
+      `${'a'.repeat(49_998)}\ud83d\udcca`,
+    );
+    await expect(persistReadme(pairStartsAfterCutoff)).resolves.toBe('a'.repeat(50_000));
   });
 });
 

@@ -7,6 +7,26 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 const DEFAULT_REQUEST_TIMEOUT_MS = 10_000;
 const DEFAULT_STAGE_TIMEOUT_MS = 15 * 60_000;
 const MAX_RETRIES = 3;
+const MAX_README_UTF16_CODE_UNITS = 50_000;
+
+/**
+ * Preserve the existing UTF-16 code-unit storage limit without cutting a
+ * supplementary character in half at the boundary. JavaScript string slices
+ * operate on UTF-16 code units, while the database requires valid Unicode.
+ */
+function truncateReadmeContent(content: string): string {
+  if (content.length <= MAX_README_UTF16_CODE_UNITS) return content;
+
+  const lastRetained = content.charCodeAt(MAX_README_UTF16_CODE_UNITS - 1);
+  const firstOmitted = content.charCodeAt(MAX_README_UTF16_CODE_UNITS);
+  const splitsSurrogatePair =
+    lastRetained >= 0xD800 && lastRetained <= 0xDBFF &&
+    firstOmitted >= 0xDC00 && firstOmitted <= 0xDFFF;
+
+  return content.slice(0, splitsSurrogatePair
+    ? MAX_README_UTF16_CODE_UNITS - 1
+    : MAX_README_UTF16_CODE_UNITS);
+}
 
 function positiveEnv(name: string, fallback: number, allowZero = false): number {
   const parsed = Number(process.env[name]);
@@ -465,10 +485,8 @@ export async function enrichWithGitHub(
         if (readmeRes.ok) {
           readmeFetchOk = true;
           readmeContent = await readmeRes.text();
-          // Truncate very long READMEs
-          if (readmeContent.length > 50000) {
-            readmeContent = readmeContent.slice(0, 50000);
-          }
+          // Truncate very long READMEs without leaving an unpaired surrogate.
+          readmeContent = truncateReadmeContent(readmeContent);
         } else if (readmeRes.status === 404) {
           // Definitively no README.
           readmeFetchOk = true;
