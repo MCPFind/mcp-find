@@ -11,6 +11,7 @@ interface RelatedArticlesProps {
 }
 
 const SERVER_ARTICLE_OVERRIDES: Record<string, string[]> = {
+  "io-elevenlabs-mcp": ["elevenlabs-mcp-server-voice-ai"],
   "com-monday-monday-com": ["monday-mcp-server-ai-agents"],
   "io-github-asklokesh-xero-mcp-server": [
     "mcp-for-accountants-quickbooks-xero",
