@@ -11,6 +11,11 @@ interface RelatedArticlesProps {
 }
 
 const SERVER_ARTICLE_OVERRIDES: Record<string, string[]> = {
+  "io-github-github-github-mcp-server": ["github-mcp-server-claude-code-tutorial"],
+  "com-figma-mcp-mcp": ["figma-mcp-server-design-to-code"],
+  "com-stripe-mcp": ["stripe-mcp-server-guide"],
+  "com-supabase-mcp": ["supabase-mcp-server-deep-dive"],
+  "com-cloudflare-mcp-mcp": ["cloudflare-mcp-server-workers-guide"],
   "io-elevenlabs-mcp": ["elevenlabs-mcp-server-voice-ai"],
   "com-monday-monday-com": ["monday-mcp-server-ai-agents"],
   "io-github-asklokesh-xero-mcp-server": [

@@ -1,9 +1,9 @@
 ---
 title: "How to Use the GitHub MCP Server with Claude Code"
 description: "Connect the official GitHub MCP server to Claude Code using a remote endpoint and project configuration, then verify a read-only repository task."
-excerpt: "Use the official GitHub server rather than the older community npm package. Includes a project configuration with an environment-based token reference."
+excerpt: "Connect the official hosted GitHub server with a scoped personal access token, constrain repository tools, and compare one known issue before enabling writes."
 date: "2026-05-07"
-updatedAt: "2026-09-10"
+updatedAt: "2026-10-17"
 author: "Gus Marquez"
 authorUrl: "https://www.linkedin.com/in/gustavoamarquez"
 authorSameAs:
@@ -29,13 +29,15 @@ faqItems:
 
 Use [GitHub's official MCP server](https://github.com/github/github-mcp-server) to connect Claude Code to repository tools. The old `@modelcontextprotocol/server-github` npm example in earlier versions of this guide is not the current official implementation.
 
-Source review: September 10, 2026. This is a documented configuration example, not a claim that an authenticated installation was tested for this article.
+*Docs reviewed October 17, 2026 from [GitHub setup documentation](https://docs.github.com/en/copilot/how-tos/provide-context/use-mcp-in-your-ide/set-up-the-github-mcp-server) and the [official repository](https://github.com/github/github-mcp-server). This guide is docs-derived; MCPFind did not authenticate or run a repository task.*
+
+The matching [GitHub server listing](/servers/io-github-github-github-mcp-server) links to the official implementation.
 
 ## Choose a supported connection
 
-GitHub documents a hosted server and local deployment options. This guide uses the hosted endpoint with a personal access token, following [GitHub's Claude installation guide](https://github.com/github/github-mcp-server/blob/main/docs/installation-guides/install-claude.md). Check that guide for local Docker or binary setup and account-specific requirements.
+GitHub recommends its hosted server for most users. For remote Claude Code, [GitHub's Claude installation guide](https://github.com/github/github-mcp-server/blob/main/docs/installation-guides/install-claude.md) documents a personal access token (PAT) in the Authorization header. OAuth support depends on the client and its registered application; do not assume a bare endpoint enables OAuth in Claude Code. Local Docker or binary deployment remains a separate choice for customization or specific security requirements.
 
-Create a token with access to the repository and only the operations you intend to use. Have your shell or secret manager provide it as `GITHUB_TOKEN` before starting Claude Code. Do not paste the actual token into this example or a committed file.
+Review the account, repository access, and organization controls before connecting. Enable only the needed toolsets and read-only mode for lookup work, following [GitHub's tool configuration documentation](https://github.com/github/github-mcp-server). An organization can restrict OAuth applications, PATs, or MCP access; changing authentication does not bypass those controls.
 
 ## Add a project configuration
 
@@ -48,14 +50,16 @@ Save the following as `.mcp.json` at your project root. If it already exists, me
       "type": "http",
       "url": "https://api.githubcopilot.com/mcp",
       "headers": {
-        "Authorization": "Bearer ${GITHUB_TOKEN}"
+        "Authorization": "Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}"
       }
     }
   }
 }
 ```
 
-Claude Code documents project scope in `.mcp.json` and environment expansion in headers. Start it from this project and review any server approval request. User and local scope use different storage; do not replace `~/.claude.json` with this standalone object. [Claude Code MCP configuration](https://code.claude.com/docs/en/mcp).
+Make a least-privilege PAT available as `GITHUB_PERSONAL_ACCESS_TOKEN` in the environment that launches Claude Code, using your secret manager or local secret setup. The configuration references the variable; never commit the token value. Review the token's repository selection and organization restrictions before use.
+
+Start Claude Code from that environment and project, then open `/mcp` to inspect the GitHub entry. Follow the current [client configuration documentation](https://code.claude.com/docs/en/mcp) for environment-variable expansion, project approval, and storage.
 
 ## Verify one repository operation
 
@@ -71,7 +75,7 @@ Within Claude Code, open `/mcp` and inspect the connection. Then use a known iss
 
 Replace the repository and number with an issue you can verify yourself. A connected status tests the connection; matching the issue tests the account, repository access, and tool result.
 
-If authentication fails, confirm that the environment variable exists in the process launching Claude Code. If the connection succeeds but a repository request fails, check the token's selected repositories, permissions, and organization restrictions before broadening access.
+If authentication fails, check the PAT's validity and the environment available to the client. If a repository request fails, review account access, selected repositories, toolsets, and organization restrictions before broadening access.
 
 ## Keep the workflow small
 

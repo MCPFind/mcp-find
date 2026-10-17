@@ -1,9 +1,9 @@
 ---
 title: "Cloudflare MCP Server: Deploy and Manage Workers With AI"
-description: "Connect Claude and Cursor to Cloudflare's full API using the official MCP server. Manage Workers, D1 databases, R2 storage, and KV -- and learn how to deploy your own MCP server on Workers."
-excerpt: "The Cloudflare MCP server gives AI agents access to over 2,500 API endpoints spanning Workers, D1, R2, KV, DNS, and Zero Trust. This guide covers how to connect it to Claude, how to use the Bindings server for active development, and how to deploy your own MCP server on Cloudflare's edge network."
+description: "Connect to Cloudflare's hosted MCP API server, review account and token scope, and inspect one Worker before approving infrastructure changes."
+excerpt: "Use the hosted Cloudflare MCP endpoint with OAuth or a scoped bearer token. Confirm the account and one known Worker before approving deployments, DNS changes, or other mutations."
 date: "2026-05-27"
-updatedAt: "2026-05-27"
+updatedAt: "2026-10-17"
 author: "Adam Bush"
 authorUrl: "https://www.linkedin.com/in/adam-bush/"
 authorSameAs:
@@ -22,93 +22,59 @@ topic_source: new_topic
 cluster: cloud
 faqItems:
   - question: "Does the Cloudflare MCP server require a paid Cloudflare plan?"
-    answer: "No. The MCP server authenticates with your Cloudflare API token, which works on all account types including the free tier. Some endpoints like D1 or advanced Zero Trust features require the plans that enable those products."
+    answer: "Authentication does not establish product entitlement. Check the current plan and limits for the Cloudflare product you intend to use, and review possible costs before authorizing a mutation."
   - question: "Can the Cloudflare MCP server deploy Workers scripts directly?"
-    answer: "Yes. The server exposes Workers deployment endpoints, letting agents push updated scripts to your account. You should review what the agent generates before approving a deployment, especially for production Workers."
+    answer: "The API server can expose deployment operations when permissions allow them. Confirm account and Worker, review the change and rollback plan, and explicitly approve the mutation before deployment."
   - question: "What is the difference between the full Cloudflare MCP server and the Bindings server?"
-    answer: "The full server covers all 2,500+ Cloudflare API endpoints and is best for managing existing infrastructure. The Bindings server is purpose-built for active Workers development -- it exposes D1, R2, and KV primitives for use during coding sessions."
+    answer: "Cloudflare currently recommends its API MCP server for most work. Treat older Bindings or product-specific examples as separate routes and check whether their exact endpoint remains documented before using them."
   - question: "How do I authenticate the Cloudflare MCP server securely?"
-    answer: "Generate a scoped API token in your Cloudflare dashboard under My Profile, then API Tokens. Set only the permissions your agent needs rather than using a global API key, which would grant access to every resource on your account."
+    answer: "Use OAuth for an interactive connection, or a scoped user/account API token as an Authorization bearer for automation. Review account, zone, resource, and read/write permissions before granting access."
 ---
 
-If you manage Cloudflare infrastructure -- Workers, D1 databases, R2 buckets, DNS records, or Zero Trust policies -- you can connect an AI agent to all of it through the official Cloudflare MCP server. MCPFind's [cloud category](/categories/cloud) indexes 85 servers, and the Cloudflare server leads the category with 3,566 stars on the [com.cloudflare.mcp server listing](/servers/com-cloudflare-mcp-mcp). That star count reflects how widely the server is used across teams that want to query, deploy, and manage Cloudflare resources from Claude, Cursor, Windsurf, or any other MCP-compatible client. This guide covers the full API server, the purpose-built Bindings development server, and how to use Workers itself as a host for your own MCP endpoints. For a broader look at what MCP is and how servers work, the [what-is-mcp guide](/blog/what-is-mcp) covers the fundamentals. And if you are thinking about hosting any MCP server remotely, the [remote server hosting guide](/blog/host-mcp-server-remotely-cloudflare-cloud-run) covers the Cloudflare Workers deployment pattern in depth.
+Cloudflare's hosted MCP API server connects an AI client to Cloudflare operations. Start with the [matching server listing](/servers/com-cloudflare-mcp-mcp), choose the intended account, and review permissions before asking for an infrastructure change. Use the [cloud category](/categories/cloud) to compare other providers without relying on undated star counts.
+
+*Docs reviewed October 17, 2026 from [Cloudflare's MCP server guide](https://developers.cloudflare.com/agents/model-context-protocol/cloudflare/servers-for-cloudflare/) and [official repository](https://github.com/cloudflare/mcp-server-cloudflare). This guide is docs-derived; MCPFind did not authorize an account, inspect infrastructure, or deploy a Worker.*
 
 ## What Does the Cloudflare MCP Server Give You Access To?
 
-The main Cloudflare MCP server exposes the complete Cloudflare REST API, which covers over 2,500 endpoints. From a single connection, an agent can query DNS records, inspect Workers deployments, list R2 buckets, read D1 database schemas, check Zero Trust access policies, and review Cloudflare Analytics. This makes it one of the broadest single-service MCP integrations available.
-
-Read operations let you audit your entire account: list all Workers by subdomain and status, check which routes map to which scripts, inspect KV namespace keys, and review firewall rules. Write operations let agents create and update resources: deploy new Workers scripts, add DNS records, create R2 buckets, and modify Zero Trust rules.
-
-The cloud category average of 115 stars per server signals that production-quality cloud tools exist in the index. Cloudflare's 3,566 stars puts it well above that average and reflects years of community use and official maintenance from the Cloudflare engineering team, not just an early proof of concept.
+Cloudflare documents API access across products such as Workers, DNS, R2, and Zero Trust, subject to the granted permissions. An agent's ability to discover an API operation does not authorize it to run that operation. Distinguish a resource lookup from deployment, deletion, or policy changes.
 
 ## How Do You Connect the Cloudflare MCP Server to Claude or Cursor?
 
-The fastest path is to add the remote MCP server URL to your client config. The Cloudflare-hosted server runs at `https://mcp.cloudflare.com` and authenticates through OAuth. In Claude Desktop on macOS, add it as a remote server entry in `~/Library/Application Support/Claude/claude_desktop_config.json`. The OAuth flow opens a browser window where you authorize access to your Cloudflare account.
-
-For environments where you prefer a local server or cannot use OAuth, you can run the server locally via npx:
+Use the hosted endpoint `https://mcp.cloudflare.com/mcp` with Streamable HTTP in a compatible client. Follow [Cloudflare's current setup instructions](https://developers.cloudflare.com/agents/model-context-protocol/cloudflare/servers-for-cloudflare/) and your client's remote-server configuration:
 
 ```json
 {
   "mcpServers": {
-    "cloudflare": {
-      "command": "npx",
-      "args": ["@cloudflare/mcp-server-cloudflare"],
-      "env": {
-        "CLOUDFLARE_API_TOKEN": "your-scoped-api-token"
-      }
+    "cloudflare-api": {
+      "url": "https://mcp.cloudflare.com/mcp"
     }
   }
 }
 ```
 
-The local setup uses a scoped API token rather than OAuth. Generate the token in your Cloudflare dashboard under My Profile and API Tokens. Create a Custom Token that grants only the permissions your agent needs -- for example, Worker Scripts Edit and D1 Read if you are using the agent for Workers development -- rather than a Global API Key that covers everything on your account.
+Complete OAuth and review the requested permissions for interactive use. For CI or automation, Cloudflare documents scoped user or account API tokens passed as Authorization bearer tokens. Store the token through protected secret configuration, not in a shared file. The previous local `npx` example and legacy `/sse` examples are not the default hosted setup.
 
-## How Do You Use the Cloudflare Bindings Server for D1, R2, and KV?
+## How Do You Use Cloudflare MCP for D1, R2, and KV?
 
-The Bindings MCP server is a separate, purpose-built tool designed for active development sessions. When you are building a Workers application and want an AI agent to interact with your actual D1 database, R2 bucket, or KV namespace during coding, the Bindings server handles that. It gives the agent direct access to your application primitives rather than routing through the full Cloudflare REST API.
+Cloudflare currently recommends its API server for most work; product-specific servers are optional. Do not infer a current Bindings endpoint or identical permissions from an older setup example. Check the documented server and its permissions for the product and account involved.
 
-In a typical session, you might ask Claude to create a D1 table matching a schema you describe, seed it with test data, and then query the records to confirm the structure is correct. The Bindings server translates each of those steps into real operations on your Workers account. You see the results immediately in your conversation rather than switching to the Cloudflare dashboard or running wrangler commands manually.
-
-The Bindings server is best for short-lived development sessions rather than production automation. It operates with the same permissions as your API token, so use a token scoped to the specific project's resources rather than your primary account token. Configure it in your MCP client the same way as the main server, pointing to the Bindings endpoint instead.
+For a D1 or storage task, begin with metadata in a development account rather than asking the agent to seed, overwrite, or delete data. Compare the returned resource identity with the Dashboard before broadening the task.
 
 ## What Cloudflare Workers Tasks Can AI Agents Handle Through MCP?
 
-Workers management is where agents save the most time for teams iterating on serverless functions. You can describe a change in natural language -- "add a cache-control header to all API responses in the fetch handler" -- and the agent reads your current script, drafts the change, and proposes the update. You review the diff before approving the deployment.
+A bounded first task is an inventory check:
 
-DNS management is another common use case. Agents can list all records for a domain, add or update A and CNAME records, and check TTL values across your zone -- all without leaving your IDE. For teams managing multiple zones, this is faster than clicking through the Cloudflare dashboard.
+> In the named account, find this known Worker and summarize its deployment information. Return the resource identity and the evidence used. Do not deploy, change routes, or modify any resources.
 
-R2 bucket operations let agents list objects, check metadata, retrieve specific files by key, and in read-write mode upload or delete objects. This is useful for inspecting what is stored in a bucket during debugging or for automated audits that check bucket contents against expected inventory. D1 database agents can run SQL queries, describe table schemas, and insert or update rows, making them practical for data inspection tasks during development.
+The expected result identifies the intended account and Worker. Compare it with the Dashboard. If access fails, review account selection and token scope before granting broader permissions.
+
+For a later deployment, have the agent present the target, code diff, expected effect, and rollback plan. Approve that mutation explicitly after review. Apply the same boundary to DNS, R2, D1, and policy changes; permission to inspect a resource is not approval to change it.
 
 ## How Do You Deploy Your Own MCP Server on Cloudflare Workers?
 
-If you are building a product or internal tool that AI agents should interact with, deploying your server on Workers gives you global reach at low cost. Workers runs at 300+ edge locations, charges only for actual requests, and supports WebSocket hibernation for persistent MCP sessions that would otherwise keep a connection alive and incur continuous costs.
-
-The simplest deployment uses Cloudflare's `createMcpHandler()` helper, which wraps your tool definitions and handles the MCP protocol negotiation. You define tools as JavaScript or TypeScript functions, export them through `createMcpHandler()`, and deploy with `wrangler deploy`. The result is a stateless MCP endpoint accessible from any MCP client that supports remote servers.
-
-For servers that need session state -- for example, an MCP server that manages a multi-step workflow with intermediate results -- you add a Durable Object to your Workers setup. The Durable Object persists state between requests within a session. Cloudflare's agent documentation covers the full setup with both the stateless and stateful patterns, including OAuth support for controlled access to your deployed server.
+Consuming Cloudflare's API MCP server is a different task from hosting your own tools on Workers. Use the current [Cloudflare Agents documentation](https://developers.cloudflare.com/agents/) for the appropriate server, transport, authentication, and state pattern. The [remote MCP hosting guide](/blog/host-mcp-server-remotely-cloudflare-cloud-run) provides a comparison starting point; do not treat an old helper name or edge-location count as a deployment specification.
 
 ## How Does Cloudflare MCP Compare to Other Cloud Infrastructure Servers?
 
-The Cloudflare MCP server is strongest for teams already running Workers, Pages, R2, and Zero Trust in their stack. A single server connection covers all of those products at once. Teams running AWS or GCP alongside Cloudflare will need separate MCP servers for those providers -- there is no cross-cloud abstraction layer in MCP today.
-
-Compared to AWS and GCP MCP options in MCPFind's cloud category, Cloudflare's server stands out for the active maintenance behind it. With 3,566 stars and an official SDK backing it, you get faster updates when Cloudflare ships new products or API changes than community-maintained alternatives typically provide.
-
-For teams looking at the full MCP catalog, you can compare all 85 cloud-category servers in MCPFind's [cloud category listing](/categories/cloud), sorted by star count and recent activity, to find the right match for your infrastructure stack.
-
-## Frequently Asked Questions
-
-### Does the Cloudflare MCP server require a paid Cloudflare plan?
-
-No. The MCP server authenticates with your Cloudflare API token, which works on all account types including the free tier. Some endpoints like D1 or advanced Zero Trust features require the plans that enable those products.
-
-### Can the Cloudflare MCP server deploy Workers scripts directly?
-
-Yes. The server exposes Workers deployment endpoints, letting agents push updated scripts to your account. Review what the agent generates before approving a deployment, especially for production Workers.
-
-### What is the difference between the full Cloudflare MCP server and the Bindings server?
-
-The full server covers all 2,500+ Cloudflare API endpoints and is best for managing existing infrastructure. The Bindings server is purpose-built for active Workers development, exposing D1, R2, and KV primitives for use during coding sessions.
-
-### How do I authenticate the Cloudflare MCP server securely?
-
-Generate a scoped API token in your Cloudflare dashboard under My Profile, then API Tokens. Set only the permissions your agent needs rather than using a global API key, which grants access to every resource on your account.
+Choose the server for the infrastructure you actually manage and the permissions it can constrain. A Cloudflare connection does not grant access to another provider. For a repeated deployment with an existing review and audit path, keep that workflow and evaluate MCP first for inspection or planning. Review product limits and costs before authorizing new resources.

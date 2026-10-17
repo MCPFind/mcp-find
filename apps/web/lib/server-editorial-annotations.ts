@@ -18,6 +18,72 @@ export type ServerEditorialAnnotation = {
 export const SERVER_EDITORIAL_ANNOTATIONS: Readonly<
   Record<string, ServerEditorialAnnotation>
 > = {
+  "io-github-github-github-mcp-server": {
+    title: "Scope repository access before enabling writes",
+    sourceLabel: "GitHub MCP server documentation",
+    sourceUrl: "https://github.com/github/github-mcp-server",
+    decision:
+      "The official hosted endpoint is https://api.githubcopilot.com/mcp. GitHub documents a personal access token in the Authorization header for remote Claude Code. OAuth depends on the client and its registered application. Review repository permissions and organization restrictions, and enable only the toolsets needed, using read-only mode for a lookup workflow.",
+    workflow:
+      "Ask for the title, state, and link of one known issue in a named repository, then compare the result with GitHub. If the repository is unavailable, review organization policy and account access before increasing permissions.",
+    reviewBoundary:
+      "Docs-derived; MCPFind did not authenticate or read a repository. Review the target repository and proposed change before permitting comments, issue edits, or pull-request actions.",
+    guideHref: "/blog/github-mcp-server-claude-code-tutorial",
+    guideLabel: "Read the GitHub setup guide",
+  },
+  "com-figma-mcp-mcp": {
+    title: "Choose hosted access or the eligible desktop route",
+    sourceLabel: "Figma MCP server documentation",
+    sourceUrl: "https://developers.figma.com/docs/figma-mcp-server/",
+    decision:
+      "Figma documents remote OAuth at https://mcp.figma.com/mcp. The desktop alternative at http://127.0.0.1:3845/mcp requires the Figma desktop app and an eligible plan with a Dev or Full seat. A personal-token npm wrapper is a separate implementation.",
+    workflow:
+      "Provide one frame link and ask for its design context and an implementation plan using existing components. Compare spacing, typography, and assets against that frame before accepting generated code or expanding to a whole page.",
+    reviewBoundary:
+      "Docs-derived; MCPFind did not connect to a Figma file or compare generated code with a design. Review file access and tool permissions; approve any canvas changes separately.",
+    guideHref: "/blog/figma-mcp-server-design-to-code",
+    guideLabel: "Read the Figma design-to-code guide",
+  },
+  "com-stripe-mcp": {
+    title: "Separate payment lookup from financial changes",
+    sourceLabel: "Stripe MCP documentation",
+    sourceUrl: "https://docs.stripe.com/mcp",
+    decision:
+      "Stripe's hosted endpoint is https://mcp.stripe.com. OAuth suits interactive access on behalf of a user; agent API keys support independent, persistent access. Begin in a sandbox with only the permissions required for a read-only task.",
+    workflow:
+      "Choose one known sandbox customer or invoice and ask for its ID and status. Compare that result with the sandbox Dashboard before widening the lookup. A refund, subscription change, or other mutation needs a separate, explicit human approval of the account, object, and intended effect.",
+    reviewBoundary:
+      "Docs-derived; MCPFind did not authorize Stripe, inspect payment data, or execute a financial operation. Confirm environment and permissions before use; a prompt alone is not an access control.",
+    guideHref: "/blog/stripe-mcp-server-guide",
+    guideLabel: "Read the Stripe access and review guide",
+  },
+  "com-supabase-mcp": {
+    title: "Constrain the project and tool groups first",
+    sourceLabel: "Supabase MCP documentation",
+    sourceUrl: "https://supabase.com/docs/guides/ai-tools/mcp",
+    decision:
+      "The hosted route at https://mcp.supabase.com/mcp uses OAuth with dynamic client registration. Scope the connection to one project, enable read-only mode, and select only the feature groups needed. A scoped PAT is the documented alternative for CI; the available tools depend on configuration.",
+    workflow:
+      "Use a development project and ask for the table names in one schema, without reading rows or applying SQL changes. Compare the names with the Dashboard. Review a proposed migration and its target separately before authorizing any write.",
+    reviewBoundary:
+      "Docs-derived; MCPFind did not connect to Supabase or execute SQL. Read-only mode still permits data exposure. Follow the separate self-hosting documentation rather than substituting a service-role key into the hosted configuration.",
+    guideHref: "/blog/supabase-mcp-server-deep-dive",
+    guideLabel: "Read the Supabase project-scoping guide",
+  },
+  "com-cloudflare-mcp-mcp": {
+    title: "Confirm account and permissions before infrastructure changes",
+    sourceLabel: "Cloudflare MCP server documentation",
+    sourceUrl:
+      "https://developers.cloudflare.com/agents/model-context-protocol/cloudflare/servers-for-cloudflare/",
+    decision:
+      "Cloudflare documents its hosted API MCP endpoint at https://mcp.cloudflare.com/mcp using Streamable HTTP. Use OAuth for interactive access or a scoped user/account bearer token for automation. Legacy local stdio and /sse examples are not the default route.",
+    workflow:
+      "Select the intended account and ask for the name and deployment information of one known Worker without changing it. Compare the result with the Dashboard, then review the target, diff, and rollback plan before approving a deployment or other mutation.",
+    reviewBoundary:
+      "Docs-derived; MCPFind did not authorize Cloudflare or deploy infrastructure. Review account, zone, resource permissions, and any costs before granting write access.",
+    guideHref: "/blog/cloudflare-mcp-server-workers-guide",
+    guideLabel: "Read the Cloudflare Workers workflow guide",
+  },
   "io-elevenlabs-mcp": {
     title: "Choose the hosted connection before a local wrapper",
     sourceLabel: "ElevenLabs plugin documentation",
