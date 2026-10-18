@@ -1,0 +1,7 @@
+servers:
+  - name: "Odds API MCP"
+    github_url: "https://github.com/odds-api/odds-api"
+    package_name: "@odds-api/mcp"
+    description: "Read sports and racing events, bookmaker odds, results, line movement and market streams through 32 MCP tools."
+    package_type: "npm"
+    category: "other"
