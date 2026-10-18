@@ -1,0 +1,7 @@
+servers:
+  - name: "SendRaven"
+    github_url: "https://github.com/CommonNinja/sendraven-mcp-server"
+    package_name: "@sendraven/mcp"
+    description: "Email infrastructure for AI agents: send email, read replies as threads, reply in context, with per-key send limits and approvals."
+    package_type: "npm"
+    category: "communication"
