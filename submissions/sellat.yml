@@ -1,0 +1,7 @@
+servers:
+  - name: "Sellat"
+    github_url: "https://github.com/skanthemore/sellat-mcp"
+    package_name: "sellat-mcp"
+    description: "Proof of existence on Polygon and Bitcoin, with qualified eIDAS timestamps. Local SHA-256 hashing and independent verification."
+    package_type: "npm"
+    category: "security"
