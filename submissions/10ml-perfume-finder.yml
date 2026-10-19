@@ -1,0 +1,6 @@
+servers:
+  - name: "10ML Perfume Finder"
+    github_url: "https://github.com/10ml-com/perfume-finder-mcp"
+    package_name: "com.10ml/perfume-finder"
+    description: "The 10ML Fragrance Index for AI assistants: perfume notes, accords, families, similar scents and expert guides. Free remote server at https://mcp.10ml.com/mcp, no sign-up."
+    category: "search"
