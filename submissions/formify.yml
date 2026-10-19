@@ -1,0 +1,6 @@
+servers:
+  - name: "Formify"
+    github_url: "https://github.com/formify-e-sign/formify-skills"
+    package_name: "formify-mcp"
+    description: "Remote MCP server for Formify e-signing: send contracts from templates or PDFs, track signatures, reminders, BankID/ID verification. OAuth, hosted at https://mcp.formify.eu/mcp"
+    category: "productivity"
