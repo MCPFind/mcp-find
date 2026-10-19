@@ -1,0 +1,7 @@
+servers:
+  - name: "OpenUptime"
+    github_url: "https://github.com/becoolme/openuptime"
+    package_name: "ghcr.io/becoolme/openuptime"
+    description: "Manage uptime monitors, incidents and status pages through an OAuth-protected remote MCP server."
+    package_type: "docker"
+    category: "monitoring"
