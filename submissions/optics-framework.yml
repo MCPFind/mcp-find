@@ -1,0 +1,7 @@
+servers:
+  - name: "optics-framework"
+    github_url: "https://github.com/mozarkai/optics-framework"
+    package_name: "optics-framework"
+    description: "Local stdio MCP server that lets an AI agent drive a real Android or iOS device, smart TV or browser, and author reusable CSV test suites. Install with pip install 'optics-framework[mcp]', run with optics mcp."
+    package_type: "pypi"
+    category: "testing"
