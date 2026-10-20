@@ -1,0 +1,12 @@
+servers:
+  - name: IPGeolocation.io
+    github_url: https://github.com/IPGeolocation/ipgeolocation-io-mcp
+    package_name: ipgeolocation-io-mcp
+    description: >-
+      Connect MCP clients to IPGeolocation.io's 17 tools for accurate IP
+      geolocation, company information, ASN and network data, IP
+      security (VPN, proxy, Tor, bot, hosting and spam detection), abuse
+      contacts, time zones, astronomy, currency data and user-agent
+      parsing.
+    package_type: npm
+    category: other
