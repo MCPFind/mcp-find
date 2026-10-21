@@ -6,7 +6,7 @@
 
 **The open-source way to find MCP servers. AI-agent optimized.**
 
-<!-- TODO: Add screenshot of server detail page with config snippets visible -->
+![Server detail page with per-client install config snippet](docs/images/server-detail-config.png)
 
 ---
 
