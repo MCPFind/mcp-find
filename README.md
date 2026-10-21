@@ -1,8 +1,8 @@
 # MCP Find
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Build Status](https://img.shields.io/github/actions/workflow/status/gusmar2017/mcp-find/ci.yml?branch=main)](https://github.com/gusmar2017/mcp-find/actions)
-[![GitHub Stars](https://img.shields.io/github/stars/gusmar2017/mcp-find?style=social)](https://github.com/gusmar2017/mcp-find/stargazers)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/MCPFind/mcp-find/ci.yml?branch=main)](https://github.com/MCPFind/mcp-find/actions)
+[![GitHub Stars](https://img.shields.io/github/stars/MCPFind/mcp-find?style=social)](https://github.com/MCPFind/mcp-find/stargazers)
 
 **The open-source way to find MCP servers. AI-agent optimized.**
 
@@ -42,7 +42,7 @@ MCP Find is the open-source alternative.
 ## Quick start for developers
 
 ```bash
-git clone https://github.com/gusmar2017/mcp-find.git
+git clone https://github.com/MCPFind/mcp-find.git
 cd mcp-find
 pnpm install
 cp .env.sample .env
