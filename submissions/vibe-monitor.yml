@@ -1,0 +1,7 @@
+servers:
+  - name: "Vibe Monitor"
+    github_url: "https://github.com/tubban1/vibe-monitor"
+    package_name: "@vibe-monitor/setup"
+    description: "Local MCP architecture evolution checkpoints for AI coding. Read-only source analysis; default pseudonymous telemetry; separate proprietary cloud policy/scoring."
+    package_type: "npm"
+    category: "devtools"
