@@ -15,7 +15,7 @@ export const FALLBACK_SERVER_COUNT = 10000;
 export const FALLBACK_SERVER_COUNT_DISPLAY = `${FALLBACK_SERVER_COUNT.toLocaleString('en-US')}+`;
 export const SITE_URL = 'https://mcpfind.org';
 export const SITE_DESCRIPTION = 'The open-source way to find MCP servers. AI-agent optimized.';
-export const REPO_URL = 'https://github.com/gusmar2017/mcp-find';
+export const REPO_URL = 'https://github.com/MCPFind/mcp-find';
 
 export const REGISTRY_API_BASE = 'https://registry.modelcontextprotocol.io';
 export const REGISTRY_SERVERS_ENDPOINT = '/v0.1/servers';
