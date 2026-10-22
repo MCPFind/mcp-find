@@ -1,0 +1,7 @@
+servers:
+  - name: "Orkid Swap"
+    github_url: "https://github.com/jjcav84/orkid-swap-mcp"
+    package_name: "orkid-swap-mcp"
+    description: "MEV-protected multichain swap routing (Tycho+RFQ) over Streamable HTTP with gasless Permit2 execution and x402-priced calls"
+    package_type: "npm"
+    category: "finance"
