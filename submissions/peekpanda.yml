@@ -1,0 +1,6 @@
+servers:
+  - name: "PeekPanda"
+    github_url: "https://github.com/fdarkaou/peekpanda-mcp"
+    package_name: "https://mcp.peekpanda.com/mcp"
+    description: "Remote MCP server for iOS competitor research: Meta ads, App Store keywords and viral posts for any app. Docs: https://peekpanda.com/docs/mcp"
+    category: "analytics"
