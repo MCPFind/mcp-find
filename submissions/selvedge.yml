@@ -1,0 +1,7 @@
+servers:
+  - name: "Selvedge"
+    github_url: "https://github.com/masondelan/selvedge"
+    package_name: "selvedge"
+    description: "Local MCP server for recording and retrieving coding decisions, reasons, and rejected approaches across sessions."
+    package_type: "pypi"
+    category: "devtools"
