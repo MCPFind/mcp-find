@@ -95,7 +95,10 @@ async function safeFetch(url, options = {}, attempt = 1) {
 function extractOwnerFromRepoUrl(raw) {
   if (!raw) return null;
   // Handles: git+https://github.com/owner/repo.git, github:owner/repo, etc.
-  const match = raw.match(/github\.com[:/]([^/]+)\/([^/.]+)/i);
+  const match =
+    raw.match(/github\.com[:/]([^/]+)\/([^/.]+)/i) ??
+    // npm 'github:owner/repo' shorthand (documented above but previously unhandled)
+    raw.match(/^github:([^/]+)\/([^/.]+)/i);
   return match ? match[1].toLowerCase() : null;
 }
 
@@ -298,6 +301,16 @@ async function getNewEntries(yamlPath) {
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
+export {
+  safeFetch,
+  extractOwnerFromRepoUrl,
+  checkRepoExists,
+  checkLicense,
+  checkPackagePublished,
+  checkOwnerMatch,
+  TRANSIENT_CODES,
+};
+
 export async function runLivenessChecks() {
   // Both accepted intake paths: the hand-edited registry file and the
   // one-file-per-server directory the /submit form writes into.
