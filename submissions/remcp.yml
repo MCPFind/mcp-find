@@ -1,0 +1,7 @@
+servers:
+  - name: "ReMCP"
+    github_url: "https://github.com/getremcp/remcp"
+    package_name: "@remcp/remcp"
+    description: "OAuth-protected MCP remote access to user-paired computers for file, terminal, browser and desktop automation with mutating capabilities."
+    package_type: "npm"
+    category: "devtools"
