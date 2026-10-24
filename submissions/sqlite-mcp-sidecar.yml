@@ -1,0 +1,7 @@
+servers:
+  - name: "SQLite MCP Sidecar"
+    github_url: "https://github.com/xakpc/sqlite-mcp-sidecar"
+    package_name: "ghcr.io/xakpc/sqlite-mcp-sidecar"
+    description: "Agent-safe MCP sidecar for a live SQLite database: read-only by default, bounded structured writes, online backups."
+    package_type: "docker"
+    category: "databases"
