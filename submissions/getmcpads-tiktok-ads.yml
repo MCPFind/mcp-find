@@ -1,0 +1,7 @@
+servers:
+  - name: "Get MCP Ads \u2014 TikTok Ads"
+    github_url: "https://github.com/get-mcp-ads/tiktok-ads-mcp-server"
+    package_name: "@getmcpads/tiktok-ads-mcp-server"
+    description: "Query TikTok advertising performance, campaigns and creatives, with optional preview-first writes."
+    package_type: "npm"
+    category: "analytics"
