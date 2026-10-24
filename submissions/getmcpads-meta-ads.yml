@@ -1,0 +1,7 @@
+servers:
+  - name: "Get MCP Ads \u2014 Meta Ads"
+    github_url: "https://github.com/get-mcp-ads/meta-ads-mcp-server"
+    package_name: "@getmcpads/meta-ads-mcp-server"
+    description: "Query Meta Ads campaigns, performance and creatives, with optional preview-first advertising writes."
+    package_type: "npm"
+    category: "analytics"
