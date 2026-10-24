@@ -52,6 +52,20 @@ pnpm dev
 
 The web app runs at `http://localhost:3000`.
 
+### Running the tests
+
+Build `@mcpfind/shared` before running the web test suite:
+
+```bash
+pnpm --filter @mcpfind/shared build
+pnpm --filter web test
+```
+
+On a fresh clone the shared package resolves to its compiled `dist/` output, so
+skipping the build makes the suites that import it fail with "Failed to resolve
+entry for package @mcpfind/shared" — the source is fine, it just has not been
+compiled yet.
+
 ---
 
 ## Tech stack
