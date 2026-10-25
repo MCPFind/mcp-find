@@ -1,0 +1,7 @@
+servers:
+  - name: "MetricBridge Apple Health MCP"
+    github_url: "https://github.com/PhilipAD/health-export-mcp"
+    package_name: "health-export-mcp"
+    description: "Query 190 Apple Health metrics from any MCP agent: zero-dependency, read-only, local-first."
+    package_type: "npm"
+    category: "other"
