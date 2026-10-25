@@ -1,0 +1,7 @@
+servers:
+  - name: PopNow MCP stdio bridge
+    github_url: https://github.com/popnow-ai/popnow-mcp
+    package_name: '@popnow/mcp'
+    description: Open-source stdio bridge to PopNow's commercial remote MCP service for AI image, video, music and speech generation; tools and prices come from the hosted API.
+    package_type: npm
+    category: media
