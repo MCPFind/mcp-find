@@ -1,0 +1,7 @@
+servers:
+  - name: "Woven"
+    github_url: "https://github.com/woven-video/woven-mcp"
+    package_name: "@woven-video/mcp"
+    description: "Make and edit videos in Woven, the AI video editor for Mac. Needs the Woven app."
+    package_type: "npm"
+    category: "media"
