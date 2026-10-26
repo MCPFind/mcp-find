@@ -1,0 +1,6 @@
+servers:
+  - name: "pangolinfo-review-mining-mcp"
+    github_url: "https://github.com/Pangolin-spg/pangolinfo-review-mining-mcp"
+    package_name: "pangolinfo-review-mining-mcp"
+    description: "Amazon review mining MCP for AI agents: complaint detection, sentiment trends and ranked complaint topics, powered by the Pangolinfo Reviews API (5 credits per review page). Review mining only."
+    category: "ecommerce"
