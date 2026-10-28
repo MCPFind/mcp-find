@@ -1,0 +1,7 @@
+servers:
+  - name: "Freelance Tax MCP"
+    github_url: "https://github.com/NarwhalThePong/freelance-tax-mcp"
+    package_name: "freelance-tax-mcp"
+    description: "US freelancer tax calculators for 2026: estimated tax, SE tax, QBI, mileage, home office, retirement and per diem. Local npx, no API key."
+    package_type: "npm"
+    category: "finance"
