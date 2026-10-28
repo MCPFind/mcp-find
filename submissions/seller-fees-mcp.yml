@@ -1,0 +1,7 @@
+servers:
+  - name: "Seller Fees MCP"
+    github_url: "https://github.com/NarwhalThePong/seller-fees-mcp"
+    package_name: "seller-fees-mcp"
+    description: "Seller fee, payout and break-even calculators for Gumroad, Stripe, PayPal and Etsy. Local npx, no API key."
+    package_type: "npm"
+    category: "ecommerce"
