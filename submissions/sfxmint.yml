@@ -1,0 +1,7 @@
+servers:
+  - name: "SFXMint"
+    github_url: "https://github.com/flreey/sfxmint-npm"
+    package_name: "sfxmint"
+    description: "Find free CC0 sound effects for apps and games by event, set or description and download them into the project; run it with npx -y sfxmint mcp."
+    package_type: "npm"
+    category: "media"
