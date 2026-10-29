@@ -1,9 +1,9 @@
 ---
-title: "ElevenLabs MCP Server: Voice Cloning and TTS via Claude"
-description: "Set up the ElevenLabs MCP server to add text-to-speech and voice cloning to Claude. Covers install, tools exposed, and how it compares to alternatives."
-excerpt: "The ElevenLabs MCP server puts text-to-speech, voice cloning, and transcription directly into Claude's toolset. This guide covers what the server exposes, how to install it, and where it fits next to MCPFind's media and ai-ml category servers."
+title: "ElevenLabs MCP Server: Hosted OAuth and a First Speech Task"
+description: "Connect the official ElevenLabs hosted MCP through its documented clients, distinguish MCP tools from plugin skills, and check one bounded text-to-speech task."
+excerpt: "Use the official plugin's hosted OAuth route for agent management and text-to-speech. Check the connected tools, account, and service terms before a small speech-generation task."
 date: "2026-07-22"
-updatedAt: "2026-10-17"
+updatedAt: "2026-10-29"
 author: "Gus Marquez"
 authorUrl: "https://www.linkedin.com/in/gustavoamarquez"
 authorSameAs:
@@ -21,69 +21,65 @@ cornerstone: false
 topic_source: new_topic
 faqItems:
   - question: "Does the ElevenLabs MCP server require a paid account?"
-    answer: "The official hosted MCP route documented by ElevenLabs signs in through OAuth and does not require a local API key. Community or local wrappers can use different credentials, so follow the package documentation for the route you choose."
+    answer: "OAuth describes sign-in, not pricing. Check current ElevenLabs account limits and terms for the specific operation; MCPFind has not verified plan eligibility or generation costs."
   - question: "Can the ElevenLabs MCP server run alongside other audio tools in the same agent?"
-    answer: "Yes. It exposes its own named tools, so it does not conflict with a transcription-only server or a different TTS provider connected in parallel. Claude picks the right tool based on what the task calls for."
+    answer: "A client may support several servers, but review the actual tool names and permissions and select the intended provider explicitly. MCPFind has not tested multi-provider routing."
   - question: "Does the ElevenLabs MCP server work with Cursor and Windsurf, or only Claude?"
-    answer: "It works with any MCP-compatible client, including Cursor, Windsurf, and the OpenAI Agents SDK, since the server speaks the standard protocol rather than a Claude-specific extension."
+    answer: "The plugin documents Cursor, Claude Code, and Codex installation. The hosted-MCP guide also documents Claude Desktop directory access; other clients need the hosted service's documented OAuth support."
   - question: "Is voice cloning through the MCP server subject to ElevenLabs' consent requirements?"
-    answer: "Yes. ElevenLabs enforces its own voice cloning consent and usage policies at the API level, and the MCP server does not bypass them. You still need explicit rights to any voice you clone."
+    answer: "The documented hosted MCP scope does not establish that cloning is exposed as an MCP tool. If your selected tool supports cloning, review ElevenLabs policies and obtain the necessary rights before using it."
 ---
 
-Most MCP servers hook Claude up to data. The ElevenLabs MCP server hooks it up to a voice. Wire this one into Claude Desktop, Cursor, or any other MCP client, and text-to-speech, voice cloning, transcription, and a handful of audio-editing tools all go live at once. Compare that to the database and API integrations that fill out most of MCPFind's [media category](/categories/media), and you're looking at a different animal entirely. It cracks open workflows plain text can't reach: agent narration, spoken reports, voice-cloned assistants, automated dubbing.
+The [ElevenLabs listing](/servers/io-elevenlabs-mcp) identifies the official plugin. Its README describes hosted MCP access for **agent management and text-to-speech**, alongside a broader collection of plugin skills. Those skills are not a promise that every ElevenLabs product is exposed as an MCP tool.
 
-Below, we cover what the server actually exposes, how to install it, where the community alternatives come in when the official option falls short, and the real-world limits worth knowing before you build on top of it.
+## What Does the Hosted MCP Expose?
 
-## What Does the ElevenLabs MCP Server Let Claude Do?
-
-Text-to-speech, voice cloning, speech-to-text transcription, voice design, audio isolation, soundscape generation. The ElevenLabs MCP server hands all of those to Claude as callable tools. So Claude can narrate a written report, clone a reference voice off a short sample, transcribe a recorded meeting, or scrub background noise out of an existing clip, and it does all of that inside the same conversation that generated the text in the first place.
-
-Here is the split that actually matters: generation versus manipulation. Voice cloning and voice design build new audio from a description or a sample. Transcription and audio isolation work on audio you already have. Most workflows land on one side of that line, not both. That makes your first setup decision an easy one to name and an easy one to get wrong: which tools do you genuinely need turned on, versus which ones just pile up surface area you now have to review? Enabling everything by default is rarely right on a first pass. With more tools active, Claude has a larger menu to choose from, and the odds of a wrong pick go up accordingly.
+Inspect the tool list after connecting. Use the hosted route when its documented agent-management or speech tools match your task. If you need transcription, cloning, or audio isolation, verify the exact tool and route first; do not infer support from a skill name or a different local wrapper.
 
 ## How Do You Install and Configure the ElevenLabs MCP Server?
 
-The current official route is the [ElevenLabs plugin](https://github.com/elevenlabs/plugin). Its documentation describes a hosted MCP server: there is no local install or API key for that route. Instead, the client signs in to an ElevenLabs account through OAuth. The plugin documents installation for Cursor, Claude Code, and Codex; use the client-specific steps there rather than copying a local-process configuration into a hosted connection.
+The current official route is the [ElevenLabs plugin](https://github.com/elevenlabs/plugin). Its documentation describes a hosted MCP server: there is no local server process or API key for that route. Instead, the client signs in to an ElevenLabs account through OAuth. The plugin documents installation for Cursor, Claude Code, and Codex; use the client-specific steps there rather than copying a local-process configuration into a hosted connection.
 
-That does not make a local package invalid. Community and local wrappers can still be the right choice when their documented tools, transport, or credential model match your task. They are a different route: review the exact package name, its requested credentials, and its tool list before adding it to a shared client configuration.
+For **Claude Desktop**, the [hosted-MCP guide](https://elevenlabs.io/docs/eleven-agents/operate/hosted-mcp) documents connecting through the directory. Other remote clients need compatible OAuth support, including the service's documented Client ID Metadata Documents (CIMD) flow; protocol support alone does not establish compatibility.
 
-For a first hosted trial, connect through the official plugin, complete OAuth, and check which account and tools are visible. Start with a reversible text-to-speech request. Review account permissions and current service terms before agent-management or audio-generation work.
+The legacy [`elevenlabs/elevenlabs-mcp`](https://github.com/elevenlabs/elevenlabs-mcp) repository is archived and points users toward hosted MCP. Community wrappers are separate implementations: inspect their maintenance status, credentials, and tools rather than treating their capabilities as those of the official hosted connection.
 
-*Docs reviewed October 17, 2026 from the [official ElevenLabs plugin documentation](https://github.com/elevenlabs/plugin). This guide is docs-derived; MCPFind did not connect an account or generate audio.*
+### Check one bounded speech task
 
-## What Are the Tool-Level Limits Worth Knowing Before You Rely on It?
+After connecting through the official plugin and completing OAuth, inspect the signed-in account and available tools. Review current service terms and generation limits before making a request. Ask the assistant to identify the documented speech tool and its required inputs without generating audio yet.
 
-Run this past quick testing and two things surface fast: character limits and voice cloning consent. Free-tier accounts blow through a low monthly character cap in a hurry, so anything beyond a test drive needs a paid plan. Voice cloning carries its own rule. You have to hold rights to the voice you are cloning, and ElevenLabs enforces that at the API level, so the MCP server just passes your request straight through. Confirm you hold those rights before you start building on top of it.
+Then, if you approve the operation, use a short sentence such as “This is a connection check,” with an existing voice you are allowed to use. Do not create or clone a voice or change an agent for this test.
 
-Latency is the other one. Generating a few minutes of audio takes noticeably longer than a text response, so any agent chaining TTS calls back to back should expect the conversation to stall on each generation instead of streaming instantly. None of this is a quirk of the MCP wrapper. It's just how the underlying ElevenLabs API behaves. These are API-level constraints, and they show up the same way no matter how you reach the service.
+The hosted documentation describes a short-lived download link for generated speech. Open the returned link promptly and check that the audio speaks the supplied sentence. A connected status alone does not verify generation or the selected account's permissions.
+
+If authentication fails, confirm the OAuth account and client connection. If the tool is absent, check the installed plugin and exposed tool list before choosing another route. If generation is denied, review the account's operation-specific permissions and limits rather than assuming a different API key or a paid upgrade is required.
+
+*Docs reviewed October 29, 2026 from the [official ElevenLabs plugin documentation](https://github.com/elevenlabs/plugin) and [hosted-MCP guide](https://elevenlabs.io/docs/eleven-agents/operate/hosted-mcp). This guide is docs-derived; MCPFind did not connect an account or generate audio.*
+
+## What Limits Should You Check?
+
+OAuth does not establish whether an operation is free or included in your plan. Check current account limits, service terms, and any intended voice's usage rights before generation. MCPFind has not measured latency, billing, or plan eligibility. Keep the first request small and review its result and account usage before scaling up.
 
 ## How Does the ElevenLabs MCP Server Compare to Other Voice Options in the Directory?
 
-Voice generation is a thin slice of what's in there. MCPFind's [media category](/categories/media) currently indexes 517 servers, most of them leaning toward video, images, or file conversion rather than speech specifically. A few community-maintained ElevenLabs wrappers sit inside that set, right alongside the vendor's own tooling, and each one packages a slightly different slice of the underlying API. So check what a given listing actually exposes. Don't assume full API parity.
+Use the [media category](/categories/media) to compare implementations by task, transport, authentication, and maintained documentation. A dedicated transcription server may fit a transcription-only task better than a speech-generation connection. Do not assume a community wrapper or plugin skill exposes the same tools as hosted MCP.
 
-Got a narrower need? Local transcription only, say. Then a dedicated speech-to-text server, minus the whole generation and cloning surface, probably beats pulling in the full feature set. If voice is just one piece of a bigger pipeline, the broader [ai-ml category](/categories/ai-ml) and its 2,100 indexed servers is where most of the surrounding model-serving and embedding tools for agent workflows actually live. Both the [best ai-ml servers for agent toolchains roundup](/blog/best-ai-ml-mcp-servers-agent-toolchains) and the broader [AI and machine learning MCP servers guide](/blog/best-mcp-servers-ai-machine-learning) walk through where voice tools sit next to the model-serving and orchestration options in that same category.
-
-## When Should You Add Voice Tools to an Agent Instead of Sticking with Text?
-
-Add voice when the output genuinely gets consumed differently than text would. Having the capability one config block away is a weak reason to reach for it on its own. A narrated summary for someone on their commute, read-aloud accessibility for a long document, a voice-cloned assistant carrying a specific brand persona, those earn their keep. A voice-generated Slack message nobody asked for does not.
-
-The teams that squeeze the most out of this start with one narrow use case, prove that latency and cost hold up at real volume, and only then widen the scope. Push narration, cloning, and transcription out all at once and you lose the thread on which tool is actually justifying its API spend.
-
-The setup path depends on the route you choose: the official hosted route uses OAuth, while a local wrapper can have its own credentials. The hard part is judgment: does audio output actually serve the task better than text? That answer depends on the use case. How easy the integration was to stand up tells you nothing about it. If your voice-enabled agent also has to hold context across sessions, the [MCP memory servers guide](/blog/mcp-memory-servers-ai-agents) is worth a look. Brand new to MCP? Read the [plain-English overview](/blog/what-is-mcp) first, before you go wiring up specialized servers like this one.
+For broader agent workflows, see the [AI and machine learning servers guide](/blog/best-mcp-servers-ai-machine-learning). Choose voice when someone needs to listen to the output, such as a short narrated summary, and compare the result and account usage before scaling the workflow. Text may be sufficient when no one needs audio.
 
 ## Frequently Asked Questions
 
 ### Does the ElevenLabs MCP server require a paid account?
 
-The official hosted route uses OAuth rather than a local API key. Check ElevenLabs' current account and service terms for the operation you intend to run; local or community wrappers can have different credential requirements.
+OAuth describes sign-in, not pricing. Check current ElevenLabs account limits and terms for the specific operation; MCPFind has not verified plan eligibility or generation costs.
 
 ### Can the ElevenLabs MCP server run alongside other audio tools in the same agent?
 
-Yes. It exposes its own named tools, so it does not conflict with a transcription-only server or a different TTS provider connected in parallel. Claude picks the right tool based on what the task calls for.
+A client may support several servers, but review the actual tool names and permissions and select the intended provider explicitly. MCPFind has not tested multi-provider routing.
 
 ### Does the ElevenLabs MCP server work with Cursor and Windsurf, or only Claude?
 
-The official plugin documents installation for Cursor, Claude Code, and Codex. For another client, check that client's current remote-MCP support and the exact server route before assuming the same setup applies.
+The plugin documents Cursor, Claude Code, and Codex installation. The hosted-MCP guide also documents Claude Desktop directory access; other clients need the hosted service's documented OAuth support.
 
 ### Is voice cloning through the MCP server subject to ElevenLabs' consent requirements?
 
-Yes. ElevenLabs enforces its own voice cloning consent and usage policies at the API level, and the MCP server does not bypass them. You still need explicit rights to any voice you clone.
+The documented hosted MCP scope does not establish that cloning is exposed as an MCP tool. If your selected tool supports cloning, review ElevenLabs policies and obtain the necessary rights before using it.

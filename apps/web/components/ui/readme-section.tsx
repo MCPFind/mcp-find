@@ -50,7 +50,7 @@ function githubRepository(githubUrl: string | null): GitHubRepository | null {
 }
 
 function resolveRepositoryReference(value: string, repository: GitHubRepository | null, image: boolean): string {
-  if (!repository || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#|\/)/i.test(value)) return value;
+  if (!repository || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(value)) return value;
   try {
     // Resolve dot segments against a synthetic file, never the Git `HEAD`
     // path. Resolving directly against .../HEAD/ lets `..` escape the ref.

@@ -3,7 +3,7 @@ title: "How to Use the GitHub MCP Server with Claude Code"
 description: "Connect the official GitHub MCP server to Claude Code using a remote endpoint and project configuration, then verify a read-only repository task."
 excerpt: "Connect the official hosted GitHub server with a scoped personal access token, constrain repository tools, and compare one known issue before enabling writes."
 date: "2026-05-07"
-updatedAt: "2026-10-17"
+updatedAt: "2026-10-29"
 author: "Gus Marquez"
 authorUrl: "https://www.linkedin.com/in/gustavoamarquez"
 authorSameAs:
@@ -29,7 +29,7 @@ faqItems:
 
 Use [GitHub's official MCP server](https://github.com/github/github-mcp-server) to connect Claude Code to repository tools. The old `@modelcontextprotocol/server-github` npm example in earlier versions of this guide is not the current official implementation.
 
-*Docs reviewed October 17, 2026 from [GitHub setup documentation](https://docs.github.com/en/copilot/how-tos/provide-context/use-mcp-in-your-ide/set-up-the-github-mcp-server) and the [official repository](https://github.com/github/github-mcp-server). This guide is docs-derived; MCPFind did not authenticate or run a repository task.*
+*Docs reviewed October 29, 2026 from [GitHub setup documentation](https://docs.github.com/en/copilot/how-tos/provide-context/use-mcp-in-your-ide/set-up-the-github-mcp-server) and the [official repository](https://github.com/github/github-mcp-server). This guide is docs-derived; MCPFind did not authenticate or run a repository task.*
 
 The matching [GitHub server listing](/servers/io-github-github-github-mcp-server) links to the official implementation.
 
@@ -50,12 +50,16 @@ Save the following as `.mcp.json` at your project root. If it already exists, me
       "type": "http",
       "url": "https://api.githubcopilot.com/mcp",
       "headers": {
-        "Authorization": "Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}"
+        "Authorization": "Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}",
+        "X-MCP-Readonly": "true",
+        "X-MCP-Toolsets": "issues"
       }
     }
   }
 }
 ```
+
+The [remote-server documentation](https://github.com/github/github-mcp-server/blob/HEAD/docs/remote-server.md) defines these headers: `X-MCP-Readonly` removes write operations, and `X-MCP-Toolsets` selects the issues toolset for the exercise below. A prompt saying “do not write” is not a replacement for those server controls. Inspect the exposed tools after connecting; reconnect if the client was already running with a broader configuration.
 
 Make a least-privilege PAT available as `GITHUB_PERSONAL_ACCESS_TOKEN` in the environment that launches Claude Code, using your secret manager or local secret setup. The configuration references the variable; never commit the token value. Review the token's repository selection and organization restrictions before use.
 
@@ -73,7 +77,7 @@ Within Claude Code, open `/mcp` and inspect the connection. Then use a known iss
 
 > Read issue 12 from OWNER/REPOSITORY using the GitHub MCP tools. Return its title, state, and link. Do not write comments or modify anything.
 
-Replace the repository and number with an issue you can verify yourself. A connected status tests the connection; matching the issue tests the account, repository access, and tool result.
+Replace the repository and number with an issue you can verify yourself. Expect the title, state, and issue URL to match GitHub. A connected status tests the connection; matching the issue tests the account, repository access, and tool result. If the response comes from a different repository or cannot identify the issue, stop and check the owner, repository, and issue number before trying another operation.
 
 If authentication fails, check the PAT's validity and the environment available to the client. If a repository request fails, review account access, selected repositories, toolsets, and organization restrictions before broadening access.
 

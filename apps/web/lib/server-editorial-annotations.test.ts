@@ -35,10 +35,17 @@ describe("server editorial annotations", () => {
       expect(annotation).toBeDefined();
       expect(annotation?.sourceUrl).toMatch(/^https:\/\//);
       expect(annotation?.reviewBoundary).toContain("Docs-derived");
-      expect(annotation?.updatedAt).toBe("2026-10-17");
-      expect(getServerEditorialUpdatedAt(slug)).toBe("2026-10-17");
+      const expectedDate = annotation?.setupGuideOnly ? "2026-10-29" : "2026-10-17";
+      expect(annotation?.updatedAt).toBe(expectedDate);
+      expect(getServerEditorialUpdatedAt(slug)).toBe(expectedDate);
       expect(Date.parse(`${annotation?.updatedAt}T00:00:00Z`)).not.toBeNaN();
     }
+  });
+
+  it("limits reviewed setup overrides to the four corrected hosted routes", () => {
+    expect(Object.entries(SERVER_EDITORIAL_ANNOTATIONS).filter(([, value]) => value.setupGuideOnly).map(([slug]) => slug).sort()).toEqual([
+      "io-github-github-github-mcp-server", "com-supabase-mcp", "io-elevenlabs-mcp", "com-monday-monday-com",
+    ].sort());
   });
 
   it("keeps each second-batch guide paired with its exact listing", async () => {

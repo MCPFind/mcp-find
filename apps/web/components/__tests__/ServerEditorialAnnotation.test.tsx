@@ -22,7 +22,7 @@ describe("ServerEditorialAnnotation", () => {
       );
       expect(html).toContain(annotation!.title);
       expect(html).toContain(`href="${annotation!.sourceUrl}"`);
-      expect(html).toContain("Docs reviewed 2026-10-17; not independently tested by MCPFind.");
+      expect(html).toContain(`Docs reviewed ${annotation!.reviewedAt ?? "2026-10-17"}; not independently tested by MCPFind.`);
     }
   });
 });
