@@ -1,0 +1,7 @@
+servers:
+  - name: "The Cartographer"
+    github_url: "https://github.com/sheepk95/The-Cartographer"
+    package_name: "the-cartographer"
+    description: "Select task-relevant agent skills from a catalogue via an MCP server or CLI."
+    package_type: "pypi"
+    category: "devtools"
