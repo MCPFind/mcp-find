@@ -34,11 +34,11 @@ const secondBatchGuides = {
 
 const guides = {
   "elevenlabs-mcp-server-voice-ai.mdx": [
-    "updatedAt: \"2026-10-17\"",
+    "updatedAt: \"2026-10-29\"",
     "https://github.com/elevenlabs/plugin",
     "hosted MCP server",
     "OAuth",
-    "different route",
+    "separate implementations",
   ],
   "mysql-mcp-server-setup-guide.mdx": [
     "updatedAt: \"2026-10-17\"",
@@ -53,10 +53,10 @@ const guides = {
     "Docs reviewed October 17, 2026",
   ],
   "monday-mcp-server-ai-agents.mdx": [
-    "updatedAt: \"2026-10-17\"",
+    "updatedAt: \"2026-10-29\"",
     "https://github.com/mondaycom/mcp",
     "hosted MCP route",
-    "Docs reviewed October 17, 2026",
+    "Docs reviewed October 29, 2026",
   ],
 };
 
@@ -72,13 +72,22 @@ describe("targeted editorial guide source guards", () => {
     for (const [filename, requiredText] of Object.entries(secondBatchGuides)) {
       const source = fs.readFileSync(path.join(contentDir, filename), "utf8");
       const { data, content } = matter(source);
-      expect(data.updatedAt).toBe("2026-10-17");
+      const corrected = ["github-mcp-server-claude-code-tutorial.mdx", "supabase-mcp-server-deep-dive.mdx"].includes(filename);
+      expect(data.updatedAt).toBe(corrected ? "2026-10-29" : "2026-10-17");
       expect(data.faqItems.length).toBeGreaterThan(0);
-      expect(content).toContain("Docs reviewed October 17, 2026");
+      expect(content).toContain(`Docs reviewed October ${corrected ? "29" : "17"}, 2026`);
       expect(content).toContain("docs-derived; MCPFind did not");
       expect(content).not.toMatch(/^## Frequently Asked Questions/m);
       for (const text of requiredText) expect(source).toContain(text);
       for (const faq of data.faqItems) expect(content).not.toContain(`### ${faq.question}`);
+    }
+  });
+
+  it("keeps ElevenLabs FAQ metadata consistent with visible answers", () => {
+    const source = fs.readFileSync(path.join(contentDir, "elevenlabs-mcp-server-voice-ai.mdx"), "utf8");
+    const { data, content } = matter(source);
+    for (const faq of data.faqItems) {
+      expect(content).toContain(`### ${faq.question}\n\n${faq.answer}`);
     }
   });
 

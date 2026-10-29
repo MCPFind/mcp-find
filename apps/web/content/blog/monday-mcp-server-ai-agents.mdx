@@ -3,7 +3,7 @@ title: "monday.com MCP Server: Connect AI Agents to Your Boards"
 description: "Set up the official monday.com MCP server so Claude and other AI assistants can read, create, and update your boards, items, and status updates directly."
 excerpt: "monday.com's official MCP server lets an AI assistant create items, move them between groups, and post updates on your boards. This guide covers install, the read-only safety flag, and what the server can and cannot touch."
 date: "2026-07-15"
-updatedAt: "2026-10-17"
+updatedAt: "2026-10-29"
 author: "Gus Marquez"
 authorUrl: "https://www.linkedin.com/in/gustavoamarquez"
 authorSameAs:
@@ -20,7 +20,7 @@ cornerstone: false
 topic_source: new_topic
 faqItems:
   - question: "Is the monday.com MCP server official, or a community project?"
-    answer: "Official. monday.com publishes and maintains the `mondaycom/mcp` package in-house, so support comes from the vendor rather than outside developers."
+    answer: "Official. monday.com publishes and maintains the `mondaycom/mcp` repository in-house, so support comes from the vendor rather than outside developers."
   - question: "Can I run the monday.com MCP server without giving it write access to my boards?"
     answer: "The local package documents a `--read-only` mode. Use it for a narrow retrieval test, then separately review workspace access, credentials, and every proposed change before enabling wider operations."
   - question: "Does the monday.com MCP server require a local install, or is there a hosted option?"
@@ -37,7 +37,7 @@ If you run projects out of monday.com boards, you know the drill. You update ite
 
 The monday.com MCP server is an official package, `mondaycom/mcp`, that connects an AI assistant to your monday.com account through the same API the web app itself uses. monday.com builds and maintains it directly. That matters if you're deciding whether to trust it with write access to real project data rather than a sandbox account.
 
-Once connected, it can create items, delete them, move an item to a different group, change column values, post updates, and spin up new boards or forms straight from a conversation. That replaces a fair amount of manual clicking through nested board views and status dropdowns. MCPFind indexes 33 servers in the productivity category, and monday.com is one of the few with a first-party integration rather than a community-built alternative, a distinction worth checking for before you connect any assistant to data you'd rather not hand to an unmaintained side project.
+Once connected, it can create items, delete them, move an item to a different group, change column values, post updates, and spin up new boards or forms straight from a conversation. That replaces a fair amount of manual clicking through nested board views and status dropdowns.
 
 The corresponding MCPFind directory entry is the [monday.com MCP server listing](/servers/com-monday-monday-com); review the [upstream repository](https://github.com/mondaycom/mcp) before installation.
 
@@ -47,25 +47,35 @@ monday.com currently recommends its hosted MCP route for normal connections: it 
 
 For the first board task, limit access to the required workspace, ask for the items on one board, and inspect the result before proposing a create or update action. The local package documents `--read-only`; its dynamic API tools are disabled by default and require full API access.
 
-*Docs reviewed October 17, 2026 from the [official monday.com MCP repository](https://github.com/mondaycom/mcp). This guide is docs-derived; MCPFind did not connect an account or modify a board.*
+*Docs reviewed October 29, 2026 from the [official monday.com MCP repository](https://github.com/mondaycom/mcp). This guide is docs-derived; MCPFind did not connect an account or modify a board.*
 
 ## Installing and Configuring the Server
 
-Installation runs through `npx`, so there's no separate package to manage or keep updated yourself. Every time you launch the server, it pulls the latest version automatically. You'll need a personal API token from your monday.com account, generated under your profile's developer settings. If you plan to keep the connection running long-term, scope that token to a service-style account rather than your own login.
+For the recommended hosted route, follow [monday.com's client integration guide](https://github.com/mondaycom/mcp#-quick-start-hosted-mcp-recommended), connect to `https://mcp.monday.com/mcp`, and complete OAuth. Review the approved workspace before proceeding. The local `--read-only` flag below is not a hosted OAuth setting.
+
+If you specifically need the local package, this example starts it in its documented read-only mode. It is a local stdio configuration for Claude Desktop, not a hosted connection. Supply your personal API token through your local credential configuration; never commit its value. `@latest` selects the package's latest tag when resolved, not a promise about update checks on every launch.
 
 ```json
 {
   "mcpServers": {
     "monday-api-mcp": {
       "command": "npx",
-      "args": ["@mondaydotcomorg/monday-api-mcp@latest"],
+      "args": ["@mondaydotcomorg/monday-api-mcp@latest", "--read-only"],
       "env": { "MONDAY_TOKEN": "your_monday_api_token" }
     }
   }
 }
 ```
 
-Prefer to skip the local process entirely and avoid managing a token file on your own machine? monday.com also runs a hosted remote server at `mcp.monday.com/mcp`. Connecting to it goes through an installed "Monday MCP" marketplace app and OAuth instead of a token in your config file. Some teams prefer that for shared or managed setups, where individual API tokens get harder to track across a growing team. The tradeoff is less control over exactly which version of the server you're running, since monday.com manages updates on its end rather than you pinning a version yourself.
+### Verify one board before widening access
+
+Choose a board you can already inspect in monday.com, with a known item. Ask:
+
+> Read items from board BOARD_ID. Return the known item's ID, name, and current status. Do not create, delete, move, or update anything.
+
+Replace `BOARD_ID` with that board's ID. Expect the returned item and status to match the board UI; no activity should be created by this retrieval task. This is a suggested check, not a test performed by MCPFind.
+
+If the board is missing or access is denied, first check the signed-in account, permitted workspace, and board ID. If the local connection fails, check the token and client process before widening permissions. Do not enable dynamic API tools to solve a read-only lookup problem: the upstream documentation says they require full API access and are incompatible with read-only mode.
 
 ## What's in the Box: The Tools It Exposes
 
@@ -77,11 +87,11 @@ One thing is notably absent by default: raw GraphQL access. monday.com's underly
 
 For the local package, start with the documented `--read-only` mode before considering change-capable access. It reduces the local server's available operations, but it does not replace workspace controls, credential handling, or review of each proposed action. Confirm what one board returns before widening the task.
 
-Once you're comfortable, drop the flag to enable writes. Because the server authenticates as you, every action it takes is attributed to your account in monday.com's activity log the same way a manual edit would be, so there's a clear audit trail if something unexpected happens. Check that trail the first few times you use write access. It builds confidence in what the assistant is actually doing on your boards, and it gives you a paper trail to point to if a teammate asks why an item suddenly moved groups or a status flipped overnight.
+Only consider removing the local flag for a specific approved change. Review the board, item, fields, and expected effect before allowing that operation; then check the board for the actual result. A successful read is not authorization to enable writes.
 
 ## How Does monday.com MCP Compare to Other Productivity MCP Servers?
 
-monday.com sits in a productivity category that MCPFind indexes at 33 servers. That's small compared to categories like documentation or communication, which makes an official, actively maintained entry like this one stand out on its own rather than getting lost in a long list of thin community projects. If your team also tracks tasks outside of boards, [Todoist's MCP server](/blog/todoist-mcp-server-task-management) covers simpler personal and team task lists, while [Notion's advanced MCP workflows](/blog/notion-mcp-server-advanced-workflows) handle a more freeform docs-and-database model that some teams prefer over a rigid board structure. Teams managing files alongside their boards may also want [Google Drive's MCP server](/blog/google-drive-mcp-server-guide), and [Obsidian's MCP setup](/blog/obsidian-mcp-server-knowledge-base) is worth a look if anyone keeps personal notes outside monday.com entirely. Browse the full [productivity category](/categories/productivity) for the rest of what MCPFind has indexed, including tools for location and scheduling workflows.
+If your team also tracks tasks outside of boards, [Todoist's MCP server](/blog/todoist-mcp-server-task-management) covers simpler personal and team task lists, while [Notion's advanced MCP workflows](/blog/notion-mcp-server-advanced-workflows) handle a more freeform docs-and-database model that some teams prefer over a rigid board structure. Teams managing files alongside their boards may also want [Google Drive's MCP server](/blog/google-drive-mcp-server-guide), and [Obsidian's MCP setup](/blog/obsidian-mcp-server-knowledge-base) is worth a look if anyone keeps personal notes outside monday.com entirely. Browse the full [productivity category](/categories/productivity) for the rest of what MCPFind has indexed, including tools for location and scheduling workflows.
 
 For background on the protocol these servers all speak, MCPFind's [cornerstone guide to MCP](/blog/what-is-mcp) explains what MCP is and why "one server per tool" has become the standard pattern rather than a single do-everything integration.
 
@@ -89,7 +99,7 @@ For background on the protocol these servers all speak, MCPFind's [cornerstone g
 
 ### Is the monday.com MCP server official, or a community project?
 
-Official. monday.com publishes and maintains the `mondaycom/mcp` package in-house, so support comes from the vendor rather than outside developers.
+Official. monday.com publishes and maintains the `mondaycom/mcp` repository in-house, so support comes from the vendor rather than outside developers.
 
 ### Can I run the monday.com MCP server without giving it write access to my boards?
 

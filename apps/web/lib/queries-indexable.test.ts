@@ -152,7 +152,7 @@ describe('getServersSitemapPage — applies isIndexable() gate', () => {
     const { getServersSitemapPage } = await import('./queries');
     const rows = await getServersSitemapPage(0, 1000);
 
-    expect(rows[0]?.lastmod).toBe('2026-10-17');
+    expect(rows[0]?.lastmod).toBe('2026-10-29');
   });
 
   it('retains a newer DB date over an annotation date', async () => {
@@ -161,7 +161,7 @@ describe('getServersSitemapPage — applies isIndexable() gate', () => {
         ...GOOD_SERVER,
         slug: 'com-monday-monday-com',
         canonical_slug: 'com-monday-monday-com',
-        updated_at: '2026-10-18T12:00:00Z',
+        updated_at: '2026-10-30T12:00:00Z',
         registry_updated_at: '2026-10-01T00:00:00Z',
       }],
     });
@@ -170,7 +170,7 @@ describe('getServersSitemapPage — applies isIndexable() gate', () => {
     const { getServersSitemapPage } = await import('./queries');
     const rows = await getServersSitemapPage(0, 1000);
 
-    expect(rows[0]?.lastmod).toBe('2026-10-18T12:00:00Z');
+    expect(rows[0]?.lastmod).toBe('2026-10-30T12:00:00Z');
   });
 
   it('reports lastmod null — never a substituted date — when the row has no timestamp', async () => {

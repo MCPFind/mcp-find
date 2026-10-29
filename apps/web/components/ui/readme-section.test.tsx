@@ -44,4 +44,31 @@ describe('ReadmeSection transport', () => {
     expect(html).not.toContain('/demo/assets/logo.png');
   });
 
+  it('resolves repository-root documentation paths without losing query or fragment', async () => {
+    const html = await renderReadmeHtml(
+      '[Claude](/docs/installation-guides/install-claude.md?view=1#setup)\n\n[production](/docs/production.md)\n\n![image](/assets/logo.png)',
+      'https://github.com/acme/demo'
+    );
+    expect(html).toContain('href="https://github.com/acme/demo/blob/HEAD/docs/installation-guides/install-claude.md?view=1#setup"');
+    expect(html).toContain('href="https://github.com/acme/demo/blob/HEAD/docs/production.md"');
+    expect(html).toContain('src="https://raw.githubusercontent.com/acme/demo/HEAD/assets/logo.png"');
+  });
+
+  it('does not rewrite absolute, protocol-relative or fragment references as repository paths', async () => {
+    const html = await renderReadmeHtml(
+      '[external](https://example.com/docs)\n\n[protocol relative](//example.com/docs)\n\n[section](#setup)\n\n[bad](javascript:alert(1))',
+      'https://github.com/acme/demo'
+    );
+    expect(html).toContain('href="https://example.com/docs"');
+    expect(html).toContain('href="//example.com/docs"');
+    expect(html).toContain('href="#setup"');
+    expect(html).not.toContain('javascript:');
+    expect(html).not.toContain('/blob/HEAD/');
+  });
+
+  it('does not invent a repository base for an unrecognized source', async () => {
+    const html = await renderReadmeHtml('[docs](/docs/production.md)', 'https://example.com/acme/demo');
+    expect(html).toContain('href="/docs/production.md"');
+  });
+
 });

@@ -177,11 +177,13 @@ export default async function ServerDetailPage({
 
   const qualityStatus = getQualityStatus(slug);
 
+  const editorialAnnotation = getServerEditorialAnnotation(server.canonical_slug ?? server.slug);
+
   // Build install config for Claude Desktop (primary)
   let claudeConfig: string | null = null;
   let installCommand: string | null = null;
 
-  if (server.package_name && server.package_type && ["npm", "pypi", "docker"].includes(server.package_type)) {
+  if (!editorialAnnotation?.setupGuideOnly && server.package_name && server.package_type && ["npm", "pypi", "docker"].includes(server.package_type)) {
     try {
       const config = generateConfig(
         {
@@ -212,7 +214,6 @@ export default async function ServerDetailPage({
     : null;
 
   const publishedDate = server.registry_published_at ?? server.created_at;
-  const editorialAnnotation = getServerEditorialAnnotation(server.canonical_slug ?? server.slug);
 
   return (
     <div className="min-h-screen bg-black text-white overflow-x-hidden">
@@ -425,7 +426,13 @@ export default async function ServerDetailPage({
             )}
 
             {/* Client-specific setup; unsupported packages never get invented commands. */}
-            {claudeConfig && server.package_name && server.package_type ? (
+            {editorialAnnotation?.setupGuideOnly && editorialAnnotation.guideHref ? (
+              <section className="rounded-xl border border-neutral-800 p-5">
+                <h2 className="font-semibold text-white mb-2">Use the reviewed connection guide</h2>
+                <p className="text-sm text-neutral-400">The guide below explains the hosted connection, authentication, and a bounded first task. A local package, when available, is a separate setup path; follow its maintainer instructions.</p>
+                <Link href={editorialAnnotation.guideHref} className="text-blue-400 underline">{editorialAnnotation.guideLabel}</Link>
+              </section>
+            ) : claudeConfig && server.package_name && server.package_type ? (
               <ClientConfigChooser serverSlug={server.canonical_slug ?? server.slug} packageName={server.package_name} packageType={server.package_type} />
             ) : (
               <section className="rounded-xl border border-neutral-800 p-5">
@@ -463,7 +470,7 @@ export default async function ServerDetailPage({
               </section>
             )}
             {/* Compatibility */}
-            {server.package_name && server.package_type && (
+            {!editorialAnnotation?.setupGuideOnly && server.package_name && server.package_type && (
               <section aria-labelledby="compatibility-heading">
                 <h2
                   id="compatibility-heading"
