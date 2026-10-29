@@ -1,0 +1,7 @@
+servers:
+  - name: "OMOPHub MCP"
+    github_url: "https://github.com/OMOPHub/omophub-mcp"
+    package_name: "@omophub/omophub-mcp"
+    description: "Search, look up and map OHDSI OMOP standardized vocabulary concepts (SNOMED CT, ICD-10, LOINC, RxNorm) with hierarchy navigation, via the OMOPHub API."
+    package_type: "npm"
+    category: "databases"
