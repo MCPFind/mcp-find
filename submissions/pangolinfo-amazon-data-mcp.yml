@@ -1,0 +1,7 @@
+servers:
+  - name: "Pangolinfo Amazon Data MCP"
+    github_url: "https://github.com/Pangolin-spg/amazon-data-mcp"
+    package_name: "pangolinfo-amazon-data-mcp"
+    description: "Read-only Amazon marketplace research for AI agents through 19 MCP tools covering products, keywords, reviews, seller catalogs, niche signals, Alexa shopping data, and AI-search intelligence."
+    package_type: "npm"
+    category: "ai-ml"
