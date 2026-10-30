@@ -4,6 +4,12 @@
 # Required fields: name, github_url, package_name, description
 # Optional fields: package_type (npm|pypi|docker), category
 servers:
+  - name: "BulkPublish MCP Server"
+    github_url: "https://github.com/azeemkafridi/bulkpublish-api"
+    package_name: "@bulkpublish/mcp-server"
+    description: "Plan, schedule, publish, and analyze multi-platform social media content through BulkPublish for AI agents."
+    package_type: "npm"
+    category: "communication"
   - name: "BuyWhere MCP Server"
     github_url: "https://github.com/BuyWhere/buywhere-mcp"
     package_name: "@buywhere/mcp-server"
