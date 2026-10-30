@@ -4,6 +4,12 @@
 # Required fields: name, github_url, package_name, description
 # Optional fields: package_type (npm|pypi|docker), category
 servers:
+  - name: "Tollgate"
+    github_url: "https://github.com/kkU1444/tollgate"
+    package_name: "tollgate-gateway"
+    description: "Zero-dependency governance gateway for AI agents that move money: deterministic 16-ring tool-call chain, canary-token injection fence, Ed25519-signed human approvals, budget escrow with freeze/clawback, tamper-evident hash-chain audit. Runs as a stdio MCP server or governed upstream proxy for any third-party MCP server."
+    package_type: "pypi"
+    category: "security"
   - name: "BuyWhere MCP Server"
     github_url: "https://github.com/BuyWhere/buywhere-mcp"
     package_name: "@buywhere/mcp-server"
