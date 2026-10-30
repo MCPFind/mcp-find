@@ -1,0 +1,7 @@
+servers:
+  - name: "SiftingIO Market Data MCP"
+    github_url: "https://github.com/SiftingIO/siftingio-mcp"
+    package_name: "siftingio-mcp"
+    description: "Access multi-asset prices, historical OHLCV, company fundamentals and market research through MCP tools backed by the SiftingIO API."
+    package_type: "npm"
+    category: "finance"
