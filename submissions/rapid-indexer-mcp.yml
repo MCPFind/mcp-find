@@ -1,0 +1,7 @@
+servers:
+  - name: "Rapid Indexer MCP"
+    github_url: "https://github.com/rollounden/rapid-indexer-mcp"
+    package_name: "rapid-indexer-mcp"
+    description: "Hands new pages and links to Googlebot via Rapid Indexer and reports which URLs are in Google's index."
+    package_type: "npm"
+    category: "search"
