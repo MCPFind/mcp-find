@@ -1,0 +1,7 @@
+servers:
+  - name: "Toolradar"
+    github_url: "https://github.com/Nadeus/toolradar-mcp"
+    package_name: "toolradar-mcp"
+    description: "Search, compare and get pricing for 10,000+ software tools from Toolradar, with alternatives and AI recommendations."
+    package_type: "npm"
+    category: "search"
