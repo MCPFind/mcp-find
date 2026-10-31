@@ -1,0 +1,7 @@
+servers:
+  - name: "BrewPage"
+    github_url: "https://github.com/kochetkov-ma/brewpage-openapi"
+    package_name: "brewpage-mcp"
+    description: "Publish and manage HTML pages, Markdown, static sites, JSON documents, files and key-value stores on BrewPage."
+    package_type: "npm"
+    category: "devtools"
