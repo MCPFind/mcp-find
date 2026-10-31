@@ -39,7 +39,7 @@ export function ServerEditorialAnnotation({
         )}
       </div>
       <p className="mt-3 text-xs text-neutral-500">
-        Docs reviewed {EDITORIAL_ANNOTATION_CHECKED_AT}; not independently tested by MCPFind.
+        Docs reviewed {annotation.reviewedAt ?? EDITORIAL_ANNOTATION_CHECKED_AT}; not independently tested by MCPFind.
       </p>
     </aside>
   );

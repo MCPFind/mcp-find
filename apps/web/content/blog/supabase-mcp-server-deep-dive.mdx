@@ -4,7 +4,7 @@ seoTitle: "Supabase MCP Server: OAuth & Read-Only Setup"
 description: "Configure hosted Supabase MCP with OAuth, project scope, read-only mode, and selected feature groups before granting database access."
 excerpt: "Use hosted OAuth, restrict the connection to one development project, and select read-only tool groups. Includes a scoped CI alternative and the separate self-hosted route."
 date: "2026-05-14"
-updatedAt: "2026-10-17"
+updatedAt: "2026-10-29"
 author: "Gus Marquez"
 authorUrl: "https://www.linkedin.com/in/gustavoamarquez"
 authorSameAs:
@@ -40,7 +40,7 @@ faqItems:
 
 The Supabase MCP server connects an AI client to selected database and platform tools. Use the [Supabase listing](/servers/com-supabase-mcp) to identify the official project, then constrain the connection before exposing data. The available tools depend on the selected feature groups and server version.
 
-*Docs reviewed October 17, 2026 from [Supabase's hosted MCP guide](https://supabase.com/docs/guides/ai-tools/mcp), [official repository](https://github.com/supabase/mcp), and [self-hosting instructions](https://supabase.com/docs/guides/self-hosting/enable-mcp). This guide is docs-derived; MCPFind did not connect to a project or execute SQL.*
+*Docs reviewed October 29, 2026 from [Supabase's hosted MCP guide](https://supabase.com/docs/guides/ai-tools/mcp), [official repository](https://github.com/supabase/mcp), and [self-hosting instructions](https://supabase.com/docs/guides/self-hosting/enable-mcp). This guide is docs-derived; MCPFind did not connect to a project or execute SQL.*
 
 ## What Tools Does the Supabase MCP Server Expose?
 
@@ -63,7 +63,22 @@ These are suggested boundaries, not claims that MCPFind exercised the tools. Ena
 
 The hosted endpoint is `https://mcp.supabase.com/mcp`. OAuth with dynamic client registration is the default; interactive setup does not require manually creating a PAT. Use your client's current remote MCP setup and complete the browser sign-in.
 
-For a development schema lookup, the documented parameters can be combined as follows. Replace `YOUR_PROJECT_REF` and verify the feature groups against the current guide:
+For **Claude Code**, save the following in `.mcp.json` at your project root, merging into any existing `mcpServers` object. Replace `YOUR_PROJECT_REF` with one development project reference. The explicit `type: "http"` selects the hosted transport:
+
+```json
+{
+  "mcpServers": {
+    "supabase": {
+      "type": "http",
+      "url": "https://mcp.supabase.com/mcp?project_ref=YOUR_PROJECT_REF&read_only=true&features=database,docs"
+    }
+  }
+}
+```
+
+Start Claude Code in that project, open `/mcp`, select Supabase, and choose **Authenticate** to complete OAuth. Check the connected account before requesting data.
+
+For **Cursor**, use the same URL in its MCP settings (`.cursor/mcp.json` for project configuration):
 
 ```json
 {
@@ -75,6 +90,8 @@ For a development schema lookup, the documented parameters can be combined as fo
 }
 ```
 
+Complete the client's OAuth flow. This is a separate client configuration, not a local `npx` process. See the [official client setup guide](https://supabase.com/docs/guides/ai-tools/mcp) for the selected client.
+
 `project_ref` restricts the project and disables account tools; `read_only=true` uses a read-only Postgres user for queries; `features` limits tool groups. For CI without browser authentication, Supabase documents a scoped PAT sent in the Authorization header. Keep the value in protected secret storage and grant only the permissions the enabled tools require.
 
 ## What Are the Security Best Practices for Supabase MCP?
@@ -83,7 +100,9 @@ Start with synthetic data in a development project. For the first check, ask:
 
 > List table names in the public schema of the selected project. Do not read row contents, apply migrations, or modify anything.
 
-Compare the result with the Dashboard. Read-only access still allows data disclosure, and project scoping does not make untrusted database text safe to follow as instructions. Review the permissions and the data your client can receive before connecting production.
+Expect only table names from the selected project and schema; compare them with the Dashboard. If the project is inaccessible, check the OAuth account and `project_ref` first. If the database tool is missing, check the `features` parameter and reconnect before broadening access. A successful connection with a wrong or empty result is not a passed schema check.
+
+Read-only access still allows data disclosure, and project scoping does not make untrusted database text safe to follow as instructions. Review the permissions and the data your client can receive before connecting production.
 
 Review proposed SQL and migrations through your normal change process. Require separate approval for a write, including its target and expected effect. Do not use the old service-role-key example as an official hosted MCP authentication route. For a self-hosted stack, follow the [separate enablement and security instructions](https://supabase.com/docs/guides/self-hosting/enable-mcp) and inspect the resulting tool surface.
 

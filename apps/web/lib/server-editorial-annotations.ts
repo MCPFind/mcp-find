@@ -3,6 +3,9 @@ export const EDITORIAL_ANNOTATION_CHECKED_AT = "2026-10-17";
 export type ServerEditorialAnnotation = {
   /** Date this specific editorial addition was materially updated (YYYY-MM-DD). */
   updatedAt: string;
+  /** Only reviewed hosted routes bypass generic local package templates. */
+  setupGuideOnly?: boolean;
+  reviewedAt?: string;
   title: string;
   sourceLabel: string;
   sourceUrl: string;
@@ -91,14 +94,16 @@ export const SERVER_EDITORIAL_ANNOTATIONS: Readonly<
     guideLabel: "Read the Exa search and source-check guide",
   },
   "io-github-github-github-mcp-server": {
-    updatedAt: "2026-10-17",
+    updatedAt: "2026-10-29",
+    reviewedAt: "2026-10-29",
+    setupGuideOnly: true,
     title: "Scope repository access before enabling writes",
     sourceLabel: "GitHub MCP server documentation",
     sourceUrl: "https://github.com/github/github-mcp-server",
     decision:
-      "The official hosted endpoint is https://api.githubcopilot.com/mcp. GitHub documents a personal access token in the Authorization header for remote Claude Code. OAuth depends on the client and its registered application. Review repository permissions and organization restrictions, and enable only the toolsets needed, using read-only mode for a lookup workflow.",
+      "The official hosted endpoint is https://api.githubcopilot.com/mcp. GitHub documents a personal access token in the Authorization header for remote Claude Code. OAuth depends on the client and its registered application. Review repository permissions and organization restrictions, and enable only the toolsets needed, using X-MCP-Readonly: true and X-MCP-Toolsets: issues for the guide's issue-lookup workflow.",
     workflow:
-      "Ask for the title, state, and link of one known issue in a named repository, then compare the result with GitHub. If the repository is unavailable, review organization policy and account access before increasing permissions.",
+      "Ask for the title, state, and link of one known issue in a named repository, then compare the result with GitHub. Expect the title, state, and link to match the issue on GitHub. If unavailable, check the owner/repository, issue number, organization policy, and account access before increasing permissions.",
     reviewBoundary:
       "Docs-derived; MCPFind did not authenticate or read a repository. Review the target repository and proposed change before permitting comments, issue edits, or pull-request actions.",
     guideHref: "/blog/github-mcp-server-claude-code-tutorial",
@@ -133,14 +138,16 @@ export const SERVER_EDITORIAL_ANNOTATIONS: Readonly<
     guideLabel: "Read the Stripe access and review guide",
   },
   "com-supabase-mcp": {
-    updatedAt: "2026-10-17",
+    updatedAt: "2026-10-29",
+    reviewedAt: "2026-10-29",
+    setupGuideOnly: true,
     title: "Constrain the project and tool groups first",
     sourceLabel: "Supabase MCP documentation",
     sourceUrl: "https://supabase.com/docs/guides/ai-tools/mcp",
     decision:
       "The hosted route at https://mcp.supabase.com/mcp uses OAuth with dynamic client registration. Scope the connection to one project, enable read-only mode, and select only the feature groups needed. A scoped PAT is the documented alternative for CI; the available tools depend on configuration.",
     workflow:
-      "Use a development project and ask for the table names in one schema, without reading rows or applying SQL changes. Compare the names with the Dashboard. Review a proposed migration and its target separately before authorizing any write.",
+      "Use a development project and ask for the table names in one schema, without reading rows or applying SQL changes. Expect names from that project and schema to match the Dashboard. If access fails, check the OAuth account and project_ref; if the tool is absent, check features and reconnect. Review a proposed migration and its target separately before authorizing any write.",
     reviewBoundary:
       "Docs-derived; MCPFind did not connect to Supabase or execute SQL. Read-only mode still permits data exposure. Follow the separate self-hosting documentation rather than substituting a service-role key into the hosted configuration.",
     guideHref: "/blog/supabase-mcp-server-deep-dive",
@@ -162,14 +169,16 @@ export const SERVER_EDITORIAL_ANNOTATIONS: Readonly<
     guideLabel: "Read the Cloudflare Workers workflow guide",
   },
   "io-elevenlabs-mcp": {
-    updatedAt: "2026-10-17",
+    updatedAt: "2026-10-29",
+    reviewedAt: "2026-10-29",
+    setupGuideOnly: true,
     title: "Choose the hosted connection before a local wrapper",
     sourceLabel: "ElevenLabs plugin documentation",
     sourceUrl: "https://github.com/elevenlabs/plugin",
     decision:
-      "The official plugin documents a hosted MCP server that signs in through OAuth, with no local install or API key for that route. A local API-key wrapper can still be useful when its documented tools are the requirement; it is a separate setup path, not a replacement for the hosted one.",
+      "The official plugin documents a hosted MCP server that signs in through OAuth, with no local server process or API key for that route. The legacy elevenlabs/elevenlabs-mcp repository is archived. Plugin installation and direct hosted client setup are distinct; follow the linked guide for the documented client route.",
     workflow:
-      "For agent management or text-to-speech, connect the hosted endpoint, finish the ElevenLabs OAuth sign-in, then confirm the account and the tool scope before asking the agent to change an agent or generate audio.",
+      "Finish OAuth and inspect the account and tool list. After checking limits and approving a small speech request with an existing permitted voice, expect a short-lived download link and compare the audio with the requested sentence. If the tool is absent, check the client and connection; if denied, check permissions and limits before changing credentials.",
     reviewBoundary:
       "Docs-derived; MCPFind did not run this connection or generate audio. Review account permissions and current service terms before a real operation.",
     guideHref: "/blog/elevenlabs-mcp-server-voice-ai",
@@ -216,14 +225,16 @@ export const SERVER_EDITORIAL_ANNOTATIONS: Readonly<
       "Docs-derived; MCPFind did not authorize an account, submit an image request, or verify pricing. Confirm current model availability and account limits in the provider documentation.",
   },
   "com-monday-monday-com": {
-    updatedAt: "2026-10-17",
+    updatedAt: "2026-10-29",
+    reviewedAt: "2026-10-29",
+    setupGuideOnly: true,
     title: "Use hosted OAuth for the normal board workflow",
     sourceLabel: "monday.com MCP documentation",
     sourceUrl: "https://github.com/mondaycom/mcp",
     decision:
       "monday.com recommends its hosted MCP for a no-install OAuth route with workspace controls. Its local package uses a personal API token and is documented for local customization, offline development, or contribution work.",
     workflow:
-      "Connect the hosted endpoint, approve access only to the workspace required, then ask for the items on one board before asking the agent to create or update anything. Review the proposed board and item before a write action.",
+      "Connect the hosted endpoint, approve access only to the workspace required, then ask for the items on one board before asking the agent to create or update anything. Compare a known item's ID, name, and status with the board UI. If access fails, check account, workspace, and board ID before broadening access. The local package needs --read-only for the lookup route; do not enable dynamic API tools for this check. Review the proposed board and item before a write action.",
     reviewBoundary:
       "Docs-derived; MCPFind did not connect an account or modify a board. Verify the current workspace controls and tool permissions before enabling writes.",
     guideHref: "/blog/monday-mcp-server-ai-agents",
