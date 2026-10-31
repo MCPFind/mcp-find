@@ -16,3 +16,10 @@ servers:
     description: "X and Twitter automation MCP server for tweet search, profile tweets, follower export, media workflows, webhooks, and confirmation-gated posting."
     package_type: "npm"
     category: "communication"
+
+  - name: "Zambo"
+    github_url: "https://github.com/zambodotdev/zambo-mcp"
+    package_name: "zambo"
+    description: "Give your AI hands. One URL. Type a job. Get a receipt. Open-source (MIT) execution layer: 120 native tools across 17 products behind one zero-auth remote MCP endpoint. Free 20 calls/tool/day, no account."
+    package_type: "npm"
+    category: "devtools"
